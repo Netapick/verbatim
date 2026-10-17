@@ -50,6 +50,8 @@ Le dossier `redist/` (moteurs prêts à l'emploi) est embarqué dans l'installat
 
 Whisper en GPU AMD (ROCm) n'a pas de binaire officiel : `build-whisper-rocm.ps1` le compile (≈180 Mo, RDNA3) et le place dans `redist/engine-rocm`, avec le runtime ROCm. Il est choisi automatiquement quand « GPU » est coché et qu'une carte Radeon est détectée.
 
+L'installateur n'affiche aucune question : il installe le pack de base, puis détecte le GPU (`src-tauri/installer/detect-gpu.ps1`) et ajoute le pack ROCm (Radeon RX 7000 / PRO W7000) ou le moteur CUDA de whisper.cpp (NVIDIA, dans `ia/engine-gpu`).
+
 Ordre de recherche d'un moteur : `ia/` (installé par l'utilisateur) puis `redist/` (livré). Pour un installateur léger, construisez `redist` sans `-WithRocm`. Le runtime ROCm livré couvre RDNA3 (gfx110X) ; d'autres cartes AMD utilisent Vulkan.
 Les redistribuables tiers (whisper.cpp, llama.cpp, ROCm) ont leurs propres licences : voir les fichiers LICENSE présents dans `redist/`.
 
