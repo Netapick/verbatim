@@ -93,7 +93,7 @@ Un bouton en bas à gauche bascule entre les deux thèmes ; par défaut, celui d
 ## Installation
 
 1. Téléchargez `Verbatim_0.1.0_x64-setup.exe` depuis la [page des releases](https://github.com/Netapick/verbatim/releases/latest) (installateur léger, environ 3 Mo, en français).
-2. Pendant l'installation, les moteurs (Whisper, llama.cpp) sont téléchargés depuis GitHub : pack de base d'environ 61 Mo ; pack ROCm optionnel d'environ 430 Mo pour les cartes AMD RDNA3.
+2. L'installateur détecte votre carte graphique et installe seul les moteurs : base (≈ 61 Mo), plus ROCm (≈ 430 Mo) pour une Radeon RX 7000, ou CUDA (≈ 685 Mo) pour une carte NVIDIA. Aucune question posée.
 3. Lancez Verbatim, puis téléchargez un modèle de transcription et, si vous le souhaitez, un modèle de rédaction depuis les **Réglages**. Aucun modèle n'est livré avec l'application.
 
 L'installation se fait par utilisateur, sans droits administrateur. Les moteurs et modèles sont rangés dans un dossier `ia` à côté de l'application.

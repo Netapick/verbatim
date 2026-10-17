@@ -4,12 +4,14 @@ param(
     [Parameter(Mandatory)][string]$Url,
     [Parameter(Mandatory)][string]$Dest,
     [string]$Sha = "",
-    [int]$SizeMb = 0
+    [int]$SizeMb = 0,
+    [string]$Log = "",
+    [switch]$Flat
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$LogPath = Join-Path $Dest "redist-install.log"
+$LogPath = if ($Log) { $Log } else { Join-Path $Dest "redist-install.log" }
 function Say($m) { Write-Output $m; try { Add-Content -Path $LogPath -Value ("{0:HH:mm:ss} {1}" -f (Get-Date), $m) -Encoding UTF8 } catch {} }
 $zip = Join-Path $env:TEMP ("verbatim-" + [guid]::NewGuid().ToString("N") + ".zip")
 try {
@@ -38,7 +40,8 @@ try {
     try {
         foreach ($e in $arc.Entries) {
             if (-not $e.Name) { continue }
-            $target = [IO.Path]::GetFullPath((Join-Path $root ($e.FullName -replace '/', '\')))
+            $rel = if ($Flat) { $e.Name } else { $e.FullName -replace '/', '\' }
+            $target = [IO.Path]::GetFullPath((Join-Path $root $rel))
             if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw "Archive invalide." }
             [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target)) | Out-Null
             [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $target, $true)
