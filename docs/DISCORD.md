@@ -33,6 +33,8 @@ https://raw.githubusercontent.com/Netapick/verbatim/main/docs/screenshots/04-pre
 https://raw.githubusercontent.com/Netapick/verbatim/main/docs/screenshots/08-reglages-redaction.png
 **Mode sombre**
 https://raw.githubusercontent.com/Netapick/verbatim/main/docs/screenshots/09-mode-sombre.png
+**Mise à jour automatique**
+https://raw.githubusercontent.com/Netapick/verbatim/main/docs/screenshots/11-mise-a-jour-banniere.png
 
 === MESSAGE 4 ===
 ## 🛠️ Installation

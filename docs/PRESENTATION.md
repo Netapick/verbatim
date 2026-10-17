@@ -90,6 +90,20 @@ Un bouton en bas à gauche bascule entre les deux thèmes ; par défaut, celui d
 
 ---
 
+## Mises à jour automatiques
+
+Au démarrage, Verbatim cherche la dernière version publiée sur GitHub. S'il en trouve une, il vérifie l'empreinte SHA-256 de l'installateur, l'installe en silence puis se relance, en quelques secondes. Vos réunions, réglages et modèles sont conservés.
+
+L'installation ne se lance **jamais** pendant un enregistrement, une transcription ou une rédaction : une bannière propose alors la mise à jour, à faire quand vous voulez.
+
+![Bannière de mise à jour](screenshots/11-mise-a-jour-banniere.png)
+
+La mise à jour se règle dans **Réglages › Connexions** : vous pouvez désactiver l'installation automatique ou lancer une recherche à la demande.
+
+![Réglages des mises à jour](screenshots/12-mise-a-jour-reglages.png)
+
+---
+
 ## Installation
 
 1. Téléchargez `Verbatim_0.2.1_x64-setup.exe` depuis la [page des releases](https://github.com/Netapick/verbatim/releases/latest) (installateur léger, environ 3 Mo, en français).
