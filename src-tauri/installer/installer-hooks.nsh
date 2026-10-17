@@ -51,13 +51,7 @@
 !macro NSIS_HOOK_POSTINSTALL
   !insertmacro VB_LOG "[hook] POSTINSTALL"
   ${IfNot} ${FileExists} "$INSTDIR\redist\engine\*.*"
-    ${If} ${Silent}
-      !insertmacro VB_FETCH "Moteurs de transcription et d'IA" "${PACK_CORE_FILE}" "${PACK_CORE_SHA}" "${PACK_CORE_MB}"
-    ${Else}
-      MessageBox MB_YESNO|MB_ICONQUESTION "Verbatim a besoin de ses moteurs de transcription (Whisper) et d'intelligence artificielle (llama.cpp).$\r$\n$\r$\nTéléchargement : environ ${PACK_CORE_MB} Mo.$\r$\n$\r$\nLes installer maintenant ?" IDNO vb_skip_core
-      !insertmacro VB_FETCH "Moteurs de transcription et d'IA" "${PACK_CORE_FILE}" "${PACK_CORE_SHA}" "${PACK_CORE_MB}"
-      vb_skip_core:
-    ${EndIf}
+    !insertmacro VB_FETCH "Moteurs de transcription et d'IA" "${PACK_CORE_FILE}" "${PACK_CORE_SHA}" "${PACK_CORE_MB}"
   ${EndIf}
   ; Accélération GPU : détectée puis installée directement, sans question.
   InitPluginsDir
