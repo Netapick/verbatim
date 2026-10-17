@@ -11,6 +11,7 @@ mod llm;
 use llm::{generate_report, llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
 mod models;
 mod recorder;
+mod update;
 use recorder::{rec_devices, rec_pause, rec_set_gain, rec_start, rec_status};
 use engine::{engine_install, engine_install_gpu, engine_remove, engine_status, retry_transcription, spawn_transcription};
 
@@ -129,7 +130,11 @@ pub struct Settings {
     /// dossier (site-packages) contenant le runtime ROCm ; vide = détection automatique
     #[serde(default)]
     pub rocm_root: String,
+    /// installe seule les nouvelles versions publiées sur GitHub
+    #[serde(default = "default_true")]
+    pub auto_update: bool,
 }
+fn default_true() -> bool { true }
 fn default_whisper_device() -> String { "auto".into() }
 fn default_device() -> String { "auto".into() }
 
@@ -137,7 +142,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings { llm_base_url: String::new(), llm_api_key: String::new(), llm_model: String::new(),
                    llm_local: String::new(), whisper_model: default_model(), whisper_lang: default_lang(), whisper_device: default_whisper_device(),
-                   llm_device: default_device(), rocm_root: String::new() }
+                   llm_device: default_device(), rocm_root: String::new(), auto_update: true }
     }
 }
 
@@ -626,7 +631,8 @@ fn main() {
             list_briefs, list_kinds, set_kinds, create_brief, update_brief, purge_brief,
             get_glossary, set_glossary, get_settings, set_settings,
             engine_status, engine_install, engine_install_gpu, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, retry_transcription,
-            rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain
+            rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
+            update::update_check, update::update_install
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de Verbatim");

@@ -549,6 +549,10 @@ async function settings() {
       <div class="card"><h3>Ollama</h3>
         <p class="meta" style="margin-bottom:10px">Si Ollama est installé, Verbatim peut l'utiliser pour rédiger avec n'importe lequel de vos modèles.</p>
         <div id="ollama"></div></div>
+      <div class="card"><h3>Mises à jour</h3>
+        <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. L'installation ne se lance jamais pendant un enregistrement, une transcription ou une rédaction.</p>
+        <label class="chk"><input type="checkbox" id="au" ${s.auto_update !== false ? "checked" : ""}> Installer automatiquement les nouvelles versions</label>
+        <div class="bar" style="margin:12px 0 0"><button class="btn" id="au-chk">Rechercher maintenant</button><span class="meta" id="au-msg"></span></div></div>
       <div class="card"><h3>API distante (facultatif)</h3><p class="meta" style="margin-bottom:8px">Utilisée si aucun modèle local n'est sélectionné.</p>
         <label style="margin-top:0">URL de l'API</label><input id="u" placeholder="https://api.exemple.com/v1" value="${esc(s.llm_base_url)}">
         <label>Clé d'API</label><input id="k" type="password" value="${esc(s.llm_api_key)}"><label>Modèle</label><input id="m" placeholder="gpt-4o-mini" value="${esc(s.llm_model)}">
@@ -561,7 +565,7 @@ async function settings() {
     document.querySelectorAll(".pane").forEach((x) => { x.hidden = x.dataset.pane !== setTab; });
   };
   let curModel = s.whisper_model, curLlm = s.llm_local || "", curWdev = s.whisper_device || "auto", curDev = !s.llm_device || s.llm_device === "cpu" ? "auto" : s.llm_device, curRocm = s.rocm_root || "";
-  const saveAll = async () => invoke("set_settings", { settings: { llm_base_url: $("#u").value.trim(), llm_api_key: $("#k").value, llm_model: $("#m").value.trim(), whisper_model: curModel, whisper_lang: $("#wl").value, llm_local: curLlm, whisper_device: curWdev, llm_device: curDev, rocm_root: curRocm } });
+  const saveAll = async () => invoke("set_settings", { settings: { llm_base_url: $("#u").value.trim(), llm_api_key: $("#k").value, llm_model: $("#m").value.trim(), whisper_model: curModel, whisper_lang: $("#wl").value, llm_local: curLlm, whisper_device: curWdev, llm_device: curDev, rocm_root: curRocm, auto_update: $("#au").checked } });
   const renderModels = async () => {
     const st = await invoke("engine_status"), d = st.download;
     $("#models").innerHTML = st.models.map((m) => {
@@ -701,11 +705,45 @@ async function settings() {
   $("#f-rescan").onclick = () => { foundExtra = null; renderFound(); };
   engineHook = () => view === "settings" && renderModels();
   $("#wl").onchange = () => run(saveAll);
+  $("#au").onchange = () => run(saveAll);
+  $("#au-chk").onclick = () => run(async () => {
+    const msg = $("#au-msg"); msg.textContent = "Recherche…";
+    const u = await invoke("update_check");
+    if (!u.available) { msg.textContent = "Vous avez la dernière version (v" + u.current + ")."; return; }
+    msg.textContent = "Version " + u.latest + " disponible.";
+    updateBanner(u);
+  });
   renderModels(); renderOllama(); renderGguf(); renderFound();
   $("#save").onclick = () => run(async () => { await saveAll(); toast("Réglages enregistrés"); });
 }
 
 try { window.__TAURI__.app.getVersion().then((v) => { $("#ver").textContent = "Verbatim v" + v; }); } catch (_) {}
+
+// ── Mise à jour (dernière release GitHub) ───────────────────────────────
+async function updateInstall(u) {
+  const b = $("#upd"); if (b) b.remove();
+  toast("Installation de la version " + u.latest + " : l'application va redémarrer…");
+  try { await invoke("update_install", { url: u.url, sha: u.sha }); }
+  catch (e) { toast(String(e)); updateBanner(u); }
+}
+function updateBanner(u) {
+  let b = $("#upd");
+  if (!b) { b = document.createElement("div"); b.id = "upd"; document.body.appendChild(b); }
+  b.innerHTML = `<span><b>Version ${esc(u.latest)} disponible</b></span><button class="btn pri sm" id="upd-go">Mettre à jour</button><button class="btn sm" id="upd-x">Plus tard</button>`;
+  $("#upd-go").onclick = () => updateInstall(u);
+  $("#upd-x").onclick = () => b.remove();
+}
+async function updateStartup() {
+  try {
+    const u = await invoke("update_check"); if (!u.available) return;
+    const [cfg, rec, ms] = await Promise.all([invoke("get_settings"), invoke("rec_status"), invoke("list_meetings", { trashed: false })]);
+    // jamais pendant un enregistrement, une transcription ou une rédaction : on propose seulement
+    const busy = rec.recording || ms.some((m) => !["ready", "error", "needs_engine"].includes(m.stage) || m.report_state === "generating");
+    if (cfg.auto_update !== false && !busy) return updateInstall(u);
+    updateBanner(u);
+  } catch (_) {}
+}
+setTimeout(updateStartup, 3000);
 go("meetings");
 $("#theme").onclick = () => {
   const t = themeNow() === "dark" ? "light" : "dark";

@@ -55,6 +55,9 @@ L'installateur n'affiche aucune question : il installe le pack de base, puis dé
 Ordre de recherche d'un moteur : `ia/` (installé par l'utilisateur) puis `redist/` (livré). Pour un installateur léger, construisez `redist` sans `-WithRocm`. Le runtime ROCm livré couvre RDNA3 (gfx110X) ; d'autres cartes AMD utilisent Vulkan.
 Les redistribuables tiers (whisper.cpp, llama.cpp, ROCm) ont leurs propres licences : voir les fichiers LICENSE présents dans `redist/`.
 
+## Mises à jour
+Au démarrage, l'app interroge `releases/latest` du dépôt GitHub, télécharge l'installateur (`*_x64-setup.exe`), vérifie son SHA-256 (champ `digest` de l'API), l'exécute en silence dans le même dossier puis se relance (`src-tauri/src/update.rs`). Jamais pendant un enregistrement, une transcription ou une rédaction. Réglages › Connexions permet de désactiver l'installation automatique. Pour publier une version : monter le numéro dans `package.json`, `tauri.conf.json`, `Cargo.toml`, `npx tauri build`, puis `gh release create vX.Y.Z <exe>` (la release doit être la plus récente).
+
 ## Identité visuelle
 Logo : `python scripts/make-logo.py` (tuile d'application dessinée en raster : dégradés, lueur, reflet ; versions simplifiées en 16/24/32 px) ; exporte `src-tauri/icons/*` (ico + png) et `ui/logo.png`, `ui/favicon.ico`, `ui/favicon.png`.
 

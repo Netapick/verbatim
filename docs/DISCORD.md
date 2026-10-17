@@ -36,8 +36,10 @@ https://raw.githubusercontent.com/Netapick/verbatim/main/docs/screenshots/09-mod
 
 === MESSAGE 4 ===
 ## 🛠️ Installation
-**1.** Téléchargez `Verbatim_0.1.0_x64-setup.exe` (≈ 3 Mo, en français, sans droits administrateur)
+**1.** Téléchargez `Verbatim_0.2.0_x64-setup.exe` (≈ 3 Mo, en français, sans droits administrateur)
 **2.** L'installateur détecte votre carte graphique et installe seul les accélérations : ROCm (≈ 430 Mo) pour une Radeon RX 7000, CUDA (≈ 685 Mo) pour NVIDIA, en plus du pack de base (≈ 61 Mo)
 **3.** Dans **Réglages**, choisissez un modèle de transcription et, si vous voulez, un modèle de rédaction (aucun n'est livré)
+
+**4.** Mises à jour automatiques depuis GitHub (désactivables dans Réglages › Connexions)
 
 *Windows x64 · pas de diarisation pour l'instant · captures avec réunions fictives*

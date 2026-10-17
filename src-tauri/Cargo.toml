@@ -1,6 +1,6 @@
 [package]
 name = "verbatim"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [build-dependencies]
@@ -17,6 +17,7 @@ ureq = { version = "2", features = ["json"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 symphonia = { version = "0.5", features = ["all"] }
 cpal = "0.18.2"
+sha2 = "0.10"
 
 [profile.release]
 opt-level = 3        # décodage audio (symphonia) nettement plus rapide qu'en "s"
