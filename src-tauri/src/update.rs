@@ -82,18 +82,26 @@ pub fn update_install(app: tauri::AppHandle, url: String, sha: String) -> R<()> 
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let inst_dir = exe.parent().ok_or("Dossier d'installation introuvable.")?.to_path_buf();
     // Script détaché : attend la fermeture de l'app, installe en silence dans le même dossier, relance.
+    let log = dir.join("update.log");
     let script = format!(
-        "Start-Sleep -Seconds 2; Start-Process -FilePath '{}' -ArgumentList '/S /D={}' -Wait; Start-Process -FilePath '{}'",
-        q(&setup.to_string_lossy()), q(&inst_dir.to_string_lossy()), q(&exe.to_string_lossy())
+        "try {{ 'demarre' | Out-File '{log}'; Start-Sleep -Seconds 2; Start-Process -FilePath '{setup}' -ArgumentList '/S /D={inst}' -Wait; Start-Process -FilePath '{exe}'; 'ok' | Out-File '{log}' }} catch {{ $_ | Out-File '{log}' }}",
+        setup = q(&setup.to_string_lossy()), inst = q(&inst_dir.to_string_lossy()), exe = q(&exe.to_string_lossy()), log = q(&log.to_string_lossy())
     );
-    let mut c = std::process::Command::new("powershell");
-    c.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", &script]);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        c.creation_flags(0x0800_0000 | 0x0000_0008); // CREATE_NO_WINDOW | DETACHED_PROCESS
-    }
-    c.spawn().map_err(|e| format!("Lancement de l'installateur impossible : {e}"))?;
+    let spawn = |flags: u32| {
+        let mut c = std::process::Command::new("powershell");
+        c.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", &script]);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            c.creation_flags(flags);
+        }
+        let _ = flags;
+        c.spawn()
+    };
+    // CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB : le script survit à la fermeture de l'app ; repli sans « breakaway » si le job l'interdit
+    spawn(0x0800_0000 | 0x0100_0000)
+        .or_else(|_| spawn(0x0800_0000))
+        .map_err(|e| format!("Lancement de l'installateur impossible : {e}"))?;
     app.exit(0);
     Ok(())
 }
