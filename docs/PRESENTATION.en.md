@@ -10,7 +10,7 @@ Verbatim is a Windows desktop application. It records or imports your meetings, 
 
 ![Meeting list](screenshots/01-reunions.png)
 
-> The screenshots in this document use fictional meetings. The application interface is in French.
+> The screenshots in this document use fictional meetings and show the French interface; the application is also available in English.
 
 ---
 
@@ -108,7 +108,7 @@ Updates are configured in **Settings › Connections**: you can turn off automat
 
 ## Installation
 
-1. Download `Verbatim_0.2.1_x64-setup.exe` from the [releases page](https://github.com/Netapick/verbatim/releases/latest) (lightweight installer, about 3 MB, in French).
+1. Download `Verbatim_0.2.1_x64-setup.exe` from the [releases page](https://github.com/Netapick/verbatim/releases/latest) (lightweight installer, about 3 MB, in French or English).
 2. The installer downloads the base engines by itself, without asking anything (≈ 61 MB: Whisper and llama.cpp, with Vulkan). It also detects your graphics card and adds the matching acceleration: ROCm (≈ 430 MB) for a Radeon RX 7000, CUDA (≈ 685 MB) for an NVIDIA card. Without a compatible card, Verbatim uses the processor.
 3. Launch Verbatim, then download a transcription model and, if you wish, a writing model from the **Settings**. No model is shipped with the application.
 
@@ -127,7 +127,7 @@ There is no need to run Verbatim as administrator: it does not change the antivi
 
 ## In short
 
-- Windows x64 · French interface
+- Windows x64 · French and English interface (chosen at installation, can be changed in Settings)
 - Whisper (whisper.cpp) for transcription, Qwen (llama.cpp) for writing
 - No speaker separation for now: a single "Intervenant" (speaker)
 - Third-party components under their respective licenses (whisper.cpp, llama.cpp, ROCm): see `THIRD-PARTY-LICENSES.md` in the release

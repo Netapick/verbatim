@@ -10,7 +10,7 @@
 
 Desktop application (Tauri 2 + Rust) to organize your meetings: audio import or
 transcript import, report, preparations (briefs), glossary, trash.
-Original visual identity, name, icon and interface. The interface is in French.
+Original visual identity, name, icon and interface. The interface is available in French and English: the installer asks for the language, which can be changed in Settings › Connections (`ui/i18n.js`: a French → English dictionary applied at display time; the app's texts are still written in French in the code).
 
 Data: a `store.json` file + the copied audio files, in the app's data folder.
 Optional LLM (Settings): OpenAI-compatible API for reports and briefs.
@@ -27,7 +27,7 @@ Generated from the transcript, in order of priority: local AI (llama.cpp + Qwen 
 
 ### Writing AI computation (CPU / GPU)
 Settings › Report: CPU, Vulkan GPU (AMD/NVIDIA/Intel, 32 MB engine, no installation) or ROCm GPU (AMD). Each engine is downloaded into `ia/llm`, `ia/llm-vulkan`, `ia/llm-rocm`.
-ROCm reuses the runtime of an AMD ComfyUI (the venv's `rocm_sdk` wheels), detected automatically on the drives or chosen by hand. Automatic fallback ROCm → Vulkan → CPU.
+ROCm uses the AMD runtime shipped with the installer (`redist/rocm-runtime`), or another runtime (a folder of HIP DLLs, or a `rocm_sdk` venv) chosen by hand in Settings. Automatic fallback ROCm → Vulkan → CPU.
 Measurement (RX 7800 XT, Qwen 3.5 4B Q4): CPU 94 / 11 tok/s (read / write), Vulkan 2566 / 127, ROCm 3673 / 117.
 
 ## Listening
@@ -47,7 +47,7 @@ Engines (whisper.cpp, llama.cpp) and models are stored in the `ia` folder next t
 If models already exist (an older Verbatim folder, models downloaded by Ollama, or any other folder/`.gguf` / `ggml-*.bin` file you choose), Settings › "Existing models" detects them and **copies** them into `ia`. A copied GGUF is used directly with Verbatim's engine, without Ollama.
 
 ## Distributing the application
-The `redist/` folder (ready-to-use engines) is bundled in the installer and used in place: no engine download at first launch, and no more dependency on ComfyUI or an installed SDK. Models (transcription, writing) still have to be installed from Settings.
+The `redist/` folder (ready-to-use engines) is bundled in the installer and used in place: no engine download at first launch, and no dependency on an installed SDK. Models (transcription, writing) still have to be installed from Settings.
 
     ./scripts/build-redist.ps1              # whisper.cpp + VAD + llama.cpp CPU and Vulkan (~170 MB)
     ./scripts/build-redist.ps1 -WithRocm    # + AMD RDNA3 ROCm: llama.cpp ROCm and minimal runtime (~1.5 GB more)

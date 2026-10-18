@@ -108,7 +108,7 @@ La mise à jour se règle dans **Réglages › Connexions** : vous pouvez désac
 
 ## Installation
 
-1. Téléchargez `Verbatim_0.2.1_x64-setup.exe` depuis la [page des releases](https://github.com/Netapick/verbatim/releases/latest) (installateur léger, environ 3 Mo, en français).
+1. Téléchargez `Verbatim_0.2.1_x64-setup.exe` depuis la [page des releases](https://github.com/Netapick/verbatim/releases/latest) (installateur léger, environ 3 Mo, en français ou en anglais).
 2. L'installateur télécharge seul, sans rien demander, les moteurs de base (≈ 61 Mo : Whisper et llama.cpp, avec Vulkan). Il détecte aussi votre carte graphique et y ajoute l'accélération adaptée : ROCm (≈ 430 Mo) pour une Radeon RX 7000, CUDA (≈ 685 Mo) pour une carte NVIDIA. Sans carte compatible, Verbatim utilise le processeur.
 3. Lancez Verbatim, puis téléchargez un modèle de transcription et, si vous le souhaitez, un modèle de rédaction depuis les **Réglages**. Aucun modèle n'est livré avec l'application.
 
@@ -127,7 +127,7 @@ Inutile de lancer Verbatim en administrateur : cela ne change rien à l'analyse 
 
 ## En bref
 
-- Windows x64 · interface en français
+- Windows x64 · interface en français et en anglais (choix à l'installation, modifiable dans les Réglages)
 - Whisper (whisper.cpp) pour la transcription, Qwen (llama.cpp) pour la rédaction
 - Pas de diarisation pour l'instant : un seul « Intervenant »
 - Composants tiers sous leurs licences respectives (whisper.cpp, llama.cpp, ROCm) : voir `THIRD-PARTY-LICENSES.md` dans la release

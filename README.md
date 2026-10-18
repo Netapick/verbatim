@@ -10,7 +10,7 @@ Français · [English](README.en.md)
 
 Application de bureau (Tauri 2 + Rust) pour organiser ses réunions : import audio ou
 transcription, compte-rendu, préparations (briefs), glossaire, corbeille.
-Identité visuelle, nom, icône et interface originaux.
+Identité visuelle, nom, icône et interface originaux. Interface en français et en anglais : l'installateur propose la langue, modifiable dans Réglages › Connexions (`ui/i18n.js` : dictionnaire français → anglais appliqué à l'affichage ; les textes de l'app restent écrits en français dans le code).
 
 Données : un fichier `store.json` + les audios copiés, dans le dossier de données de l'app.
 LLM optionnel (Réglages) : API compatible OpenAI pour compte-rendu et briefs.
@@ -27,7 +27,7 @@ Généré à partir de la transcription, par ordre de priorité : IA locale (lla
 
 ### Calcul de l'IA de rédaction (CPU / GPU)
 Réglages › Compte-rendu : CPU, GPU Vulkan (AMD/NVIDIA/Intel, moteur de 32 Mo, aucune installation) ou GPU ROCm (AMD). Chaque moteur est téléchargé dans `ia/llm`, `ia/llm-vulkan`, `ia/llm-rocm`.
-ROCm réutilise le runtime d'un ComfyUI AMD (wheels `rocm_sdk` du venv), détecté automatiquement sur les lecteurs ou à désigner à la main. Repli automatique ROCm → Vulkan → CPU.
+ROCm utilise le runtime AMD livré avec l'installateur (`redist/rocm-runtime`), ou un autre runtime (dossier de DLL HIP, ou venv `rocm_sdk`) à désigner à la main dans les Réglages. Repli automatique ROCm → Vulkan → CPU.
 Mesure (RX 7800 XT, Qwen 3.5 4B Q4) : CPU 94 / 11 tok/s (lecture / écriture), Vulkan 2566 / 127, ROCm 3673 / 117.
 
 ## Écoute
@@ -47,7 +47,7 @@ Moteurs (whisper.cpp, llama.cpp) et modèles sont rangés dans le dossier `ia` �
 Si des modèles existent déjà (ancien dossier de Verbatim, modèles téléchargés par Ollama, ou tout autre dossier/fichier `.gguf` / `ggml-*.bin` à choisir), Réglages › « Modèles existants » les détecte et les **copie** dans `ia`. Un GGUF copié s'utilise directement avec le moteur de Verbatim, sans Ollama.
 
 ## Distribuer l'application
-Le dossier `redist/` (moteurs prêts à l'emploi) est embarqué dans l'installateur et utilisé en place : aucun téléchargement de moteur au premier lancement, et plus aucune dépendance à ComfyUI ou à un SDK installé. Les modèles (transcription, rédaction) restent à installer depuis les Réglages.
+Le dossier `redist/` (moteurs prêts à l'emploi) est embarqué dans l'installateur et utilisé en place : aucun téléchargement de moteur au premier lancement, et aucune dépendance à un SDK installé. Les modèles (transcription, rédaction) restent à installer depuis les Réglages.
 
     ./scripts/build-redist.ps1              # whisper.cpp + VAD + llama.cpp CPU et Vulkan (~170 Mo)
     ./scripts/build-redist.ps1 -WithRocm    # + ROCm AMD RDNA3 : llama.cpp ROCm et runtime minimal (~1,5 Go de plus)

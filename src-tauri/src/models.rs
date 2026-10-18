@@ -126,6 +126,17 @@ pub fn models_dir_info(st: State<AppState>) -> Value {
     json!({ "path": st.mdir.to_string_lossy() })
 }
 
+/// Langue choisie dans l'installateur (« fr » ou « en », écrite dans `lang.txt` à côté de l'exe), ou vide.
+#[tauri::command]
+pub fn install_lang() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|e| std::fs::read_to_string(e.with_file_name("lang.txt")).ok())
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| s == "fr" || s == "en")
+        .unwrap_or_default()
+}
+
 #[tauri::command(async)]
 pub fn models_scan(st: State<AppState>, extra: Option<String>) -> Vec<Value> {
     scan(&st, extra.as_deref())

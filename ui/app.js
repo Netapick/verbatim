@@ -44,7 +44,7 @@ function askText(msg, value = "") {
     document.body.appendChild(o); inp.focus(); inp.select();
   });
 }
-const fmtDate = (d) => new Date(d).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+const fmtDate = (d) => new Date(d).toLocaleString(I18N.locale(), { dateStyle: "medium", timeStyle: "short" });
 const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const { listen } = window.__TAURI__.event;
 const fmtSize = (n) => n >= 1073741824 ? (n / 1073741824).toFixed(2) + " Go" : (n / 1048576).toFixed(0) + " Mo";
@@ -481,7 +481,7 @@ async function brief(id) {
   });
   $("#copy").onclick = () => run(async () => {
     const x = collect(), nl = String.fromCharCode(10);
-    const md = [`# ${b.subject}`, "", "## Objectif", x.objective, "", "## Ordre du jour", ...x.agenda.map((a, i) => `${i + 1}. ${a.title}${a.minutes ? " (" + a.minutes + " min)" : ""}`), "", "## Questions", ...x.questions.map((q) => `- ${q}`), ""].join(nl);
+    const L = I18N.t, md = [`# ${b.subject}`, "", "## " + L("Objectif"), x.objective, "", "## " + L("Ordre du jour"), ...x.agenda.map((a, i) => `${i + 1}. ${a.title}${a.minutes ? " (" + a.minutes + " min)" : ""}`), "", "## " + L("Questions"), ...x.questions.map((q) => `- ${q}`), ""].join(nl);
     await navigator.clipboard.writeText(md); toast("Copié dans le presse-papiers");
   });
   $("#del").onclick = () => run(async () => { if (!(await ask("Placer cette préparation dans la corbeille ?", "Mettre à la corbeille"))) return; await invoke("update_brief", { id, trashed: true }); go("briefs"); });
@@ -570,6 +570,8 @@ async function settings() {
       <div class="card"><h3>Ollama</h3>
         <p class="meta" style="margin-bottom:10px">Si Ollama est installé, Verbatim peut l'utiliser pour rédiger avec n'importe lequel de vos modèles.</p>
         <div id="ollama"></div></div>
+      <div class="card"><h3>Langue de l'interface</h3>
+        <select id="ui-lang" style="max-width:260px"><option value="auto" ${I18N.pref === "auto" ? "selected" : ""}>Automatique</option><option value="fr" data-nt ${I18N.pref === "fr" ? "selected" : ""}>Français</option><option value="en" data-nt ${I18N.pref === "en" ? "selected" : ""}>English</option></select></div>
       <div class="card"><h3>Mises à jour</h3>
         <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. L'installation ne se lance jamais pendant un enregistrement, une transcription ou une rédaction.</p>
         <label class="chk"><input type="checkbox" id="au" ${s.auto_update !== false ? "checked" : ""}> Installer automatiquement les nouvelles versions</label>
@@ -740,6 +742,7 @@ async function settings() {
   engineHook = () => view === "settings" && renderModels();
   $("#wl").onchange = () => run(saveAll);
   $("#au").onchange = () => run(saveAll);
+  $("#ui-lang").onchange = (e) => { I18N.set(e.target.value); };
   $("#au-chk").onclick = () => run(async () => {
     const msg = $("#au-msg"); msg.textContent = "Recherche…";
     const u = await invoke("update_check");
@@ -778,6 +781,7 @@ async function updateStartup() {
   } catch (_) {}
 }
 setTimeout(updateStartup, 3000);
+invoke("install_lang").then((v) => I18N.setInstall(v)).catch(() => {});
 go("meetings");
 $("#theme").onclick = () => {
   const t = themeNow() === "dark" ? "light" : "dark";
