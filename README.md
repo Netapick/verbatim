@@ -68,6 +68,30 @@ L'audio, les transcriptions et les comptes-rendus sont traités **uniquement sur
 - Pas de séparation des intervenants pour l'instant : un seul « Intervenant ».
 - Les comptes-rendus sont rédigés dans la langue de la réunion (les consignes données à l'IA sont en français).
 
+## Ajouts prévus
+
+Pistes de travail, sans engagement de date ni d'ordre :
+
+- **Plus de langues d'interface** : l'interface existe en français et en anglais ; espagnol, allemand et italien sont envisagés. Comptes-rendus rédigés dans la langue choisie, indépendamment de celle de la réunion.
+- **Portage Android** (à l'étude) : enregistrement et consultation sur téléphone. La faisabilité dépend de l'exécution locale de Whisper et d'un petit modèle de rédaction sur mobile.
+- **Séparation des intervenants** (diarisation) : attribuer chaque passage à son locuteur au lieu d'un seul « Intervenant ».
+- **Whisper en Vulkan** : accélérer la transcription sur les cartes AMD d'avant la série RX 7000 et sur Intel, avec un moteur plus léger que CUDA.
+- **Recherche dans toutes les réunions** : retrouver un mot, une décision ou une action à travers l'historique.
+- **Modèles de comptes-rendus personnalisables** : choisir la structure (par exemple un compte-rendu de comité, de point projet ou d'entretien) et le ton.
+- **Transcription en direct** pendant la réunion, et traduction de la transcription.
+- **Import de vidéos** (extraction de l'audio) et traitement par lots.
+- **Poser des questions à une réunion** : interroger la transcription (« qu'a-t-on décidé sur le budget ? ») avec renvoi vers le passage concerné.
+- **Correction de la transcription** directement dans l'application, avec réécoute du passage.
+- **Enregistrement plus pratique** : raccourci clavier global, icône dans la zone de notification, démarrage proposé à l'ouverture d'une visioconférence.
+- **Amélioration audio** avant transcription (réduction du bruit, volume) pour les enregistrements difficiles.
+- **Sauvegarde et restauration** : exporter et réimporter toutes les réunions, par exemple pour changer d'ordinateur.
+- **Catalogue de modèles de rédaction élargi** : d'autres familles de modèles (Llama, Mistral, Gemma) à côté de Qwen.
+- **Mode ligne de commande** pour automatiser la transcription et la rédaction.
+- **Autres plateformes** : macOS et Linux.
+- **Signature de code** de l'installateur (demande SignPath en cours) pour supprimer les avertissements de Windows.
+
+Une idée ou un besoin ? Ouvrez une [issue](https://github.com/Netapick/verbatim/issues).
+
 ## Documentation
 
 - [Présentation illustrée](docs/PRESENTATION.md) : le tour de l'application, avec captures d'écran.

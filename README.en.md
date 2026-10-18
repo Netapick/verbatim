@@ -68,6 +68,30 @@ Audio, transcripts and reports are processed **only on your computer**. The only
 - No speaker separation for now: a single "Intervenant" (speaker).
 - Reports are written in the meeting's language (the instructions given to the AI are in French).
 
+## Planned additions
+
+Ideas under consideration, with no commitment on dates or order:
+
+- **More interface languages**: the interface exists in French and English; Spanish, German and Italian are being considered. Reports written in a chosen language, independently of the meeting's language.
+- **Android port** (under evaluation): record and browse on a phone. Feasibility depends on running Whisper and a small writing model locally on mobile.
+- **Speaker separation** (diarization): attribute each passage to its speaker instead of a single "Intervenant".
+- **Whisper on Vulkan**: speed up transcription on AMD cards older than the RX 7000 series and on Intel, with an engine lighter than CUDA.
+- **Search across all meetings**: find a word, a decision or an action through the history.
+- **Customizable report templates**: choose the structure (for example a committee, project update or interview report) and the tone.
+- **Live transcription** during the meeting, and transcript translation.
+- **Video import** (audio extraction) and batch processing.
+- **Ask questions to a meeting**: query the transcript ("what did we decide about the budget?") with a link back to the relevant passage.
+- **Transcript correction** directly in the application, with replay of the passage.
+- **More convenient recording**: global keyboard shortcut, notification-area icon, recording offered when a video call opens.
+- **Audio enhancement** before transcription (noise reduction, volume) for difficult recordings.
+- **Backup and restore**: export and re-import all meetings, for example to move to another computer.
+- **Wider catalog of writing models**: other model families (Llama, Mistral, Gemma) alongside Qwen.
+- **Command-line mode** to automate transcription and report writing.
+- **Other platforms**: macOS and Linux.
+- **Code signing** of the installer (SignPath application in progress) to remove Windows warnings.
+
+Have an idea or a need? Open an [issue](https://github.com/Netapick/verbatim/issues).
+
 ## Documentation
 
 - [Illustrated presentation](docs/PRESENTATION.en.md): a tour of the application, with screenshots.
