@@ -20,7 +20,7 @@ Verbatim is a Windows desktop application. It records or imports your meetings, 
 |---|---|
 | **100% local** | Whisper (transcription) and Qwen via llama.cpp (writing) run on your PC. No account, no subscription, no data sent. |
 | **From audio to report** | Recording or audio import, timestamped transcription, then summary, topics, decisions, actions and next steps. |
-| **Accelerated by your graphics card** | AMD GPU (ROCm, Vulkan) or NVIDIA (CUDA, Vulkan), with automatic fallback to the processor. |
+| **Accelerated by your graphics card** | AMD GPU (ROCm, Vulkan) or NVIDIA (CUDA, Vulkan), with automatic fallback to the processor. Whisper has no official Windows binary for AMD: Verbatim ships a ROCm build compiled for Radeon RX 7000 cards. |
 | **Built for meetings** | Preparations (agenda, questions), glossary of business acronyms, audio player synchronized with the transcript. |
 
 ---

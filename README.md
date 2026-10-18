@@ -2,7 +2,9 @@
 
 Français · [English](README.en.md)
 
-[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4)
+[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
+
+**Whisper sur GPU AMD :** whisper.cpp n'a pas de binaire officiel pour les cartes AMD sous Windows. Verbatim le compile en ROCm (HIP, Radeon RX 7000) et l'embarque, ce qui rend possible la transcription accélérée sur AMD, en plus de NVIDIA (CUDA).
 
 > Présentation illustrée : [docs/PRESENTATION.md](docs/PRESENTATION.md) · [Télécharger](https://github.com/Netapick/verbatim/releases/latest)
 

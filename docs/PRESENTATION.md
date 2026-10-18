@@ -20,7 +20,7 @@ Verbatim est une application de bureau Windows. Elle enregistre ou importe vos r
 |---|---|
 | **100 % local** | Whisper (transcription) et Qwen via llama.cpp (rédaction) s'exécutent sur votre PC. Aucun compte, aucun abonnement, aucun envoi de données. |
 | **Du son au compte-rendu** | Enregistrement ou import audio, transcription minutée, puis résumé, points abordés, décisions, actions et prochaines étapes. |
-| **Accéléré par votre carte graphique** | GPU AMD (ROCm, Vulkan) ou NVIDIA (CUDA, Vulkan), avec repli automatique sur le processeur. |
+| **Accéléré par votre carte graphique** | GPU AMD (ROCm, Vulkan) ou NVIDIA (CUDA, Vulkan), avec repli automatique sur le processeur. Whisper n'a pas de binaire officiel pour AMD sous Windows : Verbatim embarque un build ROCm compilé pour les Radeon RX 7000. |
 | **Pensé pour les réunions** | Préparations (ordre du jour, questions), glossaire de sigles métier, lecteur audio synchronisé avec la transcription. |
 
 ---
