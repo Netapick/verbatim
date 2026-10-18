@@ -108,7 +108,7 @@ Updates are configured in **Settings › Connections**: you can turn off automat
 
 ## Installation
 
-1. Download `Verbatim_0.2.1_x64-setup.exe` from the [releases page](https://github.com/Netapick/verbatim/releases/latest) (lightweight installer, about 3 MB, in French or English).
+1. Download `Verbatim_X.Y.Z_x64-setup.exe` from the [releases page](https://github.com/Netapick/verbatim/releases/latest) (lightweight installer, about 3 MB, in French or English).
 2. The installer downloads the base engines by itself, without asking anything (≈ 61 MB: Whisper and llama.cpp, with Vulkan). It also detects your graphics card and adds the matching acceleration: ROCm (≈ 430 MB) for a Radeon RX 7000, CUDA (≈ 685 MB) for an NVIDIA card. Without a compatible card, Verbatim uses the processor.
 3. Launch Verbatim, then download a transcription model and, if you wish, a writing model from the **Settings**. No model is shipped with the application.
 
