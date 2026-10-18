@@ -61,6 +61,16 @@ Les moteurs téléchargés (whisper.cpp, llama.cpp : `whisper-cli.exe`, `llama-s
 ## Licence et signature
 Code sous licence MIT (`LICENSE`). L'installateur est construit et signé par SignPath depuis GitHub Actions (`.github/workflows/release.yml`) : voir `docs/SIGNATURE.md`.
 
+## Code signing policy
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- Seul l'installateur construit depuis ce dépôt par GitHub Actions (`.github/workflows/release.yml`) est signé ; chaque signature est approuvée manuellement.
+- Rôles : [Netapick](https://github.com/Netapick) est auteur, relecteur et approbateur (authentification multifacteur activée).
+- Les moteurs tiers (whisper.cpp, llama.cpp) sont téléchargés tels que publiés par leurs auteurs et ne sont pas signés par ce projet.
+
+## Confidentialité
+Verbatim traite l'audio, les transcriptions et les comptes-rendus **uniquement sur l'ordinateur** : rien n'est envoyé en ligne, sauf si vous configurez vous-même une API distante pour la rédaction. Les seules connexions sortantes de l'application : téléchargement des moteurs et modèles (GitHub, Hugging Face) à votre demande, et recherche de mise à jour auprès de l'API GitHub au démarrage (désactivable dans Réglages › Connexions). Aucune donnée personnelle ni télémétrie n'est collectée.
+
 ## Mises à jour
 Au démarrage, l'app interroge `releases/latest` du dépôt GitHub, télécharge l'installateur (`*_x64-setup.exe`), vérifie son SHA-256 (champ `digest` de l'API), l'exécute en silence dans le même dossier puis se relance (`src-tauri/src/update.rs`). Jamais pendant un enregistrement, une transcription ou une rédaction. Réglages › Connexions permet de désactiver l'installation automatique. Pour publier une version : monter le numéro dans `package.json`, `tauri.conf.json`, `Cargo.toml`, `npx tauri build`, puis `gh release create vX.Y.Z <exe>` (la release doit être la plus récente).
 
