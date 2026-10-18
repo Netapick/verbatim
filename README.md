@@ -2,6 +2,8 @@
 
 Français · [English](README.en.md)
 
+[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4)
+
 > Présentation illustrée : [docs/PRESENTATION.md](docs/PRESENTATION.md) · [Télécharger](https://github.com/Netapick/verbatim/releases/latest)
 
 Application de bureau (Tauri 2 + Rust) pour organiser ses réunions : import audio ou
