@@ -538,6 +538,10 @@ async function settings() {
   main.innerHTML = `<h1>Réglages</h1><p class="sub">Tout est enregistré automatiquement, sauf la connexion API.</p>
     <div class="tabs" id="tabs" role="tablist">${[["tr", "Transcription"], ["ia", "Compte-rendu"], ["mod", "Modèles"], ["net", "Connexions"]].map(([k, v]) => `<button role="tab" data-tab="${k}" class="${setTab === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <section class="pane" data-pane="tr" ${setTab === "tr" ? "" : "hidden"}>
+      <div class="card avn"><h3>Antivirus : ajoutez une exclusion</h3>
+        <p class="meta">Les moteurs d'IA (whisper.cpp, llama.cpp) ne sont pas signés : votre antivirus peut les supprimer ou les bloquer (erreurs « accès refusé » ou « connexion fermée »). Pour l'éviter, ajoutez ce dossier aux exclusions de votre antivirus :</p>
+        <p style="margin:8px 0"><code class="avn-path"></code> <button class="btn sm avn-copy">Copier le chemin</button></p>
+        <p class="meta">Windows Defender : Sécurité Windows › Protection contre les virus et menaces › Gérer les paramètres › Exclusions › Ajouter une exclusion › Dossier.</p></div>
       <div class="card"><h3>Langue et calcul</h3>
         <div class="grid2"><div><label style="margin-top:0">Langue parlée</label><select id="wl">${langs.map(([k, v]) => `<option value="${k}" ${s.whisper_lang === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
         <div id="wcalc"></div></div>
@@ -545,6 +549,10 @@ async function settings() {
         <p class="meta" style="margin-top:10px">Les modèles « compressés » sont presque aussi précis que les complets, pour moitié moins d'espace. Plus le modèle est gros, plus c'est lent.</p></div>
     </section>
     <section class="pane" data-pane="ia" ${setTab === "ia" ? "" : "hidden"}>
+      <div class="card avn"><h3>Antivirus : ajoutez une exclusion</h3>
+        <p class="meta">Les moteurs d'IA (whisper.cpp, llama.cpp) ne sont pas signés : votre antivirus peut les supprimer ou les bloquer (erreurs « accès refusé » ou « connexion fermée »). Pour l'éviter, ajoutez ce dossier aux exclusions de votre antivirus :</p>
+        <p style="margin:8px 0"><code class="avn-path"></code> <button class="btn sm avn-copy">Copier le chemin</button></p>
+        <p class="meta">Windows Defender : Sécurité Windows › Protection contre les virus et menaces › Gérer les paramètres › Exclusions › Ajouter une exclusion › Dossier.</p></div>
       <div class="card"><h3>Calcul de la rédaction</h3><div id="ldev"></div></div>
       <div class="card"><h3>IA de rédaction</h3>
         <p class="meta" style="margin-bottom:10px">Un modèle installé sur cet ordinateur rédige le compte-rendu, sans rien envoyer en ligne. Sans modèle local ni API, seul un résumé simplifié est produit.</p>
@@ -579,6 +587,10 @@ async function settings() {
   };
   let curModel = s.whisper_model, curLlm = s.llm_local || "", curWdev = s.whisper_device || "auto", curDev = !s.llm_device || s.llm_device === "cpu" ? "auto" : s.llm_device, curRocm = s.rocm_root || "";
   // Mémoire vidéo : un modèle ne tient sur le GPU que s'il y a de la place pour lui + le contexte (~1,5 Go)
+  invoke("models_dir_info").then((r) => {
+    document.querySelectorAll(".avn-path").forEach((e) => { e.textContent = r.path; });
+    document.querySelectorAll(".avn-copy").forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(r.path); toast("Chemin copié"); } catch (x) { toast(r.path); } });
+  });
   let gpuVram = 0;
   const noFit = (bytes) => gpuVram > 0 && curDev !== "cpu_only" && bytes + 1.5 * 1073741824 > gpuVram;
   const fitMsg = (bytes) => `<br><span class="meta" style="color:var(--danger)">Trop volumineux pour la mémoire vidéo de votre carte (${(gpuVram / 1073741824).toFixed(0)} Go) : environ ${((bytes + 1.5 * 1073741824) / 1073741824).toFixed(1)} Go nécessaires. Une partie du modèle tournera sur le processeur : rédaction très lente.</span>`;

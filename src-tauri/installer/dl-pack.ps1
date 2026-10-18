@@ -10,6 +10,8 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+# NSIS lit la sortie avec la page de codes ANSI de Windows : sans cela, « é » s'affiche « , » (page OEM).
+try { [Console]::OutputEncoding = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage) } catch {}
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $LogPath = if ($Log) { $Log } else { Join-Path $Dest "redist-install.log" }
 function Say($m) { Write-Output $m; try { Add-Content -Path $LogPath -Value ("{0:HH:mm:ss} {1}" -f (Get-Date), $m) -Encoding UTF8 } catch {} }

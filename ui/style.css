@@ -205,3 +205,7 @@ details summary:hover{color:var(--brand)}
 #upd{position:fixed;bottom:84px;right:24px;display:flex;align-items:center;gap:10px;background:var(--panel);color:var(--ink);border:1px solid var(--line-2);border-left:3px solid var(--brand);padding:10px 14px;border-radius:10px;box-shadow:var(--sh-2);font-size:13px;z-index:50}
 .mrow.nofit > label b:first-of-type { color: var(--danger); text-decoration: line-through; }
 .mrow.nofit { border-color: var(--danger); }
+.card.avn{--or:#c2620a;background:#f08a2418;border-color:#f08a24;border-left:4px solid #f08a24}
+.card.avn h3{color:var(--or)}
+:root[data-theme="dark"] .card.avn{--or:#f5a64a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card.avn{--or:#f5a64a}}

@@ -55,6 +55,11 @@
 
 !macro NSIS_HOOK_POSTINSTALL
   !insertmacro VB_LOG "[hook] POSTINSTALL"
+  ; Information (pas une question) : les moteurs d'IA ne sont pas signés, l'antivirus peut les supprimer.
+  DetailPrint "Antivirus : ajoutez une exclusion pour le dossier $INSTDIR\ia"
+  ${IfNot} ${Silent}
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Antivirus : ajoutez une exclusion de sécurité pour le dossier « ia ».$\r$\n$\r$\nLes moteurs d'IA (whisper.cpp, llama.cpp) ne sont pas signés : votre antivirus peut les supprimer ou les bloquer pendant leur installation.$\r$\n$\r$\nDossier à exclure :$\r$\n$INSTDIR\ia$\r$\n$\r$\nWindows Defender : Sécurité Windows > Protection contre les virus et menaces > Gérer les paramètres > Exclusions > Ajouter une exclusion > Dossier.$\r$\n$\r$\nFaites-le maintenant si possible, puis cliquez sur OK : l'installation des moteurs continue ensuite."
+  ${EndIf}
   ${IfNot} ${FileExists} "$INSTDIR\redist\engine\*.*"
     !insertmacro VB_FETCH "Moteurs de transcription et d'IA" "${PACK_CORE_FILE}" "${PACK_CORE_SHA}" "${PACK_CORE_MB}"
   ${EndIf}
