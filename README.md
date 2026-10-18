@@ -40,9 +40,17 @@ Verbatim est une application de bureau Windows. Elle enregistre ou importe vos r
 | Autres AMD, Intel | Processeur | Vulkan |
 | Sans carte graphique | Processeur | Processeur |
 
-whisper.cpp n'a pas de binaire officiel pour les cartes AMD sous Windows : Verbatim embarque un build ROCm compilé pour les Radeon RX 7000, ce qui rend possible la transcription accélérée sur AMD en plus de NVIDIA. Le mode « Automatique » choisit le moteur le plus rapide disponible, avec repli sur le processeur.
-
 Mesure de la rédaction (RX 7800 XT, Qwen 3.5 4B Q4, lecture / écriture en tokens par seconde) : processeur 94 / 11, Vulkan 2566 / 127, ROCm 3673 / 117.
+
+### Whisper sur carte AMD : un build ROCm fait pour Verbatim
+
+whisper.cpp ne fournit pas de binaire pour utiliser une carte AMD sous Windows : seules les versions processeur et NVIDIA (CUDA) sont publiées, et la transcription accélérée sur AMD n'est pas prévue clé en main. Verbatim comble ce manque :
+
+- **whisper.cpp est compilé avec ROCm (HIP)** pour les Radeon RX 7000 / PRO W7000 (RDNA 3), avec le script `scripts/build-whisper-rocm.ps1`.
+- **Un runtime ROCm minimal** est livré avec lui, pour que la carte fonctionne sans installer le SDK d'AMD.
+- **L'installateur le met en place seul** quand il détecte une carte compatible, et le mode « Automatique » le choisit, avec repli sur le processeur en cas de problème.
+
+Testé sur une RX 7800 XT. Le mode « Automatique » choisit le moteur le plus rapide disponible, avec repli sur le processeur.
 
 ## Installation
 
