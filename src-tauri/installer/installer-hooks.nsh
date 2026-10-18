@@ -31,6 +31,11 @@
 ; Moteur Whisper CUDA officiel (NVIDIA), extrait à plat dans ia\engine-gpu : même source que le bouton des Réglages.
 !define CUDA_URL "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip"
 !define CUDA_MB "685"
+; Moteur llama.cpp CUDA (rédaction) + DLL runtime : deux archives extraites dans ia\llm-cuda.
+!define LLM_CUDA_URL "https://github.com/ggml-org/llama.cpp/releases/download/b11700/llama-b11700-bin-win-cuda-12.4-x64.zip"
+!define LLM_CUDA_MB "254"
+!define LLM_CUDART_URL "https://github.com/ggml-org/llama.cpp/releases/download/b11700/cudart-llama-bin-win-cuda-12.4-x64.zip"
+!define LLM_CUDART_MB "373"
 
 !macro VB_FETCH_URL LABEL URL MB DEST
   DetailPrint "${LABEL} (environ ${MB} Mo)…"
@@ -69,6 +74,13 @@
   ${AndIfNot} ${FileExists} "$INSTDIR\ia\engine-gpu\whisper-cli.exe"
     CreateDirectory "$INSTDIR\ia\engine-gpu"
     !insertmacro VB_FETCH_URL "Accélération NVIDIA (CUDA)" "${CUDA_URL}" "${CUDA_MB}" "$INSTDIR\ia\engine-gpu"
+  ${EndIf}
+  IntOp $1 $2 & 1
+  ${If} $1 != 0
+  ${AndIfNot} ${FileExists} "$INSTDIR\ia\llm-cuda\llama-server.exe"
+    CreateDirectory "$INSTDIR\ia\llm-cuda"
+    !insertmacro VB_FETCH_URL "Rédaction NVIDIA (CUDA)" "${LLM_CUDA_URL}" "${LLM_CUDA_MB}" "$INSTDIR\ia\llm-cuda"
+    !insertmacro VB_FETCH_URL "Bibliothèques CUDA" "${LLM_CUDART_URL}" "${LLM_CUDART_MB}" "$INSTDIR\ia\llm-cuda"
   ${EndIf}
 !macroend
 

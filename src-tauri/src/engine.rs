@@ -208,7 +208,7 @@ fn rocm_ready(dir: &PathBuf, root: &str) -> bool {
 }
 
 /// Pilote NVIDIA présent (nvcuda.dll) : condition pour utiliser le build CUDA.
-fn cuda_available() -> bool {
+pub fn cuda_available() -> bool {
     std::env::var("SystemRoot")
         .map(|r| PathBuf::from(r).join("System32").join("nvcuda.dll").exists())
         .unwrap_or(false)

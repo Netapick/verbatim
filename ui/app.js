@@ -575,7 +575,7 @@ async function settings() {
       const act = m.installed
         ? `<button class="btn sm dng" data-del="${m.name}">Supprimer</button>`
         : busy ? "" : `<button class="btn sm" data-get="${m.name}">${m.partial ? "Reprendre" : "Télécharger"}</button>`;
-      return `<div class="card mrow ${m.selected ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="wm" value="${m.name}" ${m.selected ? "checked" : ""}>
+      return `<div class="card mrow ${m.selected ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="wm" value="${m.name}" ${m.selected ? "checked" : ""} ${m.installed ? "" : "disabled"}>
         <span><b>${esc(m.label)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta">${esc(m.desc)}</span><br><span class="meta" style="word-break:break-all">${m.installed ? "Emplacement" : "Sera installé dans"} : <code>${esc(m.path)}</code></span>
         ${busy ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}</span></label>${state}${act}</div>`;
     }).join("");
@@ -612,8 +612,10 @@ async function settings() {
     $("#llms").querySelectorAll("[data-lget]").forEach((b) => b.onclick = () => run(async () => { await invoke("llm_install", { model: b.dataset.lget }); renderModels(); watchDownload(); }));
     $("#llms").querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => run(async () => { if (await ask("Supprimer ce modèle du disque ?")) { await invoke("llm_remove", { model: b.dataset.ldel }); curLlm = (await invoke("get_settings")).llm_local || ""; renderModels(); renderGguf(); } }));
     const eng = llm.engines, gbusyL = d.active && d.phase === "llm-binary";
-    const gpuOk = eng.rocm.runtime && eng.rocm.installed || eng.vulkan.installed;
-    const gpuName = eng.rocm.runtime && eng.rocm.installed ? "ROCm" : eng.vulkan.installed ? "Vulkan" : "";
+    const hasNv = llm.gpus.some((n) => /nvidia/i.test(n)), hasAmd = llm.gpus.some((n) => /amd|radeon/i.test(n) && !/graphics/i.test(n));
+    const cudaOk = eng.cuda.installed && hasNv, rocmOk = eng.rocm.runtime && eng.rocm.installed;
+    const gpuOk = cudaOk || rocmOk || eng.vulkan.installed;
+    const gpuName = cudaOk ? "CUDA" : rocmOk ? "ROCm" : eng.vulkan.installed ? "Vulkan" : "";
     const lstate = curDev === "cpu_only" ? `<span class="pill">CPU</span>` : gpuOk ? `<span class="pill ok">GPU actif · ${gpuName}</span>` : `<span class="pill warn">CPU (moteur GPU non installé)</span>`;
     const devRow = (id, label, desc, extra) => {
       const e = eng[id], need = !e.installed;
@@ -626,19 +628,20 @@ async function settings() {
       : `<br><span class="meta" style="color:var(--danger)">Runtime ROCm introuvable.</span>`;
     $("#ldev").innerHTML = `<label style="margin-top:0">Calcul de la rédaction ${lstate}</label>
       <div class="seg2">
-        <label class="opt ${curDev !== "cpu_only" ? "sel" : ""}"><input type="radio" name="ld" value="auto" ${curDev !== "cpu_only" ? "checked" : ""}><span><b>Automatique</b><br><span class="meta">GPU (ROCm, sinon Vulkan), repli sur le CPU${llm.gpus.length ? " · " + esc(llm.gpus.join(", ")) : ""}</span></span></label>
+        <label class="opt ${curDev !== "cpu_only" ? "sel" : ""}"><input type="radio" name="ld" value="auto" ${curDev !== "cpu_only" ? "checked" : ""}><span><b>Automatique</b><br><span class="meta">GPU (${hasNv ? "CUDA" : "ROCm"}, sinon Vulkan), repli sur le CPU${llm.gpus.length ? " · " + esc(llm.gpus.join(", ")) : ""}</span></span></label>
         <label class="opt ${curDev === "cpu_only" ? "sel" : ""}"><input type="radio" name="ld" value="cpu_only" ${curDev === "cpu_only" ? "checked" : ""}><span><b>CPU uniquement</b><br><span class="meta">Processeur, compatible partout (beaucoup plus lent)</span></span></label></div>
-      ${gpuOk || curDev === "cpu_only" ? "" : `<p class="meta" style="margin-top:8px">Aucun moteur GPU installé. <button class="btn sm" data-ldev-get="vulkan">Télécharger le moteur Vulkan (${fmtSize(eng.vulkan.bytes)})</button></p>`}
+      ${gpuOk || curDev === "cpu_only" ? "" : `<p class="meta" style="margin-top:8px">Aucun moteur GPU installé. <button class="btn sm" data-ldev-get="${hasNv ? "cuda" : "vulkan"}">Télécharger le moteur ${hasNv ? "CUDA" : "Vulkan"} (${fmtSize((hasNv ? eng.cuda : eng.vulkan).bytes)})</button></p>`}
       ${gbusyL ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}
       <details style="margin-top:10px"><summary class="meta">Moteurs et réglages avancés</summary>
         <p class="meta" style="margin:6px 0;word-break:break-all">CPU : <code>${esc(eng.cpu.path)}</code> ${eng.cpu.installed ? "" : "(installé avec le premier modèle)"}</p>
         ${devRow("vulkan", "Forcer Vulkan", "(AMD, NVIDIA, Intel)")}
-        ${devRow("rocm", "Forcer ROCm", "(AMD RDNA3 ; lecture des longs textes plus rapide)", rocmExtra)}
-        <div class="bar" style="margin:6px 0 0"><button class="btn sm" id="rocm-pick">Choisir le dossier du runtime ROCm…</button>${curRocm ? `<button class="btn sm" id="rocm-auto">Détection automatique</button>` : ""}</div>
+        ${hasNv || eng.cuda.installed || curDev === "cuda" ? devRow("cuda", "Forcer CUDA", "(NVIDIA ; le plus rapide sur carte NVIDIA)") : ""}
+        ${hasAmd || eng.rocm.installed || curDev === "rocm" ? devRow("rocm", "Forcer ROCm", "(AMD RDNA3 ; lecture des longs textes plus rapide)", rocmExtra) : ""}
+        ${hasAmd || eng.rocm.installed || curDev === "rocm" ? `<div class="bar" style="margin:6px 0 0"><button class="btn sm" id="rocm-pick">Choisir le dossier du runtime ROCm…</button>${curRocm ? `<button class="btn sm" id="rocm-auto">Détection automatique</button>` : ""}</div>` : ""}
       </details>`;
     $("#ldev").querySelectorAll("[name=ld]").forEach((r) => r.onchange = () => run(async () => { curDev = r.value; await saveAll(); renderModels(); }));
     $("#ldev").querySelectorAll("[data-ldev-get]").forEach((b) => b.onclick = () => run(async () => { await invoke("llm_install_engine", { device: b.dataset.ldevGet }); renderModels(); watchDownload(); }));
-    $("#rocm-pick").onclick = () => run(async () => { const f = await dialog.open({ directory: true }); if (!f) return; curRocm = await invoke("llm_rocm_check", { path: f }); await saveAll(); toast("Runtime ROCm trouvé"); renderModels(); });
+    const rp = $("#rocm-pick"); if (rp) rp.onclick = () => run(async () => { const f = await dialog.open({ directory: true }); if (!f) return; curRocm = await invoke("llm_rocm_check", { path: f }); await saveAll(); toast("Runtime ROCm trouvé"); renderModels(); });
     const ra = $("#rocm-auto"); if (ra) ra.onclick = () => run(async () => { curRocm = ""; await saveAll(); renderModels(); });
     if (d.active) watchDownload();
     $("#models").querySelectorAll("[name=wm]").forEach((r) => r.onchange = () => run(async () => { curModel = r.value; await saveAll(); renderModels(); }));

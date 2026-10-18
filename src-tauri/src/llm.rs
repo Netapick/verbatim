@@ -24,6 +24,12 @@ const VULKAN_BYTES: u64 = 32_240_958;
 const ROCM_ZIP: &str =
     "https://github.com/ggml-org/llama.cpp/releases/download/b11700/llama-b11700-bin-win-rocm-10.0-x64.zip";
 const ROCM_BYTES: u64 = 258_757_149;
+// CUDA : le moteur et les DLL runtime (cudart, cuBLAS) sont deux archives extraites dans le même dossier
+const CUDA_ZIP: &str =
+    "https://github.com/ggml-org/llama.cpp/releases/download/b11700/llama-b11700-bin-win-cuda-12.4-x64.zip";
+const CUDA_RT_ZIP: &str =
+    "https://github.com/ggml-org/llama.cpp/releases/download/b11700/cudart-llama-bin-win-cuda-12.4-x64.zip";
+const CUDA_BYTES: u64 = 266_814_439 + 391_443_627;
 
 /// (id, libellé, description, taille exacte en octets, URL)
 pub const LLMS: [(&str, &str, &str, u64, &str); 4] = [
@@ -61,6 +67,7 @@ fn dev_dir(dev: &str) -> &'static str {
     match dev {
         "vulkan" => "llm-vulkan",
         "rocm" => "llm-rocm",
+        "cuda" => "llm-cuda",
         _ => "llm",
     }
 }
@@ -70,9 +77,9 @@ fn bin_for(dir: &PathBuf, dev: &str) -> PathBuf {
 fn bin_path(dir: &PathBuf) -> PathBuf {
     bin_for(dir, "cpu")
 }
-/// Au moins un moteur llama.cpp (CPU, Vulkan ou ROCm) est installé.
+/// Au moins un moteur llama.cpp (CPU, Vulkan, ROCm ou CUDA) est installé.
 fn any_engine(dir: &PathBuf) -> bool {
-    ["cpu", "vulkan", "rocm"].iter().any(|d| bin_for(dir, d).exists())
+    ["cpu", "vulkan", "rocm", "cuda"].iter().any(|d| bin_for(dir, d).exists())
 }
 
 // ─── Runtime ROCm : DLL HIP / rocBLAS… livrées dans `redist/rocm-runtime` (ou désignées à la main) ───
@@ -132,18 +139,22 @@ pub fn llm_rocm_check(path: String) -> R<String> {
         .ok_or_else(|| "Runtime ROCm introuvable dans ce dossier (attendu : un dossier contenant amdhip64_7.dll et rocblas.dll).".to_string())
 }
 
-/// Moteur à utiliser selon le réglage, avec repli (ROCm → Vulkan → CPU).
+/// Moteur à utiliser selon le réglage, avec repli (CUDA → ROCm → Vulkan → CPU).
 fn pick_engine(dir: &PathBuf, cfg: &Settings) -> Option<(PathBuf, &'static str, Vec<PathBuf>)> {
     let order: &[&'static str] = match cfg.llm_device.as_str() {
         "cpu_only" => &["cpu"],
         "vulkan" => &["vulkan", "cpu"],
         "rocm" => &["rocm", "vulkan", "cpu"],
+        "cuda" => &["cuda", "vulkan", "cpu"],
         // « auto » (et l'ancienne valeur « cpu ») : le plus rapide disponible
-        _ => &["rocm", "vulkan", "cpu"],
+        _ => &["cuda", "rocm", "vulkan", "cpu"],
     };
     for d in order {
         let b = bin_for(dir, d);
         if !b.exists() {
+            continue;
+        }
+        if *d == "cuda" && !engine::cuda_available() {
             continue;
         }
         if *d == "rocm" {
@@ -198,6 +209,7 @@ pub fn status_json(dir: &PathBuf, selected: &str, cfg: &Settings) -> Value {
         "engines": {
             "cpu": { "installed": bin_path(dir).exists(), "path": bin_path(dir).to_string_lossy(), "bytes": 19_593_035u64 },
             "vulkan": { "installed": bin_for(dir, "vulkan").exists(), "path": bin_for(dir, "vulkan").to_string_lossy(), "bytes": VULKAN_BYTES },
+            "cuda": { "installed": bin_for(dir, "cuda").exists(), "path": bin_for(dir, "cuda").to_string_lossy(), "bytes": CUDA_BYTES },
             "rocm": { "installed": bin_for(dir, "rocm").exists(), "path": bin_for(dir, "rocm").to_string_lossy(), "bytes": ROCM_BYTES,
                       "runtime": rocm.as_ref().map(|r| r.0.to_string_lossy().to_string()) },
         },
@@ -218,29 +230,36 @@ fn install_binary(dir: &PathBuf, dev: &str) -> R<()> {
     let url = match dev {
         "vulkan" => VULKAN_ZIP,
         "rocm" => ROCM_ZIP,
+        "cuda" => CUDA_ZIP,
         _ => LLAMA_ZIP,
     };
     let bin = bin_for(dir, dev);
     if !bin.exists() {
-        let zip_path = dir.join("llm.zip");
-        download_to_unsized(url, &zip_path, "llm-binary")?;
-        let f = fs::File::open(&zip_path).map_err(|e| e.to_string())?;
-        let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
         let out = dir.join(dev_dir(dev));
         fs::create_dir_all(&out).map_err(|e| e.to_string())?;
-        for i in 0..z.len() {
-            let mut f = z.by_index(i).map_err(|e| e.to_string())?;
-            if f.is_dir() {
-                continue;
-            }
-            let name = match f.enclosed_name().and_then(|p| p.file_name().map(|n| n.to_owned())) {
-                Some(n) => n,
-                None => continue,
-            };
-            let mut dst = fs::File::create(out.join(name)).map_err(|e| e.to_string())?;
-            std::io::copy(&mut f, &mut dst).map_err(|e| e.to_string())?;
+        let mut urls = vec![url];
+        if dev == "cuda" {
+            urls.push(CUDA_RT_ZIP);
         }
-        let _ = fs::remove_file(&zip_path);
+        for u in urls {
+            let zip_path = dir.join("llm.zip");
+            download_to_unsized(u, &zip_path, "llm-binary")?;
+            let f = fs::File::open(&zip_path).map_err(|e| e.to_string())?;
+            let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
+            for i in 0..z.len() {
+                let mut f = z.by_index(i).map_err(|e| e.to_string())?;
+                if f.is_dir() {
+                    continue;
+                }
+                let name = match f.enclosed_name().and_then(|p| p.file_name().map(|n| n.to_owned())) {
+                    Some(n) => n,
+                    None => continue,
+                };
+                let mut dst = fs::File::create(out.join(name)).map_err(|e| e.to_string())?;
+                std::io::copy(&mut f, &mut dst).map_err(|e| e.to_string())?;
+            }
+            let _ = fs::remove_file(&zip_path);
+        }
         if !bin.exists() {
             return Err("llama-server.exe absent de l'archive.".into());
         }
@@ -429,7 +448,14 @@ fn ollama_tags() -> Option<Value> {
 /// Renvoie (ollama.exe, « ollama app.exe » s'il existe).
 fn find_ollama() -> Option<(PathBuf, Option<PathBuf>)> {
     let mut dirs: Vec<PathBuf> = Vec::new();
-    if let Ok(o) = Command::new("where.exe").arg("ollama").stdout(Stdio::piped()).stderr(Stdio::null()).output() {
+    let mut wh = Command::new("where.exe");
+    wh.arg("ollama").stdout(Stdio::piped()).stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        wh.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    if let Ok(o) = wh.output() {
         for l in String::from_utf8_lossy(&o.stdout).lines() {
             if let Some(d) = PathBuf::from(l.trim()).parent() {
                 dirs.push(d.to_path_buf());
