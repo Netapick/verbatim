@@ -30,7 +30,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 | Strength | In practice |
 |---|---|
 | 🔒 **100% local** | Audio, transcripts, reports and models stay on your computer. No cloud, no account, no data sent. |
-| ⚡ **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor when no card is usable. |
+| ⚡ **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in 41 s on an RX 7800 XT, versus almost 10 minutes on the processor. |
 | 📝 **From sound to report** | Summary, topics, decisions, actions and next steps, from a simple recording. |
 | 🧰 **Built for meetings** | Preparations (agenda, questions), a glossary of business acronyms, an audio player synchronized with the transcript. |
 
@@ -88,14 +88,6 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 **Automatic** mode picks the fastest available engine and falls back to the processor in case of problems. Models too large for your card's video memory are flagged in Settings.
 
-**Writing speed** (RX 7800 XT, Qwen 3.5 4B Q4, in tokens per second):
-
-| Engine | Reading the text | Writing |
-|---|---:|---:|
-| Processor | 94 | 11 |
-| Vulkan | 2,566 | 127 |
-| ROCm | 3,673 | 117 |
-
 ### Whisper on AMD cards: a ROCm build made for Verbatim
 
 whisper.cpp does not provide a binary to use an AMD card on Windows: only the processor and NVIDIA (CUDA) versions are published, and accelerated transcription on AMD is not provided out of the box. Verbatim fills that gap:
@@ -105,6 +97,79 @@ whisper.cpp does not provide a binary to use an AMD card on Windows: only the pr
 - **The installer sets it up by itself** when it detects a compatible card, and "Automatic" mode picks it, falling back to the processor in case of problems.
 
 Tested on an RX 7800 XT.
+
+## Performance and resource usage
+
+Measurements of October 18, 2026 on a desktop PC (Ryzen 7 5800X3D, 8 cores / 16 threads, 48 GB of RAM, Radeon RX 7800 XT 16 GB), with a **real 15 min 16 s recording in French**, using the application's own settings (Whisper Large v3 Turbo compressed; Qwen 3.5 Q4_K_M; 3,788 tokens read and 300 written for the report). Raw data: [`docs/benchmarks/results.json`](docs/benchmarks/results.json).
+
+### At a glance
+
+| | Result |
+|---|---|
+| 🎙️ **Transcription** | 15 min 16 s transcribed in **41 s** on an AMD card (×22.5 real time), versus 9 min 48 s on the processor: **14× faster** |
+| 📝 **Report** | **6 to 8 s** with Qwen 3.5 4B or 9B on ROCm, versus 94 s for the 4B on the processor |
+| 🧠 **Video memory** | 1.2 GB for Whisper, 3.4 GB for the 4B, 5.7 GB for the 9B: an 8 GB card is enough for the whole pipeline |
+| ⚙️ **Processor** | 2 to 11% of the PC with a graphics card, versus 45% without |
+| 💤 **At rest** | 106 MB actually reserved, 0% processor |
+
+### Transcription
+
+<p align="center"><img src="docs/benchmarks/transcription.en.svg" alt="Transcription time: ROCm 41 s, processor 9 min 48 s" width="780"></p>
+
+| Engine | Time | Speed | RAM (peak) | VRAM (peak) | Processor |
+|---|---:|---:|---:|---:|---|
+| **ROCm** (RX 7800 XT) | **41 s** | ×22.5 real time | 405 MB | 1.2 GB | ≈ 1.8 core (11% of the PC) |
+| Processor (8 threads) | 9 min 48 s | ×1.6 real time | 1.1 GB | – | ≈ 7.4 cores (46% of the PC) |
+
+### Report writing
+
+<p align="center"><img src="docs/benchmarks/redaction-duree.en.svg" alt="Report writing time by model and engine" width="780"></p>
+
+<p align="center"><img src="docs/benchmarks/redaction-vitesse.en.svg" alt="Reading and writing speed in tokens per second" width="780"></p>
+
+| Model · engine | Time | Reading | Writing | RAM (peak)¹ | VRAM (peak) | Processor |
+|---|---:|---:|---:|---:|---:|---:|
+| 4B · **ROCm** | **6.4 s** | 1,909 tok/s | 74 tok/s | 3.1 GB (0.5 GB private) | 3.4 GB | 4% of the PC |
+| 4B · Vulkan | 14.9 s | 696 tok/s | 34 tok/s | 3.8 GB (1.2 GB private) | 2.8 GB | 2% of the PC |
+| 4B · Processor | 94 s | 63 tok/s | 9 tok/s | 4.6 GB (1.9 GB private) | – | 45% of the PC |
+| 9B · **ROCm** | **8.4 s** | 1,330 tok/s | 56 tok/s | 5.4 GB (0.5 GB private) | 5.7 GB | 4% of the PC |
+| 9B · Vulkan | 19 s | 490 tok/s | 29 tok/s | 6.4 GB (1.5 GB private) | 5.0 GB | 2% of the PC |
+
+¹ RAM includes the model file, memory-mapped by Windows: that part can be reclaimed at any time. The memory actually reserved by Verbatim (the "Memory" column of Task Manager) is the value in parentheses. For Whisper, only the total working memory was recorded.
+
+### Memory and processor
+
+<p align="center"><img src="docs/benchmarks/memoire.en.svg" alt="Video memory and RAM used at peak, by configuration" width="780"></p>
+
+<p align="center"><img src="docs/benchmarks/processeur.en.svg" alt="Processor load during processing, by configuration" width="780"></p>
+
+### The application at rest
+
+Window open, no processing: about **360 MB** of working memory in total, of which **106 MB** is actually reserved. Most of it is Windows' display engine (WebView2); the Verbatim process itself uses only about 30 MB, and the processor stays at 0%. The engines only run during a transcription or a report, and the writing model is unloaded from memory afterwards.
+
+### Summary
+
+**1. The graphics card changes how you use it.** On the processor, transcribing a recording takes about 64% of its duration (588 s for 916 s) and uses 7 cores out of 16: the PC remains usable, but loaded for nearly ten minutes. On ROCm, the same transcription takes 41 s and occupies only 11% of the processor. Proportionally, a one-hour meeting would be transcribed in about 2 min 40 s on ROCm, versus about 38 min on the processor (linear estimate from this measurement).
+
+**2. ROCm or Vulkan?** On a Radeon RX 7000, ROCm completes the report 2.3× faster than Vulkan (6.4 s versus 14.9 s for the 4B; 8.4 s versus 19 s for the 9B). The gap comes mostly from reading the text (2.7×), and a little less from writing (2×). The price is about 0.6 to 0.7 GB more VRAM (3.4 GB versus 2.8 GB; 5.7 GB versus 5.0 GB). Vulkan remains the universal choice: it works on AMD, NVIDIA and Intel, with performance already 6× better than the processor for the 4B.
+
+**3. Qwen 3.5 4B or 9B?** On a graphics card, the 9B (more than twice as large) costs only 2 s more than the 4B on ROCm (8.4 s versus 6.4 s, +31%): it offers better writing quality for a barely longer wait. The 4B remains useful on cards with 4 to 6 GB of VRAM and without a graphics card.
+
+**4. Sizing the memory.** Transcription and then writing run one after the other: the VRAM needed is that of the larger of the two, i.e. 5.7 GB for the 9B on ROCm. An 8 GB card is therefore enough for the whole pipeline, and a 6 GB card works with the 4B (3.4 GB). As for RAM, once the model is loaded into video memory, Verbatim reserves only about 0.5 GB; without a graphics card, count about 1.5 GB more for the 4B (1.9 GB reserved versus 0.5 GB).
+
+**5. Without a graphics card.** The result remains usable: 94 s for a report with the 4B, and a transcription lasting about two thirds of the recording. However, the processor is heavily loaded (45% of the PC), and the lighter transcription models (Small, Base) are preferable to reduce the wait.
+
+**6. Which setup to choose?**
+
+| Your hardware | Transcription | Recommended writing |
+|---|---|---|
+| Radeon RX 7000, 8 GB or more | ROCm | Qwen 3.5 9B · ROCm |
+| Other AMD or Intel card, 6 GB or more | Processor | Qwen 3.5 9B · Vulkan |
+| Card with 4 to 6 GB | depends on the card | Qwen 3.5 4B · Vulkan or ROCm |
+| NVIDIA | CUDA | CUDA or Vulkan (not measured) |
+| No graphics card | Processor | Qwen 3.5 4B · Processor |
+
+**Limits of the measurement.** A single machine, a single recording and one run per configuration; whisper.cpp v1.9.2 and llama.cpp b11700. NVIDIA (CUDA) results were not measured, for lack of a card on the test machine. Differences vary with the machine, the text length and the audio content.
 
 ## Installation
 

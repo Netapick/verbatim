@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-18",
+  "audio_s": 916.0,
+  "machine": "Ryzen 7 5800X3D (8 cores / 16 threads), 48 GB RAM, Radeon RX 7800 XT 16 GB",
+  "transcription": [
+    {
+      "engine": "rocm",
+      "duration_s": 40.7,
+      "ram_peak_mb": 405,
+      "vram_peak_mb": 1240,
+      "cpu_pct_of_pc": 11
+    },
+    {
+      "engine": "cpu",
+      "duration_s": 588.1,
+      "ram_peak_mb": 1093,
+      "vram_peak_mb": 0,
+      "cpu_pct_of_pc": 46
+    }
+  ],
+  "writing": [
+    {
+      "model": "4B",
+      "engine": "rocm",
+      "duration_s": 6.4,
+      "read_tok_s": 1909,
+      "write_tok_s": 74.3,
+      "ram_peak_mb": 3117,
+      "ram_private_mb": 462,
+      "vram_peak_mb": 3369,
+      "cpu_pct_of_pc": 4
+    },
+    {
+      "model": "4B",
+      "engine": "vulkan",
+      "duration_s": 14.9,
+      "read_tok_s": 696,
+      "write_tok_s": 34.1,
+      "ram_peak_mb": 3798,
+      "ram_private_mb": 1164,
+      "vram_peak_mb": 2765,
+      "cpu_pct_of_pc": 2
+    },
+    {
+      "model": "4B",
+      "engine": "cpu",
+      "duration_s": 94.2,
+      "read_tok_s": 63,
+      "write_tok_s": 8.9,
+      "ram_peak_mb": 4565,
+      "ram_private_mb": 1948,
+      "vram_peak_mb": 0,
+      "cpu_pct_of_pc": 45
+    },
+    {
+      "model": "9B",
+      "engine": "rocm",
+      "duration_s": 8.4,
+      "read_tok_s": 1330,
+      "write_tok_s": 56.3,
+      "ram_peak_mb": 5392,
+      "ram_private_mb": 473,
+      "vram_peak_mb": 5723,
+      "cpu_pct_of_pc": 4
+    },
+    {
+      "model": "9B",
+      "engine": "vulkan",
+      "duration_s": 19.0,
+      "read_tok_s": 490,
+      "write_tok_s": 28.6,
+      "ram_peak_mb": 6403,
+      "ram_private_mb": 1504,
+      "vram_peak_mb": 5029,
+      "cpu_pct_of_pc": 2
+    }
+  ],
+  "app_idle": {
+    "working_set_mb": 360,
+    "private_mb": 106,
+    "process_mb": 30,
+    "cpu_pct": 0
+  }
+}

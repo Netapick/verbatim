@@ -46,7 +46,7 @@ Ordre de priorité : IA locale (llama.cpp + Qwen, chargée uniquement pendant la
 
 Mode automatique : CUDA, puis ROCm, puis Vulkan, puis CPU ; si le moteur GPU est coupé en cours de rédaction, un nouvel essai est fait sur le CPU. Un modèle plus gros que la mémoire vidéo disponible est signalé dans les Réglages (lecture du registre Windows, `engine::gpu_vram`).
 
-Mesure (RX 7800 XT, Qwen 3.5 4B Q4, lecture / écriture en tok/s) : CPU 94 / 11, Vulkan 2566 / 127, ROCm 3673 / 117.
+Mesures de vitesse et de consommation (RAM, VRAM, processeur) : voir la section « Performances et consommation » du [README](../README.md). Les graphiques sont générés par `scripts/make-benchmark-charts.py` (sortie dans `docs/benchmarks/`, avec les données brutes `results.json`).
 
 ## Moteurs et modèles : emplacements
 
