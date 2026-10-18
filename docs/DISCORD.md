@@ -44,4 +44,6 @@ https://raw.githubusercontent.com/Netapick/verbatim/main/docs/screenshots/11-mis
 
 **4.** Mises à jour automatiques depuis GitHub (désactivables dans Réglages › Connexions)
 
+**⚠️ Antivirus :** les moteurs (whisper.cpp, llama.cpp) ne sont pas signés, Defender peut les mettre en quarantaine (erreur 5 ou 10054). Ajoutez le dossier de Verbatim aux exclusions (Sécurité Windows › Protection contre les virus › Exclusions), restaurez les fichiers dans l'historique de protection, puis relancez le téléchargement. Pas besoin de lancer en administrateur.
+
 *Windows x64 · pas de diarisation pour l'instant · captures avec réunions fictives*

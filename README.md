@@ -55,6 +55,12 @@ L'installateur n'affiche aucune question : il installe le pack de base, puis dé
 Ordre de recherche d'un moteur : `ia/` (installé par l'utilisateur) puis `redist/` (livré). Pour un installateur léger, construisez `redist` sans `-WithRocm`. Le runtime ROCm livré couvre RDNA3 (gfx110X) ; d'autres cartes AMD utilisent Vulkan.
 Les redistribuables tiers (whisper.cpp, llama.cpp, ROCm) ont leurs propres licences : voir les fichiers LICENSE présents dans `redist/`.
 
+## Antivirus
+Les moteurs téléchargés (whisper.cpp, llama.cpp : `whisper-cli.exe`, `llama-server.exe`, DLL Vulkan/CUDA/ROCm) ne sont pas signés ; Defender et d'autres antivirus peuvent les supprimer ou les mettre en quarantaine (erreur 5 « accès refusé » au téléchargement, erreur 10054 « connexion fermée » pendant la rédaction). Après extraction, l'app attend l'analyse puis vérifie que les fichiers sont toujours là (`engine::verify_kept`) et affiche la marche à suivre ; si le moteur GPU de rédaction est coupé, elle réessaie une fois sur le CPU. Solution utilisateur : ajouter le dossier d'installation (contenant `ia`) aux exclusions de l'antivirus (Sécurité Windows › Protection contre les virus et menaces › Exclusions), restaurer les fichiers depuis l'historique de protection, puis relancer le téléchargement. Lancer l'app en administrateur n'aide pas.
+
+## Licence et signature
+Code sous licence MIT (`LICENSE`). L'installateur est construit et signé par SignPath depuis GitHub Actions (`.github/workflows/release.yml`) : voir `docs/SIGNATURE.md`.
+
 ## Mises à jour
 Au démarrage, l'app interroge `releases/latest` du dépôt GitHub, télécharge l'installateur (`*_x64-setup.exe`), vérifie son SHA-256 (champ `digest` de l'API), l'exécute en silence dans le même dossier puis se relance (`src-tauri/src/update.rs`). Jamais pendant un enregistrement, une transcription ou une rédaction. Réglages › Connexions permet de désactiver l'installation automatique. Pour publier une version : monter le numéro dans `package.json`, `tauri.conf.json`, `Cargo.toml`, `npx tauri build`, puis `gh release create vX.Y.Z <exe>` (la release doit être la plus récente).
 

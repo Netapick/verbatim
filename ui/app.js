@@ -54,16 +54,29 @@ const dlLabel = (d) => `${{ binary: "Moteur", vad: "Détection de parole", model
 // L'état du téléchargement vit côté Rust : il survit aux changements de page.
 // Cette fonction se (re)branche dessus à chaque affichage concerné.
 let dlTimer = null, engineHook = null;
+// Bouton « Arrêter » à côté de chaque message de progression (le téléchargement reprendra plus tard).
+function dlStopButtons() {
+  document.querySelectorAll("[data-dlmsg]").forEach((e) => {
+    if (e.parentElement.querySelector("[data-dlstop]")) return;
+    const b = document.createElement("button");
+    b.className = "btn sm dng"; b.dataset.dlstop = "1"; b.style.marginLeft = "10px"; b.textContent = "Arrêter";
+    b.onclick = async (ev) => { ev.preventDefault(); ev.stopPropagation(); b.disabled = true; b.textContent = "Arrêt…"; try { await invoke("download_cancel"); } catch (x) {} };
+    e.after(b);
+  });
+}
 function watchDownload() {
   if (dlTimer) return;
+  setTimeout(dlStopButtons, 150);
   dlTimer = setInterval(async () => {
     const st = await invoke("engine_status");
     const d = st.download;
+    dlStopButtons();
     document.querySelectorAll("[data-dlmsg]").forEach((e) => { e.textContent = d.active ? dlLabel(d) : ""; });
     document.querySelectorAll("[data-dlbar]").forEach((e) => { e.style.width = dlPct(d) + "%"; });
     if (!d.active) {
       clearInterval(dlTimer); dlTimer = null;
-      if (d.error) toast("Téléchargement interrompu : " + d.error + " — vous pourrez le reprendre.");
+      if (d.error === "Téléchargement annulé.") toast("Téléchargement arrêté — vous pourrez le reprendre.");
+      else if (d.error) toast("Téléchargement interrompu : " + d.error + " — vous pourrez le reprendre.");
       else toast("Moteur Whisper prêt");
       if (engineHook) engineHook();
     }
@@ -565,6 +578,10 @@ async function settings() {
     document.querySelectorAll(".pane").forEach((x) => { x.hidden = x.dataset.pane !== setTab; });
   };
   let curModel = s.whisper_model, curLlm = s.llm_local || "", curWdev = s.whisper_device || "auto", curDev = !s.llm_device || s.llm_device === "cpu" ? "auto" : s.llm_device, curRocm = s.rocm_root || "";
+  // Mémoire vidéo : un modèle ne tient sur le GPU que s'il y a de la place pour lui + le contexte (~1,5 Go)
+  let gpuVram = 0;
+  const noFit = (bytes) => gpuVram > 0 && curDev !== "cpu_only" && bytes + 1.5 * 1073741824 > gpuVram;
+  const fitMsg = (bytes) => `<br><span class="meta" style="color:var(--danger)">Trop volumineux pour la mémoire vidéo de votre carte (${(gpuVram / 1073741824).toFixed(0)} Go) : environ ${((bytes + 1.5 * 1073741824) / 1073741824).toFixed(1)} Go nécessaires. Une partie du modèle tournera sur le processeur : rédaction très lente.</span>`;
   const saveAll = async () => invoke("set_settings", { settings: { llm_base_url: $("#u").value.trim(), llm_api_key: $("#k").value, llm_model: $("#m").value.trim(), whisper_model: curModel, whisper_lang: $("#wl").value, llm_local: curLlm, whisper_device: curWdev, llm_device: curDev, rocm_root: curRocm, auto_update: $("#au").checked } });
   const renderModels = async () => {
     const st = await invoke("engine_status"), d = st.download;
@@ -596,6 +613,7 @@ async function settings() {
     $("#wcalc").querySelectorAll("[name=wd]").forEach((r) => r.onchange = () => run(async () => { curWdev = r.value; await saveAll(); renderModels(); }));
     const gd = $("#g-dl"); if (gd) gd.onclick = () => run(async () => { await invoke("engine_install_gpu"); renderModels(); watchDownload(); });
     const llm = st.llm;
+    gpuVram = llm.vram || 0;
     const lrows = [`<div class="card mrow ${curLlm === "" ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="" ${curLlm === "" ? "checked" : ""}>
       <span><b>Aucune IA locale</b><br><span class="meta">Utiliser l'API distante si elle est configurée, sinon un résumé simplifié</span></span></label></div>`].concat(llm.models.map((m) => {
       const busy = d.active && d.model === m.name;
@@ -603,8 +621,8 @@ async function settings() {
       const state = m.installed ? `<span class="pill ok">Installé</span>` : busy ? `<span class="pill">Téléchargement…</span>` : m.partial ? `<span class="pill warn">Interrompu ${pct} %</span>` : "";
       const act = m.installed ? `<button class="btn sm dng" data-ldel="${m.name}">Supprimer</button>`
         : busy ? "" : `<button class="btn sm" data-lget="${m.name}">${m.partial ? "Reprendre" : "Télécharger"}</button>`;
-      return `<div class="card mrow ${curLlm === m.name ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${m.name}" ${curLlm === m.name ? "checked" : ""} ${m.installed ? "" : "disabled"}>
-        <span><b>${esc(m.label)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta">${esc(m.desc)}</span><br><span class="meta" style="word-break:break-all">${m.installed ? "Emplacement" : "Sera installé dans"} : <code>${esc(m.path)}</code></span>
+      return `<div class="card mrow ${curLlm === m.name ? "sel" : ""} ${noFit(m.bytes) ? "nofit" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${m.name}" ${curLlm === m.name ? "checked" : ""} ${m.installed ? "" : "disabled"}>
+        <span><b>${esc(m.label)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta">${esc(m.desc)}</span><br><span class="meta" style="word-break:break-all">${m.installed ? "Emplacement" : "Sera installé dans"} : <code>${esc(m.path)}</code></span>${noFit(m.bytes) ? fitMsg(m.bytes) : ""}
         ${busy ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}</span></label>${state}${act}</div>`;
     }));
     $("#llms").innerHTML = lrows.join("") + `<p class="meta" style="margin-top:6px">Moteur d'IA locale (llama.cpp) : ${llm.binary ? "installé" : "non installé (téléchargé avec le premier modèle)"} · <code>${esc(llm.binary_path)}</code></p><p class="meta" style="margin-top:6px">Le modèle n'est chargé en mémoire (4 à 24 Go selon le modèle) que pendant la rédaction.</p>`;
@@ -661,8 +679,8 @@ async function settings() {
     if (!o.models.length) { box.innerHTML = `<p class="meta">Ollama fonctionne, mais aucun modèle n'est téléchargé. Dans un terminal : <code>ollama pull qwen3:8b</code></p>`; return; }
     box.innerHTML = o.models.map((m) => {
       const val = "ollama:" + m.name, big = m.bytes > 40 * 1073741824;
-      return `<div class="card mrow ${curLlm === val ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${esc(val)}" ${curLlm === val ? "checked" : ""}>
-        <span><b>${esc(m.name)}</b> <span class="meta">· ${fmtSize(m.bytes)}${m.params ? " · " + esc(m.params) : ""}${m.quant ? " · " + esc(m.quant) : ""}</span>
+      return `<div class="card mrow ${curLlm === val ? "sel" : ""} ${noFit(m.bytes) ? "nofit" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${esc(val)}" ${curLlm === val ? "checked" : ""}>
+        <span><b>${esc(m.name)}</b> <span class="meta">· ${fmtSize(m.bytes)}${m.params ? " · " + esc(m.params) : ""}${m.quant ? " · " + esc(m.quant) : ""}</span>${noFit(m.bytes) ? fitMsg(m.bytes) : ""}
         ${big ? `<br><span class="meta" style="color:var(--danger)">Très volumineux : sans assez de mémoire (RAM + carte graphique), la rédaction sera extrêmement lente.</span>` : ""}</span></label></div>`;
     }).join("");
     box.querySelectorAll("[name=lm]").forEach((r) => r.onchange = () => run(async () => { curLlm = r.value; await saveAll(); renderModels(); renderOllama(); renderGguf(); }));
@@ -673,10 +691,11 @@ async function settings() {
     $("#mdir").textContent = (await invoke("models_dir_info")).path;
     const [list, st] = await Promise.all([invoke("local_gguf_list"), invoke("engine_status")]);
     const d = st.download;
+    gpuVram = st.llm.vram || 0;
     box.innerHTML = (list.length ? `<label style="margin-top:0">Modèles personnalisés installés</label>` : "") + list.map((m) => {
       const val = "gguf:" + m.path;
-      return `<div class="card mrow ${curLlm === val ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${esc(val)}" ${curLlm === val ? "checked" : ""}>
-        <span><b>${esc(m.name)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta" style="word-break:break-all">Emplacement : <code>${esc(m.path)}</code></span>${m.bytes > 12 * 1073741824 ? `<br><span class="meta">Gros modèle : chargement long, rédaction lente sans carte graphique.</span>` : ""}</span></label>
+      return `<div class="card mrow ${curLlm === val ? "sel" : ""} ${noFit(m.bytes) ? "nofit" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${esc(val)}" ${curLlm === val ? "checked" : ""}>
+        <span><b>${esc(m.name)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta" style="word-break:break-all">Emplacement : <code>${esc(m.path)}</code></span>${noFit(m.bytes) ? fitMsg(m.bytes) : ""}${m.bytes > 12 * 1073741824 ? `<br><span class="meta">Gros modèle : chargement long, rédaction lente sans carte graphique.</span>` : ""}</span></label>
         <button class="btn sm dng" data-gdel="${esc(m.path)}">Supprimer</button></div>`;
     }).join("") + (list.length && !st.llm.binary ? `<p class="meta" style="margin-top:6px">Le moteur d'IA locale n'est pas installé. <button class="btn sm" id="g-eng">Télécharger le moteur (~20 Mo)</button></p>` : "");
     box.querySelectorAll("[name=lm]").forEach((r) => r.onchange = () => run(async () => { curLlm = r.value; await saveAll(); renderModels(); renderOllama(); renderGguf(); }));

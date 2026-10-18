@@ -203,3 +203,5 @@ details summary:hover{color:var(--brand)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .player audio{color-scheme:light}}
 .pill.hw{background:var(--panel-2);border:1px solid var(--line-2);color:var(--mute);font-weight:500}
 #upd{position:fixed;bottom:84px;right:24px;display:flex;align-items:center;gap:10px;background:var(--panel);color:var(--ink);border:1px solid var(--line-2);border-left:3px solid var(--brand);padding:10px 14px;border-radius:10px;box-shadow:var(--sh-2);font-size:13px;z-index:50}
+.mrow.nofit > label b:first-of-type { color: var(--danger); text-decoration: line-through; }
+.mrow.nofit { border-color: var(--danger); }

@@ -206,6 +206,7 @@ pub fn status_json(dir: &PathBuf, selected: &str, cfg: &Settings) -> Value {
         "binary": bin_path(dir).exists(), "binary_path": bin_path(dir).to_string_lossy(), "models": models,
         "device": cfg.llm_device,
         "gpus": engine::gpu_names(),
+        "vram": engine::gpu_vram(),
         "engines": {
             "cpu": { "installed": bin_path(dir).exists(), "path": bin_path(dir).to_string_lossy(), "bytes": 19_593_035u64 },
             "vulkan": { "installed": bin_for(dir, "vulkan").exists(), "path": bin_for(dir, "vulkan").to_string_lossy(), "bytes": VULKAN_BYTES },
@@ -244,21 +245,9 @@ fn install_binary(dir: &PathBuf, dev: &str) -> R<()> {
         for u in urls {
             let zip_path = dir.join("llm.zip");
             download_to_unsized(u, &zip_path, "llm-binary")?;
-            let f = fs::File::open(&zip_path).map_err(|e| e.to_string())?;
-            let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
-            for i in 0..z.len() {
-                let mut f = z.by_index(i).map_err(|e| e.to_string())?;
-                if f.is_dir() {
-                    continue;
-                }
-                let name = match f.enclosed_name().and_then(|p| p.file_name().map(|n| n.to_owned())) {
-                    Some(n) => n,
-                    None => continue,
-                };
-                let mut dst = fs::File::create(out.join(name)).map_err(|e| e.to_string())?;
-                std::io::copy(&mut f, &mut dst).map_err(|e| e.to_string())?;
-            }
+            let files = engine::extract_flat(&zip_path, &out)?;
             let _ = fs::remove_file(&zip_path);
+            engine::verify_kept(&files)?;
         }
         if !bin.exists() {
             return Err("llama-server.exe absent de l'archive.".into());
@@ -316,6 +305,20 @@ impl Drop for Server {
 /// Dossiers à ajouter au PATH pour charger le runtime ROCm (utilisé aussi par Whisper).
 pub fn rocm_path_dirs(dir: &PathBuf, root: &str) -> Option<Vec<PathBuf>> {
     rocm_runtime(dir, root).map(|(_, p)| p)
+}
+
+/// Le moteur GPU s'est arrêté brutalement (connexion coupée) : typiquement un antivirus qui supprime ou bloque le runtime.
+fn engine_crashed(e: &str) -> bool {
+    let l = e.to_lowercase();
+    ["10054", "10053", "10061", "arrêtée au démarrage", "connexion", "connection"].iter().any(|k| l.contains(k))
+}
+
+fn crash_hint(e: &str) -> String {
+    if engine_crashed(e) {
+        format!("{e} — le moteur d'IA a été arrêté, souvent par l'antivirus qui met en quarantaine le runtime (Vulkan, CUDA, ROCm). Restaurez-le dans Sécurité Windows › Historique de protection et ajoutez le dossier « ia » aux exclusions, ou choisissez « CPU uniquement » dans Réglages › Compte-rendu")
+    } else {
+        e.to_string()
+    }
 }
 
 fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings) -> R<Server> {
@@ -1017,25 +1020,35 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
         }
         set_progress(app, id, "Chargement de l'IA locale (gros modèle : plusieurs minutes possibles)…");
         set_pct(app, id, 3.0);
-        let res = start_server(&st.mdir, &path, &cfg).and_then(|srv| {
-            let be = Backend {
-                base: format!("http://127.0.0.1:{}/v1", srv.port),
-                key: String::new(),
-                model: "local".into(),
-                label: name.clone(),
-                hw: engine_hw(&st.mdir, &cfg),
-                mode: "local",
-                kind: "openai",
-                chunk_chars: 11_000,
-                timeout: 7200,
-            };
-            let r = run_with_backend(app, id, &be, &ctx, &lines);
-            drop(srv);
-            r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
-        });
+        let attempt = |cfg: &Settings| {
+            start_server(&st.mdir, &path, cfg).and_then(|srv| {
+                let be = Backend {
+                    base: format!("http://127.0.0.1:{}/v1", srv.port),
+                    key: String::new(),
+                    model: "local".into(),
+                    label: name.clone(),
+                    hw: engine_hw(&st.mdir, cfg),
+                    mode: "local",
+                    kind: "openai",
+                    chunk_chars: 11_000,
+                    timeout: 7200,
+                };
+                let r = run_with_backend(app, id, &be, &ctx, &lines);
+                drop(srv);
+                r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
+            })
+        };
+        let mut res = attempt(&cfg);
+        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" {
+            // le moteur GPU a été coupé : on retente une fois sur le processeur
+            set_progress(app, id, "Moteur GPU interrompu : nouvel essai sur le processeur…");
+            let mut cpu = cfg.clone();
+            cpu.llm_device = "cpu_only".into();
+            res = attempt(&cpu).map_err(|e2| format!("{} (essai sur le processeur : {e2})", res.as_ref().err().cloned().unwrap_or_default()));
+        }
         return match res {
             Ok(v) => Ok(v),
-            Err(e) => Ok(extractive(&title, &segs, &format!("L'IA locale a échoué ({e}). Résumé simplifié affiché."))),
+            Err(e) => Ok(extractive(&title, &segs, &format!("L'IA locale a échoué ({}). Résumé simplifié affiché.", crash_hint(&e)))),
         };
     }
     // 1) IA locale
@@ -1043,26 +1056,36 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
         let info = model_info(&cfg.llm_local).unwrap();
         set_progress(app, id, "Chargement de l'IA locale…");
         set_pct(app, id, 3.0);
-        let res = start_server(&st.mdir, &model_file(&st.mdir, &cfg.llm_local), &cfg).and_then(|srv| {
-            let be = Backend {
-                base: format!("http://127.0.0.1:{}/v1", srv.port),
-                key: String::new(),
-                model: "local".into(),
-                label: info.1.to_string(),
-                hw: engine_hw(&st.mdir, &cfg),
-                mode: "local",
-                kind: "openai",
-                chunk_chars: 11_000,
-                timeout: 1800,
-            };
-            let r = run_with_backend(app, id, &be, &ctx, &lines);
-            drop(srv);
-            r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
-        });
+        let attempt = |cfg: &Settings| {
+            start_server(&st.mdir, &model_file(&st.mdir, &cfg.llm_local), cfg).and_then(|srv| {
+                let be = Backend {
+                    base: format!("http://127.0.0.1:{}/v1", srv.port),
+                    key: String::new(),
+                    model: "local".into(),
+                    label: info.1.to_string(),
+                    hw: engine_hw(&st.mdir, cfg),
+                    mode: "local",
+                    kind: "openai",
+                    chunk_chars: 11_000,
+                    timeout: 1800,
+                };
+                let r = run_with_backend(app, id, &be, &ctx, &lines);
+                drop(srv);
+                r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
+            })
+        };
+        let mut res = attempt(&cfg);
+        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" {
+            // le moteur GPU a été coupé : on retente une fois sur le processeur
+            set_progress(app, id, "Moteur GPU interrompu : nouvel essai sur le processeur…");
+            let mut cpu = cfg.clone();
+            cpu.llm_device = "cpu_only".into();
+            res = attempt(&cpu).map_err(|e2| format!("{} (essai sur le processeur : {e2})", res.as_ref().err().cloned().unwrap_or_default()));
+        }
         match res {
             Ok(v) => return Ok(v),
             Err(e) => {
-                return Ok(extractive(&title, &segs, &format!("L'IA locale a échoué ({e}). Résumé simplifié affiché.")));
+                return Ok(extractive(&title, &segs, &format!("L'IA locale a échoué ({}). Résumé simplifié affiché.", crash_hint(&e))));
             }
         }
     }

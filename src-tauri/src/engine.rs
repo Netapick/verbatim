@@ -7,7 +7,7 @@ use std::{
     io::{Read, Write},
     path::PathBuf,
 };
-use std::sync::Mutex;
+use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const WHISPER_ZIP: &str =
@@ -40,6 +40,71 @@ struct Dl {
     error: Option<String>,
 }
 static DL: Mutex<Dl> = Mutex::new(Dl { active: false, model: String::new(), phase: String::new(), done: 0, total: 0, error: None });
+
+/// Demande d'arrêt du téléchargement en cours (les `.part` sont conservés pour une reprise).
+static CANCEL: AtomicBool = AtomicBool::new(false);
+const CANCELLED: &str = "Téléchargement annulé.";
+
+#[tauri::command]
+pub fn download_cancel() {
+    CANCEL.store(true, Ordering::SeqCst);
+}
+
+/// Message d'erreur lisible pour une erreur d'écriture ; les refus d'accès (5), violations de partage (32)
+/// ou de verrouillage viennent presque toujours d'un antivirus qui analyse ou met en quarantaine le fichier.
+pub fn fs_err(e: &std::io::Error, p: &std::path::Path) -> String {
+    let blocked = matches!(e.raw_os_error(), Some(5) | Some(32) | Some(33) | Some(1224)) || e.kind() == std::io::ErrorKind::PermissionDenied;
+    if !blocked {
+        return e.to_string();
+    }
+    let dir = p.parent().unwrap_or(p).display();
+    format!(
+        "Accès refusé à « {} » ({e}) : votre antivirus (ou Windows Defender) bloque ou verrouille ce fichier. Dans Sécurité Windows › Protection contre les virus › Historique de protection, restaurez-le, ajoutez le dossier « {dir} » aux exclusions, puis relancez le téléchargement.",
+        p.display()
+    )
+}
+
+/// Extrait une archive à plat dans `out` (ignore les chemins douteux) ; renvoie (fichier, taille écrite).
+pub fn extract_flat(zip_path: &std::path::Path, out: &std::path::Path) -> R<Vec<(PathBuf, u64)>> {
+    let f = fs::File::open(zip_path).map_err(|e| fs_err(&e, zip_path))?;
+    let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
+    fs::create_dir_all(out).map_err(|e| fs_err(&e, out))?;
+    let mut files = Vec::new();
+    for i in 0..z.len() {
+        let mut f = z.by_index(i).map_err(|e| e.to_string())?;
+        if f.is_dir() {
+            continue;
+        }
+        // aplatit « Release/xxx.dll »
+        let name = match f.enclosed_name().and_then(|p| p.file_name().map(|n| n.to_owned())) {
+            Some(n) => n,
+            None => continue,
+        };
+        let target = out.join(name);
+        let mut dst = fs::File::create(&target).map_err(|e| fs_err(&e, &target))?;
+        let n = std::io::copy(&mut f, &mut dst).map_err(|e| fs_err(&e, &target))?;
+        files.push((target, n));
+    }
+    Ok(files)
+}
+
+/// Un antivirus supprime souvent les moteurs juste après l'extraction : on attend l'analyse puis on vérifie.
+pub fn verify_kept(files: &[(PathBuf, u64)]) -> R<()> {
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    let gone: Vec<String> = files
+        .iter()
+        .filter(|(p, n)| fs::metadata(p).map(|m| m.len() != *n).unwrap_or(true))
+        .map(|(p, _)| p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default())
+        .collect();
+    if gone.is_empty() {
+        return Ok(());
+    }
+    let dir = files.first().and_then(|f| f.0.parent()).map(|d| d.display().to_string()).unwrap_or_default();
+    Err(format!(
+        "Votre antivirus a supprimé ou mis en quarantaine : {}. Dans Sécurité Windows › Protection contre les virus › Historique de protection, restaurez ces fichiers, ajoutez le dossier « {dir} » aux exclusions, puis relancez le téléchargement.",
+        gone.join(", ")
+    ))
+}
 
 fn model_bytes(name: &str) -> Option<u64> {
     MODELS.iter().find(|m| m.0 == name).map(|m| m.3)
@@ -108,19 +173,22 @@ pub fn download_to(url: &str, dst: &PathBuf, expected: u64, phase: &str, model: 
         }
         let resp = req.call().map_err(|e| format!("Téléchargement impossible : {e}"))?;
         let mut f = if resp.status() == 206 {
-            fs::OpenOptions::new().append(true).open(&part).map_err(|e| e.to_string())?
+            fs::OpenOptions::new().append(true).open(&part).map_err(|e| fs_err(&e, &part))?
         } else {
             have = 0; // le serveur ne gère pas la reprise : on repart de zéro
-            fs::File::create(&part).map_err(|e| e.to_string())?
+            fs::File::create(&part).map_err(|e| fs_err(&e, &part))?
         };
         let mut rd = resp.into_reader();
         let (mut buf, mut done, mut last) = (vec![0u8; 128 * 1024], have, 0u64);
         loop {
+            if CANCEL.load(Ordering::SeqCst) {
+                return Err(CANCELLED.into());
+            }
             let n = rd.read(&mut buf).map_err(|e| format!("Connexion interrompue : {e}"))?;
             if n == 0 {
                 break;
             }
-            f.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+            f.write_all(&buf[..n]).map_err(|e| fs_err(&e, &part))?;
             done += n as u64;
             if done - last > 256 * 1024 {
                 last = done;
@@ -137,7 +205,7 @@ pub fn download_to(url: &str, dst: &PathBuf, expected: u64, phase: &str, model: 
     if got != expected {
         return Err(format!("Téléchargement incomplet ({got} / {expected} octets) — relancez pour reprendre."));
     }
-    fs::rename(&part, dst).map_err(|e| e.to_string())
+    fs::rename(&part, dst).map_err(|e| fs_err(&e, dst))
 }
 
 /// Archive du moteur : petite, taille inconnue à l'avance ; téléchargée en une fois.
@@ -145,14 +213,19 @@ pub fn download_to_unsized(url: &str, dst: &PathBuf, phase: &str) -> R<()> {
     let resp = ureq::get(url).call().map_err(|e| format!("Téléchargement impossible : {e}"))?;
     let total: u64 = resp.header("Content-Length").and_then(|v| v.parse().ok()).unwrap_or(0);
     let mut rd = resp.into_reader();
-    let mut f = fs::File::create(dst).map_err(|e| e.to_string())?;
+    let mut f = fs::File::create(dst).map_err(|e| fs_err(&e, dst))?;
     let (mut buf, mut done) = (vec![0u8; 128 * 1024], 0u64);
     loop {
+        if CANCEL.load(Ordering::SeqCst) {
+            drop(f);
+            let _ = fs::remove_file(dst);
+            return Err(CANCELLED.into());
+        }
         let n = rd.read(&mut buf).map_err(|e| format!("Connexion interrompue : {e}"))?;
         if n == 0 {
             break;
         }
-        f.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        f.write_all(&buf[..n]).map_err(|e| fs_err(&e, dst))?;
         done += n as u64;
         let mut d = DL.lock().unwrap();
         d.phase = phase.into();
@@ -232,6 +305,25 @@ pub fn gpu_names() -> Vec<String> {
         .clone()
 }
 
+/// Mémoire vidéo dédiée de la carte la plus dotée, en octets (0 si inconnue). Lue dans le registre
+/// (valeur 64 bits) : `AdapterRAM` de WMI est plafonné à 4 Go.
+pub fn gpu_vram() -> u64 {
+    static V: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *V.get_or_init(|| {
+        let script = r#"$k='HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}'; Get-ChildItem $k -ErrorAction SilentlyContinue | ForEach-Object { $p=Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue; $v=$p.'HardwareInformation.qwMemorySize'; if($v){ [string]$v } }"#;
+        let mut c = std::process::Command::new("powershell");
+        c.args(["-NoProfile", "-Command", script]);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            c.creation_flags(0x0800_0000);
+        }
+        c.output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter_map(|l| l.trim().parse::<u64>().ok()).max().unwrap_or(0))
+            .unwrap_or(0)
+    })
+}
+
 /// Télécharge et installe le build GPU (CUDA) de whisper.cpp dans `engine-gpu`.
 #[tauri::command]
 pub fn engine_install_gpu(app: AppHandle, st: State<AppState>) -> R<()> {
@@ -245,23 +337,9 @@ pub fn engine_install_gpu(app: AppHandle, st: State<AppState>) -> R<()> {
         }
         let zip_path = dir.join("engine-gpu.zip");
         download_to_unsized(WHISPER_GPU_ZIP, &zip_path, "binary-gpu")?;
-        let f = fs::File::open(&zip_path).map_err(|e| e.to_string())?;
-        let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
-        let out = dir.join("engine-gpu");
-        fs::create_dir_all(&out).map_err(|e| e.to_string())?;
-        for i in 0..z.len() {
-            let mut f = z.by_index(i).map_err(|e| e.to_string())?;
-            if f.is_dir() {
-                continue;
-            }
-            let name = match f.enclosed_name().and_then(|p| p.file_name().map(|n| n.to_owned())) {
-                Some(n) => n,
-                None => continue,
-            };
-            let mut dst = fs::File::create(out.join(name)).map_err(|e| e.to_string())?;
-            std::io::copy(&mut f, &mut dst).map_err(|e| e.to_string())?;
-        }
+        let files = extract_flat(&zip_path, &dir.join("engine-gpu"))?;
         let _ = fs::remove_file(&zip_path);
+        verify_kept(&files)?;
         if !engine_gpu_bin(&dir).exists() {
             return Err("whisper-cli.exe absent de l'archive GPU.".into());
         }
@@ -279,6 +357,7 @@ pub fn engine_install(app: AppHandle, st: State<AppState>, model: String) -> R<(
         if d.active {
             return Err("Un téléchargement est déjà en cours.".into());
         }
+        CANCEL.store(false, Ordering::SeqCst);
         *d = Dl { active: true, model: model.clone(), phase: "binary".into(), ..Default::default() };
     }
     let dir = st.mdir.clone();
@@ -323,24 +402,9 @@ fn install_engine_only(dir: &PathBuf) -> R<()> {
     if !engine_bin(dir).exists() {
         let zip_path = dir.join("engine.zip");
         download_to_unsized(WHISPER_ZIP, &zip_path, "binary")?;
-        let f = fs::File::open(&zip_path).map_err(|e| e.to_string())?;
-        let mut z = zip::ZipArchive::new(f).map_err(|e| e.to_string())?;
-        let out = dir.join("engine");
-        fs::create_dir_all(&out).map_err(|e| e.to_string())?;
-        for i in 0..z.len() {
-            let mut f = z.by_index(i).map_err(|e| e.to_string())?;
-            if f.is_dir() {
-                continue;
-            }
-            // aplatit « Release/xxx.dll » ; ignore les chemins douteux
-            let name = match f.enclosed_name().and_then(|p| p.file_name().map(|n| n.to_owned())) {
-                Some(n) => n,
-                None => continue,
-            };
-            let mut dst = fs::File::create(out.join(name)).map_err(|e| e.to_string())?;
-            std::io::copy(&mut f, &mut dst).map_err(|e| e.to_string())?;
-        }
+        let files = extract_flat(&zip_path, &dir.join("engine"))?;
         let _ = fs::remove_file(&zip_path);
+        verify_kept(&files)?;
         if !engine_bin(dir).exists() {
             return Err("whisper-cli.exe absent de l'archive.".into());
         }
@@ -366,6 +430,7 @@ pub fn run_job(app: AppHandle, model: String, phase: &str, job: impl FnOnce() ->
         if d.active {
             return Err("Un téléchargement est déjà en cours.".into());
         }
+        CANCEL.store(false, Ordering::SeqCst);
         *d = Dl { active: true, model, phase: phase.into(), ..Default::default() };
     }
     std::thread::spawn(move || {

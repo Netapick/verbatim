@@ -114,6 +114,15 @@ La mise à jour se règle dans **Réglages › Connexions** : vous pouvez désac
 
 L'installation se fait par utilisateur, sans droits administrateur. Les moteurs et modèles sont rangés dans un dossier `ia` à côté de l'application.
 
+### Si l'antivirus bloque un moteur
+
+Les moteurs (whisper.cpp, llama.cpp) sont des programmes tiers non signés : certains antivirus, dont Windows Defender, les suppriment ou les mettent en quarantaine par erreur. Signes typiques : « Accès refusé (erreur 5) » au téléchargement, ou « une connexion existante a dû être fermée (erreur 10054) » pendant la rédaction.
+
+1. Ouvrez **Sécurité Windows › Protection contre les virus et menaces › Gérer les paramètres › Exclusions**, puis **Ajouter une exclusion › Dossier**, et choisissez le dossier d'installation de Verbatim (celui qui contient `ia`).
+2. Dans **Historique de protection**, restaurez les fichiers mis en quarantaine, ou relancez simplement le téléchargement du moteur depuis les **Réglages**.
+
+Inutile de lancer Verbatim en administrateur : cela ne change rien à l'analyse de l'antivirus. Si la rédaction sur carte graphique est coupée, Verbatim réessaie tout seul sur le processeur.
+
 ## En bref
 
 - Windows x64 · interface en français

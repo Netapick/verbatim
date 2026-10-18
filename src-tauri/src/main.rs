@@ -13,7 +13,7 @@ mod models;
 mod recorder;
 mod update;
 use recorder::{rec_devices, rec_pause, rec_set_gain, rec_start, rec_status};
-use engine::{engine_install, engine_install_gpu, engine_remove, engine_status, retry_transcription, spawn_transcription};
+use engine::{engine_install, download_cancel, engine_install_gpu, engine_remove, engine_status, retry_transcription, spawn_transcription};
 
 pub mod engine_paths {
     use std::path::PathBuf;
@@ -630,7 +630,7 @@ fn main() {
             update_meeting, purge_meeting, export_meeting,
             list_briefs, list_kinds, set_kinds, create_brief, update_brief, purge_brief,
             get_glossary, set_glossary, get_settings, set_settings,
-            engine_status, engine_install, engine_install_gpu, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, retry_transcription,
+            engine_status, engine_install, engine_install_gpu, download_cancel, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, retry_transcription,
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
             update::update_check, update::update_install
         ])

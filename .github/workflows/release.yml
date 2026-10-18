@@ -1,0 +1,54 @@
+name: release
+
+# Construit l'installateur sur GitHub, le fait signer par SignPath, puis publie la release.
+# Déclenchement : pousser un tag « vX.Y.Z » (la version doit déjà être montée dans les fichiers du projet).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-sign-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: npm ci
+
+      - name: Build (Tauri, NSIS)
+        run: npx tauri build
+
+      - name: Archive l'installateur non signé
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: installateur-non-signe
+          path: src-tauri/target/release/bundle/nsis/*_x64-setup.exe
+
+      - name: Signature (SignPath)
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: verbatim
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Publie la release (installateur signé)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" signed/*_x64-setup.exe --title "${{ github.ref_name }}" --generate-notes
