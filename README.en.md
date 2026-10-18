@@ -2,89 +2,86 @@
 
 [Français](README.md) · English
 
+**Transcribe your meetings and get written reports, without anything leaving your computer.**
+
 [![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![MIT license](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
 
-**Whisper on AMD GPUs:** whisper.cpp has no official Windows binary for AMD cards. Verbatim builds it for ROCm (HIP, Radeon RX 7000) and ships it, making GPU-accelerated transcription possible on AMD as well as NVIDIA (CUDA).
+[**Download Verbatim**](https://github.com/Netapick/verbatim/releases/latest) · [Illustrated presentation](docs/PRESENTATION.en.md) · [Privacy](docs/PRIVACY.en.md)
 
-> Illustrated presentation: [docs/PRESENTATION.en.md](docs/PRESENTATION.en.md) · [Download](https://github.com/Netapick/verbatim/releases/latest)
+![Meeting report](docs/screenshots/03-compte-rendu.png)
 
-Desktop application (Tauri 2 + Rust) to organize your meetings: audio import or
-transcript import, report, preparations (briefs), glossary, trash.
-Original visual identity, name, icon and interface. The interface is available in French and English: the installer asks for the language, which can be changed in Settings › Connections (`ui/i18n.js`: a French → English dictionary applied at display time; the app's texts are still written in French in the code).
+Verbatim is a Windows desktop application. It records or imports your meetings, transcribes them with **Whisper**, then writes the report with a **Qwen** AI that runs on your own machine. Audio, transcripts and models stay with you: no account, no subscription, no telemetry. (The screenshots show the French interface; the app is also available in English.)
 
-Data: a `store.json` file + the copied audio files, in the app's data folder.
-Optional LLM (Settings): OpenAI-compatible API for reports and briefs.
+## Features
 
-## Recording from the PC
-"● Record" button: microphone, PC sound (WASAPI loopback: video calls, videos…) or both, mixed to 16 kHz mono.
-Choice of the input device and of the output to capture (remembered), pause/resume, timer and live levels; when you stop, the meeting is created and transcribed automatically.
+**Record or import**
+- Record the microphone, the PC sound (video calls, videos) or both, with pause, live levels and recovery after a crash.
+- Import audio (mp3, m4a/aac, ogg, flac, wav…) or an existing transcript (txt, srt, vtt, md).
 
-Audio is written to disk as you go (nothing is kept in memory). After a crash or power loss,
-the recording is rebuilt on the next launch (about 2 s lost at most) and added to the meetings.
+**Transcribe**
+- Local Whisper (whisper.cpp), with speech detection to limit hallucinations on silences.
+- French, English, Spanish, German, Italian, or automatic detection; a glossary of acronyms is passed to the model.
 
-## Report
-Generated from the transcript, in order of priority: local AI (llama.cpp + Qwen 3.5 4B or 9B, or Qwen 3.8 27B (Q4 or lighter), downloaded in Settings; loaded only while writing), then Ollama (if installed: started on demand, model of your choice in Settings), then an OpenAI-compatible API, then a simplified summary computed from the transcript (real sentences, no invented text). Long meetings are split into parts, summarized, then merged. The glossary and the linked preparation are provided to the model.
+**Write**
+- Summary, topics, decisions, actions and next steps, by a local AI (Qwen 3.5 4B/9B, Qwen 3.8 27B, or your own GGUF models). Ollama and an OpenAI-compatible API are optional.
+- Without a writing model, a simplified summary is built from real sentences of the transcript, inventing nothing.
 
-### Writing AI computation (CPU / GPU)
-Settings › Report: CPU, Vulkan GPU (AMD/NVIDIA/Intel, 32 MB engine, no installation) or ROCm GPU (AMD). Each engine is downloaded into `ia/llm`, `ia/llm-vulkan`, `ia/llm-rocm`.
-ROCm uses the AMD runtime shipped with the installer (`redist/rocm-runtime`), or another runtime (a folder of HIP DLLs, or a `rocm_sdk` venv) chosen by hand in Settings. Automatic fallback ROCm → Vulkan → CPU.
-Measurement (RX 7800 XT, Qwen 3.5 4B Q4): CPU 94 / 11 tok/s (read / write), Vulkan 2566 / 127, ROCm 3673 / 117.
+**Prepare and look back**
+- Meeting preparations (objective, agenda, questions), customizable meeting types.
+- Audio player synchronized with the transcript (click a passage to play from there), export to text, subtitles, JSON, Markdown and audio.
+- Light and dark theme, French and English interface, automatic updates.
 
-## Listening
-Audio player in each meeting (speed 0.75× to 2×); clicking a passage of the transcript starts playback at that moment, and the current passage is highlighted.
+## Supported hardware
 
-## Transcription
-Local Whisper via whisper.cpp v1.9.2 (official CPU binary): on first use, the app downloads
-the engine (~8 MB) and the chosen model (tiny 75 MB, base 142 MB, small 466 MB) into its data folder.
-Audio is decoded in Rust (symphonia: mp3, m4a/aac, ogg, flac, wav), converted to 16 kHz mono,
-then transcribed offline. The glossary is passed to Whisper as the initial prompt.
-Models of your choice in Settings (tiny → large v3). Downloads are resumable (`.part` file kept, HTTP Range resume), their progress survives page changes, and models stay in the app's data folder. Speech detection (Silero VAD) is enabled to limit hallucinations on silences.
-Computation: CPU by default; CPU / GPU button in Settings (GPU = official CUDA build of whisper.cpp, NVIDIA cards only, ~685 MB to download into `ia/engine-gpu`).
-Limits: no speaker separation (a single "Intervenant"), no AMD/Intel GPU for Whisper, Windows x64.
+| Graphics card | Transcription (Whisper) | Writing (Qwen) |
+|---|---|---|
+| **NVIDIA** | CUDA | CUDA, otherwise Vulkan |
+| **AMD Radeon RX 7000 / PRO W7000** (RDNA 3) | ROCm | ROCm, otherwise Vulkan |
+| Other AMD, Intel | Processor | Vulkan |
+| No graphics card | Processor | Processor |
 
-## Model location
-Engines (whisper.cpp, llama.cpp) and models are stored in the `ia` folder next to `verbatim.exe` (otherwise in the app's data if that folder is not writable). No model is provided: you download them in Settings.
-If models already exist (an older Verbatim folder, models downloaded by Ollama, or any other folder/`.gguf` / `ggml-*.bin` file you choose), Settings › "Existing models" detects them and **copies** them into `ia`. A copied GGUF is used directly with Verbatim's engine, without Ollama.
+whisper.cpp has no official Windows binary for AMD cards: Verbatim ships a ROCm build compiled for Radeon RX 7000 cards, making GPU-accelerated transcription possible on AMD as well as NVIDIA. "Automatic" mode picks the fastest available engine, with fallback to the processor.
 
-## Distributing the application
-The `redist/` folder (ready-to-use engines) is bundled in the installer and used in place: no engine download at first launch, and no dependency on an installed SDK. Models (transcription, writing) still have to be installed from Settings.
+Writing speed (RX 7800 XT, Qwen 3.5 4B Q4, prompt / generation in tokens per second): processor 94 / 11, Vulkan 2566 / 127, ROCm 3673 / 117.
 
-    ./scripts/build-redist.ps1              # whisper.cpp + VAD + llama.cpp CPU and Vulkan (~170 MB)
-    ./scripts/build-redist.ps1 -WithRocm    # + AMD RDNA3 ROCm: llama.cpp ROCm and minimal runtime (~1.5 GB more)
-    ./scripts/build-whisper-rocm.ps1 -HipRoot <sdk>   # (once) builds whisper.cpp for ROCm, then build-redist.ps1 -WithRocm -WhisperRocmFrom <...\build-hip\bin>
-    npx tauri build                          # NSIS installer (per user, writable `ia` folder)
+## Installation
 
-Whisper on AMD GPU (ROCm) has no official binary: `build-whisper-rocm.ps1` builds it (≈180 MB, RDNA3) and places it in `redist/engine-rocm`, with the ROCm runtime. It is chosen automatically when "GPU" is checked and a Radeon card is detected.
+1. Download `Verbatim_X.Y.Z_x64-setup.exe` from the [latest release](https://github.com/Netapick/verbatim/releases/latest). The installer is lightweight (about 3 MB) and offers French or English.
+2. It downloads the engines by itself: the base pack (≈ 61 MB), then the acceleration that matches your card (ROCm ≈ 430 MB, or CUDA ≈ 1.3 GB). It asks no questions and needs no administrator rights.
+3. Launch Verbatim, then download a transcription model and, if you wish, a writing model from **Settings**. No model is shipped with the application.
 
-The installer shows no question: it installs the base pack, then detects the GPU (`src-tauri/installer/detect-gpu.ps1`) and adds the ROCm pack (Radeon RX 7000 / PRO W7000) or the whisper.cpp CUDA engine (NVIDIA, in `ia/engine-gpu`).
+Engines and models are stored in an `ia` folder next to the application. If you already have models (Ollama, `.gguf` or `ggml-*.bin` files), **Settings › Models** detects them and **copies** them into `ia`, leaving the originals untouched.
 
-Engine search order: `ia/` (installed by the user) then `redist/` (shipped). For a lightweight installer, build `redist` without `-WithRocm`. The shipped ROCm runtime covers RDNA3 (gfx110X); other AMD cards use Vulkan.
-Third-party redistributables (whisper.cpp, llama.cpp, ROCm) have their own licenses: see the LICENSE files in `redist/`.
+**Updates:** at startup, Verbatim looks for the latest version on GitHub, verifies its SHA-256, installs it and restarts. Never during a recording, a transcription or report writing. Can be turned off in **Settings › Connections**.
 
-## Antivirus
-The downloaded engines (whisper.cpp, llama.cpp: `whisper-cli.exe`, `llama-server.exe`, Vulkan/CUDA/ROCm DLLs) are unsigned; Defender and other antivirus products may delete them or quarantine them (error 5 "access denied" when downloading, error 10054 "connection closed" while writing a report). After extraction, the app waits for the scan, then checks that the files are still there (`engine::verify_kept`) and shows the steps to follow; if the GPU writing engine is cut off, it retries once on the CPU. User solution: add the installation folder (containing `ia`) to the antivirus exclusions (Windows Security › Virus & threat protection › Exclusions), restore the files from the protection history, then restart the download. Running the app as administrator does not help.
+### If your antivirus blocks an engine
 
-## License and signing
-Code under the MIT license (`LICENSE`). The installer is built and signed by SignPath from GitHub Actions (`.github/workflows/release.yml`): see `docs/SIGNATURE.en.md`.
+The third-party engines (whisper.cpp, llama.cpp) are unsigned: some antivirus products, including Windows Defender, may delete or block them ("access denied" or "connection closed" errors). Add Verbatim's installation folder (the one containing `ia`) to the exclusions: *Windows Security › Virus & threat protection › Manage settings › Exclusions › Add an exclusion › Folder*. Then restore the files from the protection history, or restart the download. Running the application as administrator does not help.
 
-## Code signing policy
+## Privacy
+
+Audio, transcripts and reports are processed **only on your computer**. The only outgoing connections: downloading engines and models (GitHub, Hugging Face) at your request, the update check against the GitHub API, and, only if you configure one yourself, a remote API for report writing. Full text: [docs/PRIVACY.en.md](docs/PRIVACY.en.md).
+
+## Limitations
+
+- Windows x64 only.
+- No speaker separation for now: a single "Intervenant" (speaker).
+- Reports are written in the meeting's language (the instructions given to the AI are in French).
+
+## Documentation
+
+- [Illustrated presentation](docs/PRESENTATION.en.md): a tour of the application, with screenshots.
+- [Technical documentation](docs/DEVELOPMENT.en.md): architecture, building, distribution, updates.
+- [Code signing](docs/SIGNATURE.en.md) · [Privacy](docs/PRIVACY.en.md)
+
+## License
+
+Code under the [MIT](LICENSE) license. Third-party components (whisper.cpp, llama.cpp, ROCm) remain under their respective licenses, detailed in each release's `THIRD-PARTY-LICENSES.md`.
+
+### Code signing policy
+
 Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
 - Only the installer built from this repository by GitHub Actions (`.github/workflows/release.yml`) is signed; each signing request is manually approved.
 - Roles: [Netapick](https://github.com/Netapick) is author, reviewer and approver (multi-factor authentication enabled).
 - Third-party engines (whisper.cpp, llama.cpp) are downloaded as published by their authors and are not signed by this project.
-
-## Privacy
-Verbatim processes audio, transcripts and reports **only on the computer**: nothing is sent online, unless you configure a remote API yourself for writing. The application's only outgoing connections: downloading engines and models (GitHub, Hugging Face) at your request, and an update check against the GitHub API at startup (can be turned off in Settings › Connections). No personal data or telemetry is collected. Full text: [docs/PRIVACY.en.md](docs/PRIVACY.en.md).
-
-## Updates
-At startup, the app queries `releases/latest` of the GitHub repository, downloads the installer (`*_x64-setup.exe`), verifies its SHA-256 (the API's `digest` field), runs it silently in the same folder, then restarts (`src-tauri/src/update.rs`). Never during a recording, a transcription or report writing. Settings › Connections lets you turn off automatic installation. To publish a version: bump the number in `package.json`, `tauri.conf.json`, `Cargo.toml`, `npx tauri build`, then `gh release create vX.Y.Z <exe>` (the release must be the most recent one).
-
-## Visual identity
-Logo: `python scripts/make-logo.py` (app tile drawn as a raster: gradients, glow, reflection; simplified versions at 16/24/32 px); exports `src-tauri/icons/*` (ico + png) and `ui/logo.png`, `ui/favicon.ico`, `ui/favicon.png`.
-
-## Development
-    npm install
-    npx tauri dev                    # run
-    npx tauri build --no-bundle      # exe: src-tauri/target/release/verbatim.exe
-    npx tauri build                  # installers (requires WiX/NSIS)
