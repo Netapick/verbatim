@@ -1,5 +1,7 @@
 # Verbatim
 
+Français · [English](PRESENTATION.en.md)
+
 **Transcrivez vos réunions et obtenez des comptes-rendus rédigés, sans que rien ne quitte votre ordinateur.**
 
 Verbatim est une application de bureau Windows. Elle enregistre ou importe vos réunions, les transcrit avec Whisper, puis rédige le compte-rendu avec une IA qui tourne sur votre propre machine : l'audio, les transcriptions et les modèles restent chez vous. L'application n'envoie rien en ligne, sauf si vous configurez vous-même une API distante.

@@ -1,5 +1,7 @@
 # Signature du code (SignPath)
 
+Français · [English](SIGNATURE.en.md)
+
 L'installateur est signé par [SignPath Foundation](https://signpath.org/) (gratuit pour les projets open source, licence MIT du dépôt). La signature se fait sur GitHub Actions : `.github/workflows/release.yml` construit l'installateur, l'envoie à SignPath, récupère la version signée et publie la release.
 
 ## Ce qui est signé, et ce qui ne l'est pas

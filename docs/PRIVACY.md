@@ -1,6 +1,6 @@
 # Politique de confidentialité — Verbatim
 
-*Privacy policy — English summary at the end.*
+Français · [English](PRIVACY.en.md)
 
 Dernière mise à jour : 18 octobre 2026.
 

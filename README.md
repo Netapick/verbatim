@@ -1,5 +1,7 @@
 # Verbatim
 
+Français · [English](README.en.md)
+
 > Présentation illustrée : [docs/PRESENTATION.md](docs/PRESENTATION.md) · [Télécharger](https://github.com/Netapick/verbatim/releases/latest)
 
 Application de bureau (Tauri 2 + Rust) pour organiser ses réunions : import audio ou
