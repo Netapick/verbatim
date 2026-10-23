@@ -1,6 +1,6 @@
 ﻿# Prépare les packs téléchargés par l'installateur (installateur léger) à partir du dossier "redist".
 #
-#   .\scripts\make-packs.ps1 -BaseUrl "https://exemple.com/verbatim/0.1.0"
+#   .\scripts\make-packs.ps1 -BaseUrl "https://github.com/Netapick/verbatim/releases/download"
 #   .\scripts\make-packs.ps1 -BaseUrl "..." -SkipZip       # ne régénère que packs.nsh (nouvelle URL)
 #   .\scripts\make-packs.ps1 -BaseUrl "..." -Rebuild ROCM  # ne refait que le pack ROCm (les autres zips existants sont réutilisés)
 #
@@ -12,7 +12,7 @@
 param(
     [Parameter(Mandatory)][string]$BaseUrl,
     [switch]$SkipZip,
-    [string[]]$Rebuild = @("CORE", "ROCM")
+    [string[]]$Rebuild = @("CORE", "ROCM", "ROCMFIX")
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -22,13 +22,15 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $ver = (Get-Content (Join-Path $root "src-tauri\tauri.conf.json") -Raw | ConvertFrom-Json).version
 
 $packs = [ordered]@{
-    CORE = @{ File = "verbatim-redist-core-0.1.0.zip"; Dirs = @("engine", "llm", "llm-vulkan", "models") }
-    ROCM = @{ File = "verbatim-redist-rocm-0.3.0.zip"; Dirs = @("engine-rocm", "llm-rocm", "rocm-runtime") }  # 0.3.0 : + whisper-server ROCm (direct)
+    CORE = @{ Tag = "v0.1.0"; File = "verbatim-redist-core-0.1.0.zip"; Dirs = @("engine", "llm", "llm-vulkan", "models") }
+    ROCM = @{ Tag = "v0.3.0"; File = "verbatim-redist-rocm-0.3.0.zip"; Dirs = @("engine-rocm", "llm-rocm", "rocm-runtime") }  # 0.3.0 : + whisper-server ROCm (direct)
+    # correctif pour les mises à jour : seul whisper-server.exe, ajouté à un dossier engine-rocm déjà installé (~0,5 Mo)
+    ROCMFIX = @{ Tag = "v0.3.0"; File = "verbatim-redist-rocm-server-0.3.0.zip"; Files = @("engine-rocm\whisper-server.exe") }
 }
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$nsh = @("; Généré par scripts/make-packs.ps1 : ne pas modifier à la main.", "!define PACKS_BASE `"$($BaseUrl.TrimEnd('/'))`"")
+$nsh = @("; Généré par scripts/make-packs.ps1 : ne pas modifier à la main.")
 foreach ($k in $packs.Keys) {
     $pk = $packs[$k]
     $zip = Join-Path $out $pk.File
@@ -46,12 +48,19 @@ foreach ($k in $packs.Keys) {
                     [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($za, $_.FullName, $rel, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
                 }
             }
+            foreach ($f in $pk.Files) {
+                $src = Join-Path $redist $f
+                if (-not (Test-Path $src)) { throw "Fichier manquant : redist\$f" }
+                [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($za, $src, "redist/" + $f.Replace('\', '/'), [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+            }
         } finally { $za.Dispose(); $fs.Dispose() }
     }
     if (-not (Test-Path $zip)) { throw "Pack absent : $zip (lancez sans -SkipZip)" }
     $mb = [int][math]::Ceiling((Get-Item $zip).Length / 1MB)
     $sha = (Get-FileHash -Algorithm SHA256 $zip).Hash
     Write-Host ("  {0} Mo  SHA256 {1}" -f $mb, $sha)
+    # chaque pack est téléchargé depuis la release (tag) où il a été publié
+    $nsh += "!define PACK_${k}_BASE `"$($BaseUrl.TrimEnd('/'))/$($pk.Tag)`""
     $nsh += "!define PACK_${k}_FILE `"$($pk.File)`""
     $nsh += "!define PACK_${k}_SHA `"$sha`""
     $nsh += "!define PACK_${k}_MB `"$mb`""

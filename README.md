@@ -52,10 +52,17 @@ Français · [English](README.en.md)
 
 - Whisper local (whisper.cpp), avec détection de parole pour limiter les hallucinations sur les silences.
 - Français, anglais, espagnol, allemand, italien, ou détection automatique de la langue.
+- **Transcription en direct** (case à cocher dans le panneau d'enregistrement) : le texte s'affiche pendant la réunion, avec quelques secondes de retard ; à l'arrêt, la transcription complète est refaite pour une qualité maximale.
 - Du modèle le plus léger (Tiny, 75 Mo) au plus précis (Large v3), avec des versions compressées.
 - Un glossaire de sigles et de termes métier est transmis au modèle pour limiter les erreurs sur les noms propres.
 
 <img src="docs/screenshots/07-reglages-transcription.png" alt="Réglages de la transcription" width="720">
+
+### Traduire
+
+- **Traduction de la transcription** en 14 langues, par une IA locale (**TranslateGemma** de Google, ou le modèle du compte-rendu), avec les horodatages conservés : le lecteur et le surlignage fonctionnent aussi sur la traduction. Les exports (.txt, .srt, .vtt, .json) suivent la langue affichée.
+- **Traduction en direct** sous chaque phrase de la transcription en direct.
+- Calcul au choix (carte graphique ou processeur) dans Réglages › Traduction ; le matériel et le modèle utilisés sont affichés.
 
 ### Rédiger le compte-rendu
 
@@ -63,6 +70,7 @@ Français · [English](README.en.md)
 - Les réunions longues sont découpées en parties, résumées, puis fusionnées. Le glossaire et la préparation liée sont fournis au modèle.
 - Sans modèle de rédaction, Verbatim produit un résumé simplifié à partir de phrases réelles de la transcription, sans rien inventer.
 - Le modèle n'est chargé en mémoire que pendant la rédaction.
+- **Langue du compte-rendu au choix**, indépendante de celle de la réunion (français, anglais, espagnol, allemand, italien, portugais, néerlandais), par défaut ou réunion par réunion.
 
 <img src="docs/screenshots/08-reglages-redaction.png" alt="Réglages de la rédaction" width="720">
 
@@ -72,7 +80,7 @@ Français · [English](README.en.md)
 
 - **Préparations** : objectif, ordre du jour chronométré et questions à poser, avec des types de réunion personnalisables.
 - **Lecteur audio synchronisé** (0,75× à 2×) : un clic sur un passage de la transcription lance la lecture à cet instant.
-- **Export** en texte, sous-titres (.srt, .vtt), données (.json), compte-rendu (.md) et audio d'origine.
+- **Export** en texte, sous-titres (.srt, .vtt), données (.json), compte-rendu (.md) et audio d'origine, dans la langue d'origine ou traduite.
 - **Thème clair et sombre**, interface en français et en anglais.
 
 ## Matériel pris en charge
@@ -92,6 +100,7 @@ whisper.cpp ne fournit pas de binaire pour utiliser une carte AMD sous Windows :
 
 - **whisper.cpp est compilé avec ROCm (HIP)** pour les Radeon RX 7000 / PRO W7000 (RDNA 3), avec le script `scripts/build-whisper-rocm.ps1`.
 - **Un runtime ROCm minimal** est livré avec lui, pour que la carte fonctionne sans installer le SDK d'AMD.
+- **Un `whisper-server` ROCm** assure aussi la transcription en direct sur ces cartes : une fenêtre de 10 s est traitée en 0,16 s, contre 1,2 s sur processeur.
 - **L'installateur le met en place seul** quand il détecte une carte compatible, et le mode « Automatique » le choisit, avec repli sur le processeur en cas de problème.
 
 Testé sur une RX 7800 XT.
@@ -210,10 +219,13 @@ Seulement pour télécharger les moteurs et les modèles, et pour chercher les m
 Non. Verbatim fonctionne sur le processeur, mais une carte NVIDIA ou AMD accélère nettement la transcription et la rédaction.
 
 **Quelle place et quelle mémoire faut-il ?**
-Le pack de base pèse environ 61 Mo. Chaque modèle de transcription fait de 75 Mo à 1,1 Go, et chaque modèle de rédaction de 2,7 à 16 Go environ. Qwen 3.5 4B demande environ 4 Go de mémoire, le 9B environ 8 Go.
+Le pack de base pèse environ 61 Mo. Chaque modèle de transcription fait de 75 Mo à 1,1 Go, chaque modèle de rédaction de 2,7 à 16 Go environ, et chaque modèle de traduction (TranslateGemma) de 2,5 à 7,3 Go. Qwen 3.5 4B demande environ 4 Go de mémoire, le 9B environ 8 Go.
 
 **Dans quelle langue sont les comptes-rendus ?**
-Dans la langue de la réunion. L'interface de Verbatim est disponible en français et en anglais, au choix à l'installation ou dans les Réglages.
+Au choix : dans la langue de la réunion (par défaut) ou dans une autre, réglable par réunion. L'interface de Verbatim est disponible en français et en anglais, au choix à l'installation ou dans les Réglages.
+
+**La traduction envoie-t-elle mon texte en ligne ?**
+Non : elle utilise un modèle local, comme le compte-rendu. Seule exception : si vous avez configuré vous-même une API distante et qu'aucun modèle local n'est installé, c'est cette API qui est utilisée.
 
 **Verbatim distingue-t-il les intervenants ?**
 Pas encore : un seul « Intervenant » est affiché. C'est une piste de la [feuille de route](#feuille-de-route).
@@ -226,7 +238,7 @@ L'installateur et les moteurs ne sont pas encore signés. Voir la section sur l'
 Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 
 **Priorités**
-- **Plus de langues d'interface** (espagnol, allemand, italien), et comptes-rendus rédigés dans la langue choisie, indépendamment de celle de la réunion.
+- **Plus de langues d'interface** (espagnol, allemand, italien).
 - **Séparation des intervenants** (diarisation) : attribuer chaque passage à son locuteur.
 - **Whisper en Vulkan** : accélérer la transcription sur les cartes AMD d'avant la série RX 7000 et sur Intel.
 - **Signature de code** de l'installateur (demande SignPath en cours), pour supprimer les avertissements de Windows.
@@ -236,7 +248,6 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 - **Poser des questions à une réunion**, avec renvoi vers le passage concerné.
 - **Recherche dans toutes les réunions** et **correction de la transcription** dans l'application.
 - **Modèles de comptes-rendus personnalisables** (structure et ton).
-- **Transcription en direct** pendant la réunion, et traduction de la transcription.
 - **Import de vidéos** et traitement par lots.
 - **Enregistrement plus pratique** : raccourci global, icône dans la zone de notification, démarrage proposé à l'ouverture d'une visioconférence.
 - **Amélioration audio** avant transcription, **sauvegarde et restauration** des réunions, **catalogue de modèles élargi** (Llama, Mistral, Gemma), **mode ligne de commande**, **macOS et Linux**.

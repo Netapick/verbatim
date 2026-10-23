@@ -2,6 +2,52 @@
 
 Français · English below each version.
 
+## 0.3.0
+
+**Compte-rendu**
+- La langue de rédaction se choisit : dans Réglages › Compte-rendu (par défaut) et, réunion par réunion, à côté du bouton « Générer ». « Automatique » rédige dans la langue de la réunion. Les titres du compte-rendu et son export suivent la langue choisie.
+
+**Traduction de la transcription**
+- Nouveau menu « Traduire en… » dans la carte Transcription (14 langues). La traduction est faite par l'IA locale, segment par segment : les horodatages sont conservés, le lecteur et le surlignage fonctionnent aussi sur la traduction. Une traduction par langue, conservée avec la réunion.
+- Nouveaux modèles **TranslateGemma 4B et 12B** (Google, 55 langues), exécutés par llama.cpp. À défaut, le modèle du compte-rendu est utilisé.
+- Nouvel onglet **Réglages › Traduction** : calcul (automatique, ou processeur seul), modèle, et dossier des modèles (`ia	ranslation-models`).
+- Pendant la traduction : pourcentage, modèle, matériel utilisé (CPU ou GPU) et bouton « Arrêter ».
+- Les exports .txt, .srt, .vtt et .json suivent la langue affichée.
+
+**Transcription en direct**
+- Case « Transcription en direct » dans le panneau d'enregistrement, sous les niveaux du micro et du son du PC. Le texte s'affiche pendant la réunion, avec une latence de quelques secondes ; une traduction en direct peut s'afficher sous chaque phrase. Le point rouge de l'enregistrement pulse pendant le direct.
+- À l'arrêt, la transcription complète du fichier est refaite comme d'habitude (meilleure qualité) : le texte du direct est provisoire.
+- Sur carte **AMD Radeon RX 7000 / PRO W7000**, le direct utilise un `whisper-server` compilé en ROCm (une inférence de 10 s en 0,16 s au lieu de 1,2 s sur processeur) et accepte tous les modèles Whisper ; sur processeur, modèles Tiny à Small.
+
+**Installateur**
+- Le pack ROCm est mis à jour (ajout de `whisper-server`). Une mise à jour depuis une version précédente ne télécharge que ce petit fichier (≈ 0,5 Mo) ; une installation neuve télécharge le pack complet (≈ 414 Mo). Les packs sont désormais sur la release v0.3.0.
+
+**Divers**
+- Les données (`store.json`) sont écrites de façon atomique.
+
+### English
+
+**Report**
+- The writing language can be chosen: in Settings › Report (default) and, meeting by meeting, next to the "Generate" button. "Automatic" writes in the meeting's language. The report's headings and its export follow the chosen language.
+
+**Transcript translation**
+- New "Translate into…" menu in the Transcription card (14 languages). The translation is done by the local AI, segment by segment: timestamps are kept, so the player and highlighting also work on the translation. One translation per language, stored with the meeting.
+- New **TranslateGemma 4B and 12B** models (Google, 55 languages), run by llama.cpp. Otherwise the report model is used.
+- New **Settings › Translation** tab: compute (automatic, or processor only), model, and models folder (`ia	ranslation-models`).
+- During translation: percentage, model, hardware used (CPU or GPU) and a "Stop" button.
+- .txt, .srt, .vtt and .json exports follow the displayed language.
+
+**Live transcription**
+- "Live transcription" checkbox in the recording panel, under the microphone and PC sound levels. Text appears during the meeting with a few seconds of delay; a live translation can appear under each sentence. The red recording dot pulses during live mode.
+- When you stop, the full transcription of the file is redone as usual (better quality): live text is provisional.
+- On an **AMD Radeon RX 7000 / PRO W7000** card, live mode uses a `whisper-server` built for ROCm (a 10 s inference in 0.16 s instead of 1.2 s on the processor) and accepts every Whisper model; on the processor, Tiny to Small models.
+
+**Installer**
+- The ROCm pack is updated (adds `whisper-server`). Updating from a previous version only downloads this small file (≈ 0.5 MB); a fresh install downloads the full pack (≈ 414 MB). Packs now live on the v0.3.0 release.
+
+**Misc.**
+- Data (`store.json`) is written atomically.
+
 ## 0.2.3
 
 **Interface en anglais**

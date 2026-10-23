@@ -22,12 +22,12 @@
   ${EndIf}
 !macroend
 
-!macro VB_FETCH LABEL_FR LABEL_EN FILE SHA MB
+!macro VB_FETCH LABEL_FR LABEL_EN BASE FILE SHA MB
   !insertmacro VB_SAY "${LABEL_FR} (environ ${MB} Mo)…" "${LABEL_EN} (about ${MB} MB)…"
   !insertmacro VB_LOG "[hook] ${LABEL_FR}"
   InitPluginsDir
   File "/oname=$PLUGINSDIR\dl-pack.ps1" "${VB_DIR}\dl-pack.ps1"
-  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\dl-pack.ps1" -Url "${PACKS_BASE}/${FILE}" -Sha "${SHA}" -Dest "$INSTDIR" -SizeMb ${MB} -Lang $R7'
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\dl-pack.ps1" -Url "${BASE}/${FILE}" -Sha "${SHA}" -Dest "$INSTDIR" -SizeMb ${MB} -Lang $R7'
   Pop $0
   !insertmacro VB_LOG "[hook] code retour : $0"
   ${If} $0 != "0"
@@ -94,7 +94,7 @@
     ${EndIf}
   ${EndIf}
   ${IfNot} ${FileExists} "$INSTDIR\redist\engine\*.*"
-    !insertmacro VB_FETCH "Moteurs de transcription et d'IA" "Transcription and AI engines" "${PACK_CORE_FILE}" "${PACK_CORE_SHA}" "${PACK_CORE_MB}"
+    !insertmacro VB_FETCH "Moteurs de transcription et d'IA" "Transcription and AI engines" "${PACK_CORE_BASE}" "${PACK_CORE_FILE}" "${PACK_CORE_SHA}" "${PACK_CORE_MB}"
   ${EndIf}
   ; Accélération GPU : détectée puis installée directement, sans question.
   InitPluginsDir
@@ -104,8 +104,12 @@
   !insertmacro VB_LOG "[hook] détection GPU, code : $2"
   IntOp $1 $2 & 2
   ${If} $1 != 0
-  ${AndIfNot} ${FileExists} "$INSTDIR\redist\engine-rocm\*.*"
-    !insertmacro VB_FETCH "Accélération AMD (ROCm)" "AMD acceleration (ROCm)" "${PACK_ROCM_FILE}" "${PACK_ROCM_SHA}" "${PACK_ROCM_MB}"
+    ${IfNot} ${FileExists} "$INSTDIR\redist\engine-rocm\*.*"
+      !insertmacro VB_FETCH "Accélération AMD (ROCm)" "AMD acceleration (ROCm)" "${PACK_ROCM_BASE}" "${PACK_ROCM_FILE}" "${PACK_ROCM_SHA}" "${PACK_ROCM_MB}"
+    ${ElseIfNot} ${FileExists} "$INSTDIR\redist\engine-rocm\whisper-server.exe"
+      ; mise à jour d'une installation plus ancienne : il ne manque que le serveur de la transcription en direct
+      !insertmacro VB_FETCH "Transcription en direct (ROCm)" "Live transcription (ROCm)" "${PACK_ROCMFIX_BASE}" "${PACK_ROCMFIX_FILE}" "${PACK_ROCMFIX_SHA}" "${PACK_ROCMFIX_MB}"
+    ${EndIf}
   ${EndIf}
   IntOp $1 $2 & 1
   ${If} $1 != 0

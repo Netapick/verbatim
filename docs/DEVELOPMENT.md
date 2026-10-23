@@ -12,11 +12,19 @@ Verbatim est une application de bureau **Tauri 2 + Rust** (interface HTML/JS san
 | `src-tauri/src/main.rs` | Données (réunions, préparations, glossaire, réglages), commandes Tauri |
 | `src-tauri/src/engine.rs` | Transcription : whisper.cpp, décodage audio (symphonia), téléchargements reprenables, détection GPU |
 | `src-tauri/src/llm.rs` | Rédaction : llama.cpp (serveur local), Ollama, API distante, résumé simplifié |
-| `src-tauri/src/recorder.rs` | Enregistrement micro et son du PC (cpal, WASAPI loopback) |
+| `src-tauri/src/recorder.rs` | Enregistrement micro et son du PC (cpal, WASAPI loopback) ; copie des échantillons pour le direct |
+| `src-tauri/src/live.rs` | Transcription en direct : `whisper-server` persistant, fenêtre glissante, événements `live-*` |
+| `src-tauri/src/translate.rs` | Traduction de la transcription par lots (TranslateGemma ou modèle du compte-rendu) |
 | `src-tauri/src/models.rs` | Détection et copie de modèles existants |
 | `src-tauri/src/update.rs` | Mise à jour automatique |
 | `src-tauri/installer/` | Hooks NSIS et scripts PowerShell de l'installateur |
 | `scripts/` | Construction des moteurs et des packs, logo |
+
+## Langue du compte-rendu, traduction et direct
+
+- **Langue du compte-rendu** : `Settings.report_lang` (`auto` ou un code), surchargée par réunion via `generate_report(lang)` ; `llm::rules(lang)` ajoute la consigne de langue, `report.lang` mémorise le choix, `section_labels` localise les titres de l'export.
+- **Traduction** : `translate_meeting(id, lang)` découpe les segments en lots de 8, un seul `llama-server` pour toute la réunion (`llm::with_backend`). TranslateGemma est appelé par invite brute sur `/completion` (son gabarit de chat refuse le rôle système) ; les autres modèles passent par `chat_text`. Le résultat est rangé dans `Meeting.translations[lang]` avec les horodatages d'origine ; le calcul est réglé par `translate_device` (`llm::translate_cfg`). Arrêt : `translate_stop` (drapeau vérifié entre deux lots). Modèles dans `ia/translation-models`.
+- **Direct** : `recorder::Sink` publie les échantillons dans un `TapBuf` par source ; `live.rs` les mixe, envoie toutes les ~0,6 s la fin de l'audio non validé à `whisper-server` (`/inference`), valide les phrases terminées 1,2 s avant la fin de l'audio (événement `live-segment`), laisse la dernière provisoire (`live-partial`) et traduit chaque phrase validée (`live-translation`). Serveur : ROCm (`engine-rocm/whisper-server.exe`) si carte Radeon + runtime, sinon CPU ; modèle ≤ small sur CPU. À l'arrêt, `recorder::finish` coupe le direct puis la transcription normale du fichier est lancée.
 
 Les données sont dans un fichier `store.json` et les audios copiés, dans le dossier de données de l'application.
 
@@ -57,16 +65,17 @@ Les moteurs et modèles sont rangés dans `ia/` à côté de `verbatim.exe` (à 
 L'installateur est un NSIS léger (≈ 3 Mo, par utilisateur, français et anglais). Les moteurs sont téléchargés pendant l'installation, sans aucune question :
 
 1. Pack de base (≈ 61 Mo : whisper.cpp, VAD, llama.cpp CPU et Vulkan).
-2. Détection de la carte graphique (`src-tauri/installer/detect-gpu.ps1`), puis pack ROCm (Radeon RX 7000 / PRO W7000, ≈ 430 Mo) ou moteurs CUDA (NVIDIA : Whisper b5454 et llama.cpp b11700 + DLL CUDA).
+2. Détection de la carte graphique (`src-tauri/installer/detect-gpu.ps1`), puis pack ROCm (Radeon RX 7000 / PRO W7000, ≈ 414 Mo ; sur une installation existante où il ne manque que `whisper-server.exe`, seul le petit correctif ≈ 0,5 Mo est téléchargé) ou moteurs CUDA (NVIDIA : Whisper b5454 et llama.cpp b11700 + DLL CUDA).
 3. Écriture de la langue choisie dans `lang.txt`, reprise par l'application au premier démarrage.
 
-Les packs sont des zips publiés sur la release `v0.1.0` du dépôt ; `packs.nsh` (URL, taille, SHA-256) est généré par `scripts/make-packs.ps1`. Journal de l'installation : `redist-install.log`.
+Les packs sont des zips publiés sur les releases du dépôt : pack de base sur `v0.1.0`, packs ROCm (complet et correctif `whisper-server`) sur `v0.3.0`. Un pack modifié reçoit toujours un **nouveau nom** (les anciens installateurs vérifient la somme SHA-256 de l'ancien fichier). `packs.nsh` (URL de chaque pack, taille, SHA-256) est généré par `scripts/make-packs.ps1`. Journal de l'installation : `redist-install.log`.
 
 ```
 ./scripts/build-redist.ps1              # whisper.cpp + VAD + llama.cpp CPU et Vulkan
 ./scripts/build-redist.ps1 -WithRocm    # + ROCm AMD RDNA3 (runtime minimal)
-./scripts/build-whisper-rocm.ps1 -HipRoot <sdk>   # compile whisper.cpp en ROCm (une fois)
-./scripts/make-packs.ps1 -BaseUrl <url> # zips des packs + packs.nsh
+python scripts/make-hiproot.py <site-packages avec rocm_sdk_devel> <hiproot>   # reconstitue le SDK ROCm de développement (une fois)
+./scripts/build-whisper-rocm.ps1 -HipRoot <hiproot>   # compile whisper-cli et whisper-server en ROCm
+./scripts/make-packs.ps1 -BaseUrl <url> # zips des packs + packs.nsh (-Rebuild ROCM pour un seul pack)
 npx tauri build                         # installateur NSIS
 ```
 

@@ -54,10 +54,17 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 - Local Whisper (whisper.cpp), with speech detection to limit hallucinations on silences.
 - French, English, Spanish, German, Italian, or automatic language detection.
+- **Live transcription** (checkbox in the recording panel): the text appears during the meeting with a few seconds of delay; when you stop, the full transcription is redone for maximum quality.
 - From the lightest model (Tiny, 75 MB) to the most accurate (Large v3), with compressed versions.
 - A glossary of acronyms and business terms is passed to the model to limit mistakes on proper names.
 
 <img src="docs/screenshots/07-reglages-transcription.png" alt="Transcription settings" width="720">
+
+### Translate
+
+- **Transcript translation** into 14 languages, by a local AI (Google's **TranslateGemma**, or the report model), with timestamps kept: the player and highlighting also work on the translation. Exports (.txt, .srt, .vtt, .json) follow the displayed language.
+- **Live translation** under each sentence of the live transcription.
+- Compute of your choice (graphics card or processor) in Settings › Translation; the hardware and model used are shown.
 
 ### Write the report
 
@@ -65,6 +72,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 - Long meetings are split into parts, summarized, then merged. The glossary and the linked preparation are provided to the model.
 - Without a writing model, Verbatim produces a simplified summary built from real sentences of the transcript, inventing nothing.
 - The model is only loaded into memory while writing.
+- **Report language of your choice**, independent of the meeting's (French, English, Spanish, German, Italian, Portuguese, Dutch), as a default or meeting by meeting.
 
 <img src="docs/screenshots/08-reglages-redaction.png" alt="Report writing settings" width="720">
 
@@ -74,7 +82,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 - **Preparations**: objective, timed agenda and questions to ask, with customizable meeting types.
 - **Synchronized audio player** (0.75× to 2×): clicking a passage of the transcript starts playback at that moment.
-- **Export** to text, subtitles (.srt, .vtt), data (.json), report (.md) and the original audio.
+- **Export** to text, subtitles (.srt, .vtt), data (.json), report (.md) and the original audio, in the original or translated language.
 - **Light and dark theme**, French and English interface.
 
 ## Supported hardware
@@ -94,6 +102,7 @@ whisper.cpp does not provide a binary to use an AMD card on Windows: only the pr
 
 - **whisper.cpp is built with ROCm (HIP)** for Radeon RX 7000 / PRO W7000 cards (RDNA 3), using the `scripts/build-whisper-rocm.ps1` script.
 - **A minimal ROCm runtime** ships with it, so the card works without installing AMD's SDK.
+- **A ROCm `whisper-server`** also handles live transcription on these cards: a 10 s window is processed in 0.16 s, versus 1.2 s on the processor.
 - **The installer sets it up by itself** when it detects a compatible card, and "Automatic" mode picks it, falling back to the processor in case of problems.
 
 Tested on an RX 7800 XT.
@@ -212,10 +221,13 @@ Only to download engines and models, and to check for updates. Transcription and
 No. Verbatim runs on the processor, but an NVIDIA or AMD card speeds up transcription and writing considerably.
 
 **How much space and memory do I need?**
-The base pack is about 61 MB. Each transcription model is 75 MB to 1.1 GB, and each writing model about 2.7 to 16 GB. Qwen 3.5 4B needs about 4 GB of memory, the 9B about 8 GB.
+The base pack is about 61 MB. Each transcription model is 75 MB to 1.1 GB, each writing model about 2.7 to 16 GB, and each translation model (TranslateGemma) 2.5 to 7.3 GB. Qwen 3.5 4B needs about 4 GB of memory, the 9B about 8 GB.
 
 **What language are the reports in?**
-The meeting's language. Verbatim's interface is available in French and English, chosen at installation or in Settings.
+Your choice: the meeting's language (default) or another one, adjustable per meeting. Verbatim's interface is available in French and English, chosen at installation or in Settings.
+
+**Does translation send my text online?**
+No: it uses a local model, like the report. The only exception: if you configured a remote API yourself and no local model is installed, that API is used.
 
 **Does Verbatim tell speakers apart?**
 Not yet: a single "Intervenant" (speaker) is shown. It is an item of the [roadmap](#roadmap).
@@ -228,7 +240,7 @@ The installer and the engines are not signed yet. See the section on [antivirus]
 These are working ideas, with no commitment on dates or order.
 
 **Priorities**
-- **More interface languages** (Spanish, German, Italian), and reports written in a chosen language, independently of the meeting's language.
+- **More interface languages** (Spanish, German, Italian).
 - **Speaker separation** (diarization): attribute each passage to its speaker.
 - **Whisper on Vulkan**: speed up transcription on AMD cards older than the RX 7000 series and on Intel.
 - **Code signing** of the installer (SignPath application in progress), to remove Windows warnings.
@@ -238,7 +250,6 @@ These are working ideas, with no commitment on dates or order.
 - **Ask questions to a meeting**, with a link back to the relevant passage.
 - **Search across all meetings** and **transcript correction** in the application.
 - **Customizable report templates** (structure and tone).
-- **Live transcription** during the meeting, and transcript translation.
 - **Video import** and batch processing.
 - **More convenient recording**: global shortcut, notification-area icon, recording offered when a video call opens.
 - **Audio enhancement** before transcription, **backup and restore** of meetings, a **wider model catalog** (Llama, Mistral, Gemma), a **command-line mode**, **macOS and Linux**.
