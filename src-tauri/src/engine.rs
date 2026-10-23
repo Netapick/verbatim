@@ -150,7 +150,7 @@ pub fn engine_status(st: State<AppState>) -> R<Value> {
     }))
 }
 
-fn vad_path(dir: &PathBuf) -> PathBuf {
+pub(crate) fn vad_path(dir: &PathBuf) -> PathBuf {
     pick(dir, "models\\ggml-silero-v5.1.2.bin")
 }
 
@@ -271,6 +271,14 @@ fn set_hw(app: &AppHandle, id: &str, label: &str) {
     if let Some(m) = s.meetings.iter_mut().find(|m| m.id == id) {
         m.transcribe_hw = label.to_string();
     }
+}
+
+/// whisper-server ROCm utilisable (carte AMD, runtime ROCm, exécutable livré) : dossiers du runtime pour le PATH.
+pub fn rocm_server_ready(dir: &PathBuf, root: &str) -> Option<Vec<PathBuf>> {
+    if !crate::engine_paths::engine_rocm_server(dir).exists() || !rocm_ready(dir, root) {
+        return None;
+    }
+    crate::llm::rocm_path_dirs(dir, root)
 }
 
 /// Carte AMD présente et moteur Whisper ROCm + runtime disponibles.
@@ -560,6 +568,7 @@ fn set_status(app: &AppHandle, id: &str, status: &str, error: Option<String>, tr
         m.error = error;
         if let Some(t) = transcript {
             m.transcript = t;
+            m.translations.clear(); // les traductions suivaient l'ancienne transcription
         }
     }
     let _ = st.save(&s);

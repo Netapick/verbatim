@@ -7,10 +7,12 @@ use std::{fs, path::PathBuf, sync::Mutex};
 use tauri::{Manager, State};
 
 mod engine;
+mod live;
 mod llm;
 use llm::{generate_report, llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
 mod models;
 mod recorder;
+mod translate;
 mod update;
 use recorder::{rec_devices, rec_pause, rec_set_gain, rec_start, rec_status};
 use engine::{engine_install, download_cancel, engine_install_gpu, engine_remove, engine_status, retry_transcription, spawn_transcription};
@@ -33,6 +35,7 @@ pub mod engine_paths {
     pub fn engine_bin(dir: &PathBuf) -> PathBuf { pick(dir, "engine\\whisper-cli.exe") }
     pub fn engine_gpu_bin(dir: &PathBuf) -> PathBuf { dir.join("engine-gpu").join("whisper-cli.exe") }
     pub fn engine_rocm_bin(dir: &PathBuf) -> PathBuf { pick(dir, "engine-rocm/whisper-cli.exe") }
+    pub fn engine_rocm_server(dir: &PathBuf) -> PathBuf { pick(dir, "engine-rocm/whisper-server.exe") }
     pub fn model_path(dir: &PathBuf, m: &str) -> PathBuf { dir.join("models").join(format!("ggml-{m}.bin")) }
     pub fn engine_ready(dir: &PathBuf, model: &str) -> bool { engine_bin(dir).exists() && model_path(dir, model).exists() }
 }
@@ -82,7 +85,40 @@ pub struct Meeting {
     pub transcribe_hw: String,
     #[serde(default)]
     pub report_hw: String,
+    /// traductions de la transcription, par langue (mêmes horodatages que l'original)
+    #[serde(default)]
+    pub translations: std::collections::HashMap<String, Vec<Segment>>,
+    /// "" | translating | error
+    #[serde(default)]
+    pub translate_state: String,
+    #[serde(default)]
+    pub translate_error: Option<String>,
+    #[serde(default)]
+    pub translate_lang: String,
+    #[serde(default)]
+    pub translate_pct: u8,
+    /// matériel utilisé pour la traduction en cours
+    #[serde(default)]
+    pub translate_hw: String,
+    /// modèle de la traduction en cours
+    #[serde(default)]
+    pub translate_label: String,
+    /// modèle (et matériel) qui a produit chaque traduction, par langue
+    #[serde(default)]
+    pub translation_models: std::collections::HashMap<String, String>,
     deleted: bool,
+}
+
+impl Meeting {
+    fn new(id: String, title: String, created_at: DateTime<Utc>, audio_path: Option<String>, source: &str, status: &str, transcript: Vec<Segment>) -> Meeting {
+        Meeting {
+            id, title, created_at, audio_path, brief_id: None, source: source.into(), status: status.into(),
+            error: None, transcript, report: None, report_state: String::new(), report_error: None,
+            report_progress: String::new(), report_pct: 0, transcribe_pct: 0, transcribe_hw: String::new(),
+            report_hw: String::new(), translations: Default::default(), translate_state: String::new(),
+            translate_error: None, translate_lang: String::new(), translate_pct: 0, translate_hw: String::new(), translate_label: String::new(), translation_models: Default::default(), deleted: false,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -133,7 +169,17 @@ pub struct Settings {
     /// installe seule les nouvelles versions publiées sur GitHub
     #[serde(default = "default_true")]
     pub auto_update: bool,
+    /// langue de rédaction du compte-rendu : "auto" (celle de la transcription) ou un code (fr, en, es…)
+    #[serde(default = "default_auto")]
+    pub report_lang: String,
+    /// modèle de traduction ("" = celui du compte-rendu)
+    #[serde(default)]
+    pub translate_model: String,
+    /// calcul de la traduction : "auto" (GPU si possible) ou "cpu_only"
+    #[serde(default = "default_auto")]
+    pub translate_device: String,
 }
+fn default_auto() -> String { "auto".into() }
 fn default_true() -> bool { true }
 fn default_whisper_device() -> String { "auto".into() }
 fn default_device() -> String { "auto".into() }
@@ -142,7 +188,8 @@ impl Default for Settings {
     fn default() -> Self {
         Settings { llm_base_url: String::new(), llm_api_key: String::new(), llm_model: String::new(),
                    llm_local: String::new(), whisper_model: default_model(), whisper_lang: default_lang(), whisper_device: default_whisper_device(),
-                   llm_device: default_device(), rocm_root: String::new(), auto_update: true }
+                   llm_device: default_device(), rocm_root: String::new(), auto_update: true,
+                   report_lang: default_auto(), translate_model: String::new(), translate_device: default_auto() }
     }
 }
 
@@ -191,7 +238,10 @@ struct AppState {
 impl AppState {
     pub fn save(&self, s: &Store) -> Result<(), String> {
         let txt = serde_json::to_string_pretty(s).map_err(|e| e.to_string())?;
-        fs::write(self.dir.join("store.json"), txt).map_err(|e| e.to_string())
+        // écriture atomique : fichier temporaire puis renommage (une coupure ne tronque pas le magasin)
+        let tmp = self.dir.join("store.json.tmp");
+        fs::write(&tmp, txt).map_err(|e| e.to_string())?;
+        fs::rename(&tmp, self.dir.join("store.json")).map_err(|e| e.to_string())
     }
 }
 
@@ -265,13 +315,17 @@ fn make_brief(cfg: &Settings, subject: &str, system: &str, themes: &[String]) ->
 
 fn meeting_view(m: &Meeting) -> Value {
     let (key, label, pct) = stage(m);
+    let mut tl: Vec<&String> = m.translations.keys().collect();
+    tl.sort();
     json!({
         "id": m.id, "title": m.title, "created_at": m.created_at, "source": m.source,
         "brief_id": m.brief_id, "has_audio": m.audio_path.is_some(), "audio_path": m.audio_path,
         "play_path": m.audio_path.as_deref().map(engine::play_path),
         "stage": key, "stage_label": label, "progress": pct,
         "segments": m.transcript.len(), "error": m.error,
-        "report_state": m.report_state, "report_error": m.report_error, "report_progress": m.report_progress, "report_pct": m.report_pct, "transcribe_hw": m.transcribe_hw, "report_hw": m.report_hw
+        "report_state": m.report_state, "report_error": m.report_error, "report_progress": m.report_progress, "report_pct": m.report_pct, "transcribe_hw": m.transcribe_hw, "report_hw": m.report_hw,
+        "translate_state": m.translate_state, "translate_error": m.translate_error, "translate_lang": m.translate_lang, "translate_pct": m.translate_pct, "translate_hw": m.translate_hw, "translate_label": m.translate_label, "translation_models": m.translation_models,
+        "translation_langs": tl
     })
 }
 
@@ -300,13 +354,8 @@ fn import_audio(app: tauri::AppHandle, st: State<AppState>, paths: Vec<String>) 
             let id = new_id();
             let dst = audio_dir.join(format!("{id}.{ext}"));
             fs::copy(&src, &dst).map_err(|e| format!("{p}: {e}"))?;
-            s.meetings.push(Meeting {
-                id: id.clone(), title: name, created_at: Utc::now(),
-                audio_path: Some(dst.to_string_lossy().into()), brief_id: None,
-                source: "audio".into(),
-                status: if installed { "queued".into() } else { "needs_engine".into() },
-                error: None, transcript: vec![], report: None, report_state: String::new(), report_error: None, report_progress: String::new(), report_pct: 0, transcribe_pct: 0, transcribe_hw: String::new(), report_hw: String::new(), deleted: false,
-            });
+            s.meetings.push(Meeting::new(id.clone(), name, Utc::now(), Some(dst.to_string_lossy().into()), "audio",
+                if installed { "queued" } else { "needs_engine" }, vec![]));
             ids.push(id);
         }
         st.save(&s)?;
@@ -327,12 +376,8 @@ fn rec_stop(app: tauri::AppHandle, st: State<AppState>, title: Option<String>) -
         let mut s = st.store.lock().unwrap();
         let title = title.filter(|t| !t.trim().is_empty())
             .unwrap_or_else(|| format!("Enregistrement du {}", chrono::Local::now().format("%d/%m/%Y %H:%M")));
-        s.meetings.push(Meeting {
-            id: id.clone(), title, created_at: Utc::now(),
-            audio_path: Some(dst.to_string_lossy().into()), brief_id: None, source: "audio".into(),
-            status: if installed { "queued".into() } else { "needs_engine".into() },
-            error: None, transcript: vec![], report: None, report_state: String::new(), report_error: None, report_progress: String::new(), report_pct: 0, transcribe_pct: 0, transcribe_hw: String::new(), report_hw: String::new(), deleted: false,
-        });
+        s.meetings.push(Meeting::new(id.clone(), title, Utc::now(), Some(dst.to_string_lossy().into()), "audio",
+            if installed { "queued" } else { "needs_engine" }, vec![]));
         st.save(&s)?;
     }
     if installed { spawn_transcription(app, id.clone()); }
@@ -367,11 +412,7 @@ fn import_transcript(st: State<AppState>, path: String) -> R<String> {
     let name = PathBuf::from(&path).file_stem().and_then(|x| x.to_str()).unwrap_or("Transcription").to_string();
     let mut s = st.store.lock().unwrap();
     let id = new_id();
-    s.meetings.push(Meeting {
-        id: id.clone(), title: name, created_at: Utc::now(), audio_path: None, brief_id: None,
-        source: "transcript".into(), status: "ready".into(), error: None,
-        transcript: segs, report: None, report_state: String::new(), report_error: None, report_progress: String::new(), report_pct: 0, transcribe_pct: 0, transcribe_hw: String::new(), report_hw: String::new(), deleted: false,
-    });
+    s.meetings.push(Meeting::new(id.clone(), name, Utc::now(), None, "transcript", "ready", segs));
     st.save(&s)?;
     Ok(id)
 }
@@ -384,6 +425,7 @@ fn get_meeting(st: State<AppState>, id: String) -> R<Value> {
     let ready = stage(m).0 == "ready";
     v["transcript"] = if ready { json!(m.transcript) } else { json!([]) };
     v["report"] = json!(m.report);
+    v["translations"] = json!(m.translations);
     Ok(v)
 }
 
@@ -413,29 +455,48 @@ fn ts(sec: f64, sep: char) -> String {
     format!("{:02}:{:02}:{:02}{}{:03}", t / 3600, t % 3600 / 60, t % 60, sep, ms)
 }
 
+/// Titres des sections du compte-rendu (points abordés, décisions, actions, prochaines étapes).
+pub fn section_labels(lang: &str) -> [&'static str; 4] {
+    match lang {
+        "en" => ["Topics discussed", "Decisions", "Actions", "Next steps"],
+        "es" => ["Temas tratados", "Decisiones", "Acciones", "Próximos pasos"],
+        "de" => ["Besprochene Punkte", "Entscheidungen", "Aufgaben", "Nächste Schritte"],
+        "it" => ["Argomenti trattati", "Decisioni", "Azioni", "Prossimi passi"],
+        "pt" => ["Pontos abordados", "Decisões", "Ações", "Próximos passos"],
+        "nl" => ["Besproken punten", "Beslissingen", "Acties", "Volgende stappen"],
+        _ => ["Points abordés", "Décisions", "Actions", "Prochaines étapes"],
+    }
+}
+
 #[tauri::command(async)]
-fn export_meeting(st: State<AppState>, id: String, format: String, dest: String) -> R<()> {
+fn export_meeting(st: State<AppState>, id: String, format: String, dest: String, lang: Option<String>) -> R<()> {
     let s = st.store.lock().unwrap();
     let m = s.meetings.iter().find(|m| m.id == id).ok_or("Réunion introuvable")?;
     if format == "audio" {
         let src = m.audio_path.as_ref().ok_or("Pas d'audio")?;
         return fs::copy(src, &dest).map(|_| ()).map_err(|e| e.to_string());
     }
+    // transcription d'origine, ou traduction si une langue est demandée
+    let segs: &Vec<Segment> = match lang.as_deref().filter(|l| !l.is_empty()) {
+        Some(l) => m.translations.get(l).ok_or("Cette traduction n'existe pas encore.")?,
+        None => &m.transcript,
+    };
     let body = match format.as_str() {
-        "srt" => m.transcript.iter().enumerate().map(|(i, g)|
+        "srt" => segs.iter().enumerate().map(|(i, g)|
             format!("{}\n{} --> {}\n{}: {}\n", i + 1, ts(g.start, ','), ts(g.end, ','), g.speaker, g.text)
         ).collect::<Vec<_>>().join("\n"),
-        "vtt" => format!("WEBVTT\n\n{}", m.transcript.iter().map(|g|
+        "vtt" => format!("WEBVTT\n\n{}", segs.iter().map(|g|
             format!("{} --> {}\n{}: {}\n", ts(g.start, '.'), ts(g.end, '.'), g.speaker, g.text)
         ).collect::<Vec<_>>().join("\n")),
-        "json" => serde_json::to_string_pretty(&m.transcript).map_err(|e| e.to_string())?,
+        "json" => serde_json::to_string_pretty(segs).map_err(|e| e.to_string())?,
         "report" => {
             let r = m.report.as_ref().ok_or("Aucun compte-rendu généré.")?;
             let list = |k: &str| r[k].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).map(|x| format!("- {x}")).collect::<Vec<_>>().join("\n")).unwrap_or_default();
-            format!("# {}\n\n{}\n\n## Points abordés\n{}\n\n## Décisions\n{}\n\n## Actions\n{}\n\n## Prochaines étapes\n{}\n",
-                m.title, r["summary"].as_str().unwrap_or(""), list("topics"), list("decisions"), list("actions"), list("next_steps"))
+            let l = section_labels(r["lang"].as_str().unwrap_or(""));
+            format!("# {}\n\n{}\n\n## {}\n{}\n\n## {}\n{}\n\n## {}\n{}\n\n## {}\n{}\n",
+                m.title, r["summary"].as_str().unwrap_or(""), l[0], list("topics"), l[1], list("decisions"), l[2], list("actions"), l[3], list("next_steps"))
         }
-        _ => m.transcript.iter().map(|g| format!("{} : {}", g.speaker, g.text)).collect::<Vec<_>>().join("\n"),
+        _ => segs.iter().map(|g| format!("{} : {}", g.speaker, g.text)).collect::<Vec<_>>().join("\n"),
     };
     fs::write(dest, body).map_err(|e| e.to_string())
 }
@@ -581,6 +642,11 @@ fn main() {
                 .and_then(|t| serde_json::from_str(&t).ok())
                 .unwrap_or_default();
             for mt in store.meetings.iter_mut() {
+                if mt.translate_state == "translating" {
+                    mt.translate_state = "error".into();
+                    mt.translate_error = Some("Traduction interrompue (application fermée). Relancez-la.".into());
+                    mt.translate_pct = 0;
+                }
                 if mt.report_state == "generating" {
                     mt.report_state = "error".into();
                     mt.report_error = Some("Génération interrompue (application fermée). Relancez-la.".into());
@@ -610,14 +676,10 @@ fn main() {
                     let mut g = st.store.lock().unwrap();
                     for (id, wav, when) in recovered {
                         let dt: DateTime<Utc> = when.into();
-                        g.meetings.push(Meeting {
-                            id: id.clone(),
-                            title: format!("Enregistrement récupéré ({})", dt.with_timezone(&chrono::Local).format("%d/%m/%Y %H:%M")),
-                            created_at: dt, audio_path: Some(wav.to_string_lossy().into()), brief_id: None,
-                            source: "audio".into(),
-                            status: if ready { "queued".into() } else { "needs_engine".into() },
-                            error: None, transcript: vec![], report: None, report_state: String::new(), report_error: None, report_progress: String::new(), report_pct: 0, transcribe_pct: 0, transcribe_hw: String::new(), report_hw: String::new(), deleted: false,
-                        });
+                        g.meetings.push(Meeting::new(id.clone(),
+                            format!("Enregistrement récupéré ({})", dt.with_timezone(&chrono::Local).format("%d/%m/%Y %H:%M")),
+                            dt, Some(wav.to_string_lossy().into()), "audio",
+                            if ready { "queued" } else { "needs_engine" }, vec![]));
                         new_ids.push(id);
                     }
                     let _ = st.save(&g);
@@ -633,6 +695,7 @@ fn main() {
             get_glossary, set_glossary, get_settings, set_settings,
             engine_status, engine_install, engine_install_gpu, download_cancel, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, models::install_lang, retry_transcription,
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
+            translate::translate_meeting, translate::translate_stop, translate::translation_remove,
             update::update_check, update::update_install
         ])
         .run(tauri::generate_context!())

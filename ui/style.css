@@ -121,6 +121,16 @@ input[type=radio],input[type=checkbox]{accent-color:var(--brand)}
 .meter{display:inline-block;width:72px;height:6px;border-radius:9px;background:var(--line);overflow:hidden}
 .meter b{display:block;height:100%;background:var(--ok);transition:width .2s}
 @keyframes pulse{50%{opacity:.25}}
+/* direct : le point pulse avec un halo */
+.recing.live .dot{animation:livepulse 1.1s ease-out infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 #c93a4599;transform:scale(1)}60%{box-shadow:0 0 0 9px #c93a4500;transform:scale(1.25)}100%{box-shadow:0 0 0 0 #c93a4500;transform:scale(1)}}
+.recing.live.paused .dot{animation:none}
+.live{margin-top:10px}
+.live-lines{max-height:220px;overflow-y:auto;margin-top:8px;font-size:14px}
+.live-lines .ll{display:flex;gap:10px;padding:3px 0}
+.live-lines .tm{color:var(--mute);font-family:var(--mono);font-size:12px;min-width:54px}
+.live-lines .part .lt{color:var(--mute);font-style:italic}
+.live-lines .ltr{color:var(--brand);font-size:13px}
 
 /* ── Notification ── */
 #toast{position:fixed;bottom:24px;right:24px;max-width:420px;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;box-shadow:var(--sh-2);opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;pointer-events:none;font-weight:500}
@@ -209,3 +219,5 @@ details summary:hover{color:var(--brand)}
 .card.avn h3{color:var(--or)}
 :root[data-theme="dark"] .card.avn{--or:#f5a64a}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card.avn{--or:#f5a64a}}
+.tl-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.tl-status .pill{white-space:nowrap}

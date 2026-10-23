@@ -68,7 +68,7 @@ if ($WithRocm) {
     if ($WhisperRocmFrom) {
         Write-Host "Whisper (ROCm)"
         $we = "$out\engine-rocm"; New-Item -ItemType Directory -Force $we | Out-Null
-        foreach ($f in "whisper-cli.exe", "whisper.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-hip.dll") { Copy-Item "$WhisperRocmFrom\$f" $we -Force }
+        foreach ($f in "whisper-cli.exe", "whisper-server.exe", "whisper.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-hip.dll") { Copy-Item "$WhisperRocmFrom\$f" $we -Force }
     } elseif (-not (Test-Path "$out\engine-rocm\whisper-cli.exe")) {
         Write-Warning "Pas de Whisper ROCm : compilez-le avec scripts/build-whisper-rocm.ps1 puis relancez avec -WhisperRocmFrom."
     }

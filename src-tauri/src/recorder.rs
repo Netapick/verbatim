@@ -36,21 +36,43 @@ impl Clock {
 
 /// Écriture au fil de l'eau (PCM i16 brut) : rien n'est gardé en mémoire et une
 /// coupure brutale laisse un fichier récupérable au prochain lancement.
+/// Copie en mémoire des derniers échantillons d'une source, lue par la transcription en direct.
+/// `data` couvre les échantillons [base, base + data.len()) de la source.
+#[derive(Default)]
+pub struct TapBuf {
+    pub base: usize,
+    pub data: Vec<i16>,
+}
+
 pub struct Sink {
     w: BufWriter<File>,
     len: usize,
     unflushed: usize,
+    tap: Option<Arc<Mutex<TapBuf>>>,
+    pend: Vec<i16>,
 }
 
 impl Sink {
-    fn new(path: &Path) -> R<Self> {
+    fn new(path: &Path, tap: Option<Arc<Mutex<TapBuf>>>) -> R<Self> {
         let f = File::create(path).map_err(|e| format!("Création du fichier d'enregistrement impossible : {e}"))?;
-        Ok(Sink { w: BufWriter::with_capacity(64 * 1024, f), len: 0, unflushed: 0 })
+        Ok(Sink { w: BufWriter::with_capacity(64 * 1024, f), len: 0, unflushed: 0, tap, pend: Vec::new() })
     }
     fn put(&mut self, v: i16) {
         let _ = self.w.write_all(&v.to_le_bytes());
         self.len += 1;
         self.unflushed += 1;
+        if self.tap.is_some() {
+            self.pend.push(v);
+        }
+    }
+    /// Transmet à la transcription en direct ce qui a été écrit depuis le dernier appel.
+    fn publish(&mut self) {
+        if let Some(t) = &self.tap {
+            if !self.pend.is_empty() {
+                t.lock().unwrap().data.extend_from_slice(&self.pend);
+                self.pend.clear();
+            }
+        }
     }
     fn pad_to(&mut self, target: usize) {
         while self.len < target {
@@ -79,6 +101,7 @@ pub struct Recorder {
     clock: Arc<Mutex<Clock>>,
     mic: Option<Source>,
     sys: Option<Source>,
+    live: Option<crate::live::LiveHandle>,
 }
 
 pub type RecState = Mutex<Option<Recorder>>;
@@ -139,6 +162,7 @@ fn open_stream(dev: &cpal::Device, src: &Source, started: Instant, clock: Arc<Mu
                 }
                 pos = (pos - frames as f64).max(0.0);
                 out.flush_if_due();
+                out.publish();
                 level.store((peak.min(1.0) * 1000.0) as u32, Ordering::Relaxed);
             },
             |e| eprintln!("erreur flux audio : {e}"),
@@ -150,7 +174,7 @@ fn open_stream(dev: &cpal::Device, src: &Source, started: Instant, clock: Arc<Mu
 }
 
 #[tauri::command]
-pub fn rec_start(st: State<AppState>, mic: bool, system: bool, mic_device: Option<String>, sys_device: Option<String>, mic_gain: Option<f32>, sys_gain: Option<f32>) -> R<()> {
+pub fn rec_start(app: tauri::AppHandle, st: State<AppState>, mic: bool, system: bool, mic_device: Option<String>, sys_device: Option<String>, mic_gain: Option<f32>, sys_gain: Option<f32>, live: Option<bool>, translate_to: Option<String>) -> R<()> {
     if !mic && !system {
         return Err("Choisissez au moins une source.".into());
     }
@@ -161,14 +185,22 @@ pub fn rec_start(st: State<AppState>, mic: bool, system: bool, mic_device: Optio
     let rec_dir = st.dir.join("recordings");
     std::fs::create_dir_all(&rec_dir).map_err(|e| e.to_string())?;
     let rid = uuid::Uuid::new_v4().to_string();
+    // transcription en direct : vérifie d'abord que le moteur et un modèle sont disponibles
+    let live_cfg = if live.unwrap_or(false) { Some(crate::live::prepare(&st, translate_to.filter(|l| !l.is_empty()))?) } else { None };
+    let mut taps: Vec<Arc<Mutex<TapBuf>>> = Vec::new();
     let to_milli = |g: Option<f32>| (g.unwrap_or(1.0).clamp(0.25, 10.0) * 1000.0) as u32;
     let mk = |on: bool, tag: &str, g: Option<f32>| -> R<Option<Source>> {
         if !on {
             return Ok(None);
         }
         let path = rec_dir.join(format!("{rid}.{tag}.pcm"));
-        Ok(Some(Source { pcm: Arc::new(Mutex::new(Sink::new(&path)?)), level: Arc::new(AtomicU32::new(0)), gain: Arc::new(AtomicU32::new(to_milli(g))), path }))
+        let tap = live_cfg.as_ref().map(|_| Arc::new(Mutex::new(TapBuf::default())));
+        if let Some(tp) = &tap {
+            taps.push(tp.clone());
+        }
+        Ok(Some(Source { pcm: Arc::new(Mutex::new(Sink::new(&path, tap)?)), level: Arc::new(AtomicU32::new(0)), gain: Arc::new(AtomicU32::new(to_milli(g))), path }))
     };
+    let mut mk = mk;
     let (m, s) = (mk(mic, "mic", mic_gain)?, mk(system, "sys", sys_gain)?);
     let started = Instant::now();
     let clock = Arc::new(Mutex::new(Clock::default()));
@@ -206,7 +238,8 @@ pub fn rec_start(st: State<AppState>, mic: bool, system: bool, mic_device: Optio
     });
     match ready_rx.recv_timeout(Duration::from_secs(10)) {
         Ok(Ok(())) => {
-            *slot = Some(Recorder { stop: stop_tx, join, started, clock, mic: m, sys: s });
+            let live_h = live_cfg.map(|c| crate::live::start(app, taps, c));
+            *slot = Some(Recorder { stop: stop_tx, join, started, clock, mic: m, sys: s, live: live_h });
             Ok(())
         }
         Ok(Err(e)) => Err(e),
@@ -238,6 +271,7 @@ pub fn rec_status(st: State<AppState>) -> R<Value> {
             };
             json!({
             "recording": true,
+            "live": r.live.is_some(),
             "seconds": seconds,
             "paused": paused,
             "mic": r.mic.as_ref().map(|s| s.level.load(Ordering::Relaxed)),
@@ -251,7 +285,10 @@ pub fn rec_status(st: State<AppState>) -> R<Value> {
 
 /// Arrête l'enregistrement, mixe les sources depuis le disque et écrit le WAV.
 pub fn finish(st: &AppState, dst: &Path) -> R<()> {
-    let rec = st.rec.lock().unwrap().take().ok_or("Aucun enregistrement en cours.")?;
+    let mut rec = st.rec.lock().unwrap().take().ok_or("Aucun enregistrement en cours.")?;
+    if let Some(l) = rec.live.take() {
+        l.stop(); // libère Whisper et le modèle de traduction avant la transcription finale
+    }
     let _ = rec.stop.send(());
     let _ = rec.join.join();
     let total = (rec.clock.lock().unwrap().active(rec.started).as_secs_f64() * RATE) as usize;

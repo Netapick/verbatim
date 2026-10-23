@@ -128,6 +128,36 @@ const meter = (v) => `<span class="meter"><b style="width:${Math.min(100, Math.r
 const lsGet = (k) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 
+// Transcription en direct : l'état est gardé ici, les événements du moteur l'alimentent
+const LIVE = { segs: [], tr: {}, partial: "", state: "", msg: "", trMsg: "", wantTr: false };
+let liveRaf = 0;
+function liveRender() {
+  if (liveRaf) return;
+  liveRaf = requestAnimationFrame(() => {
+    liveRaf = 0;
+    const box = $("#livebox"); if (!box) return;
+    if (!LIVE.state) { box.innerHTML = ""; return; }
+    const stateTxt = LIVE.state === "loading" ? "Chargement de Whisper…" : LIVE.state === "error" ? (LIVE.msg || "Erreur") : "";
+    const old = box.querySelector(".live-lines"), stick = !old || old.scrollHeight - old.scrollTop - old.clientHeight < 40;
+    box.innerHTML = `<div class="card live"><b>Transcription en direct</b> <span class="meta">texte provisoire : la transcription complète est refaite à l'arrêt</span>
+      ${LIVE.hw ? `<span class="pill hw">${esc(LIVE.hw)}</span>` : ""}${stateTxt ? `<p class="meta" style="margin-top:6px">${esc(stateTxt)}</p>` : ""}${LIVE.trMsg ? `<p class="meta" style="margin-top:6px">${esc(LIVE.trMsg)}</p>` : ""}
+      <div class="live-lines">${LIVE.segs.map((s) => `<div class="ll"><span class="tm">${fmtClock(Math.floor(s.start))}</span><span class="lt">${esc(s.text)}${LIVE.tr[s.i] ? `<br><span class="ltr">${esc(LIVE.tr[s.i])}</span>` : ""}</span></div>`).join("")}${LIVE.partial ? `<div class="ll part"><span class="tm"></span><span class="lt">${esc(LIVE.partial)}</span></div>` : ""}</div></div>`;
+    const n = box.querySelector(".live-lines"); if (n && stick) n.scrollTop = n.scrollHeight;
+  });
+}
+listen("live-segment", (e) => { LIVE.segs.push(e.payload); if (LIVE.segs.length > 400) LIVE.segs.shift(); LIVE.partial = ""; if (LIVE.state === "loading") LIVE.state = "ready"; liveRender(); });
+listen("live-partial", (e) => { LIVE.partial = e.payload.text || ""; liveRender(); });
+listen("live-translation", (e) => { LIVE.tr[e.payload.i] = e.payload.text; liveRender(); });
+listen("live-state", (e) => {
+  const { state, message } = e.payload;
+  if (state === "translate-loading") LIVE.trMsg = "Chargement de la traduction : " + message;
+  else if (state === "translate-ready") LIVE.trMsg = "";
+  else if (state === "translate-error") LIVE.trMsg = message;
+  else if (state === "warn") { LIVE.trMsg = LIVE.trMsg || ""; }
+  else { LIVE.state = state; LIVE.msg = message; if (state === "ready") LIVE.hw = message; }
+  liveRender();
+});
+
 const fmtGain = (v) => "× " + (v / 100).toFixed(2).replace(/\.?0+$/, "");
 async function recPanel() {
   const box = $("#recbox"); if (!box) return;
@@ -145,8 +175,12 @@ async function recPanel() {
         <label style="margin-top:10px">Sensibilité du son du PC <span class="pill" id="r-sysg-v"></span></label>
         <input type="range" id="r-sysg" min="25" max="800" step="5" value="${Math.round(parseFloat(lsGet("rec.sysgain") || "1") * 100)}"></div>
     </div>
+    <div style="margin-top:12px"><label class="chk" title="Affiche le texte au fil de l'enregistrement ; la transcription complète est refaite à l'arrêt"><input type="checkbox" id="live-chk" ${lsGet("rec.live") === "1" ? "checked" : ""}> Transcription en direct</label>
+      <select id="live-tr" style="margin-top:6px;max-width:260px" title="Traduire en direct" ${lsGet("rec.live") === "1" ? "" : "hidden"}><option value="">Sans traduction</option>${TR_LANGS.map(([k, v]) => `<option value="${k}" ${lsGet("rec.livetr") === k ? "selected" : ""}>Traduire en ${v}</option>`).join("")}</select></div>
     <div class="bar" style="margin:12px 0 0"><button class="btn rec" id="r-go">● Démarrer</button><button class="btn" id="r-x">Annuler</button></div>
     <p class="meta" style="margin-top:8px">Pour une visioconférence, cochez les deux : votre voix et celle de vos interlocuteurs sont enregistrées. Pour « Son du PC », choisissez la sortie sur laquelle vous écoutez (casque, haut-parleurs).</p></div>`;
+  $("#live-chk").onchange = (e) => { lsSet("rec.live", e.target.checked ? "1" : "0"); $("#live-tr").hidden = !e.target.checked; };
+  $("#live-tr").onchange = (e) => lsSet("rec.livetr", e.target.value);
   const fmtG = fmtGain;
   const gv = (id, out) => { const e = $(id), o = $(out); e.oninput = () => { o.textContent = fmtG(e.value); }; o.textContent = fmtG(e.value); return e; };
   const gm = gv("#r-micg", "#r-micg-v"), gs = gv("#r-sysg", "#r-sysg-v");
@@ -155,7 +189,9 @@ async function recPanel() {
     const mic = $("#r-mic").checked, system = $("#r-sys").checked;
     const micDevice = $("#r-micdev").value, sysDevice = $("#r-sysdev").value;
     const micGain = gm.value / 100, sysGain = gs.value / 100;
-    await invoke("rec_start", { mic, system, micDevice: micDevice || null, sysDevice: sysDevice || null, micGain, sysGain });
+    const live = !!($("#live-chk") && $("#live-chk").checked), translateTo = live && $("#live-tr") ? $("#live-tr").value || null : null;
+    LIVE.hw = ""; LIVE.segs = []; LIVE.tr = {}; LIVE.partial = ""; LIVE.state = live ? "loading" : ""; LIVE.msg = ""; LIVE.trMsg = ""; LIVE.wantTr = !!translateTo;
+    await invoke("rec_start", { mic, system, micDevice: micDevice || null, sysDevice: sysDevice || null, micGain, sysGain, live, translateTo });
     lsSet("rec.micgain", String(micGain)); lsSet("rec.sysgain", String(sysGain));
     lsSet("rec.mic", mic ? "1" : "0"); lsSet("rec.sys", system ? "1" : "0"); lsSet("rec.micdev", micDevice); lsSet("rec.sysdev", sysDevice);
     recRefresh();
@@ -171,7 +207,7 @@ async function recRefresh() {
     const b = $("#recbox"); if (!b || view !== "meetings") return clearInterval(recTimer);
     const s = await invoke("rec_status");
     if (!s.recording) { clearInterval(recTimer); b.innerHTML = ""; return; }
-    b.innerHTML = `<div class="card recing ${s.paused ? "paused" : ""}"><span class="dot"></span><b>${s.paused ? "En pause" : "Enregistrement en cours"}</b>
+    b.innerHTML = `<div class="card recing ${s.paused ? "paused" : ""} ${s.live ? "live" : ""}"><span class="dot"></span><b>${s.paused ? "En pause" : "Enregistrement en cours"}</b>
       <span class="clock">${fmtClock(s.seconds)}</span>
       ${s.mic != null ? `<span class="meta">Micro</span>${meter(s.mic)}` : ""}${s.system != null ? `<span class="meta">PC</span>${meter(s.system)}` : ""}
       ${s.mic != null ? `<label class="chk" title="Sensibilité du micro" style="gap:6px">Sensibilité <input type="range" id="r-live-g" min="25" max="800" step="5" value="${Math.round((s.mic_gain || 1) * 100)}" style="width:110px"><span class="pill" id="r-live-gv">${fmtGain((s.mic_gain || 1) * 100)}</span></label>` : ""}
@@ -185,9 +221,11 @@ async function recRefresh() {
       clearInterval(recTimer);
       const title = $("#r-title").value;
       const id = await invoke("rec_stop", { title });
+      LIVE.state = ""; liveRender();
       toast("Enregistrement ajouté — transcription lancée"); go("meeting", id);
     });
   };
+  liveRender();
   await draw(); recTimer = setInterval(async () => {
     if (view !== "meetings" || !$("#recbox")) return clearInterval(recTimer);
     // ne redessine pas pendant la saisie du titre : met seulement à jour horloge et niveaux
@@ -205,7 +243,7 @@ async function recRefresh() {
 async function meetings() {
   main.innerHTML = `<h1>Réunions</h1><p class="sub">Importez un enregistrement ou une transcription existante.</p>
     <div class="bar"><button class="btn rec" id="rec">● Enregistrer</button><button class="btn pri" id="ia">+ Importer un audio</button><button class="btn" id="it">Importer une transcription</button></div>
-    <div id="recbox"></div><div id="eng"></div><div id="list"></div>`;
+    <div id="recbox"></div><div id="livebox"></div><div id="eng"></div><div id="list"></div>`;
   $("#rec").onclick = () => recPanel();
   recRefresh();
   const cfg0 = await invoke("get_settings");
@@ -239,6 +277,31 @@ async function meetings() {
   if (view === "meetings") setPoll(() => view === "meetings" && draw(), 1500);
 }
 
+// Langues de rédaction du compte-rendu et titres des sections dans chacune
+const REP_LANGS = [["auto", "Automatique"], ["fr", "Compte-rendu en français"], ["en", "Compte-rendu en anglais"], ["es", "Compte-rendu en espagnol"], ["de", "Compte-rendu en allemand"], ["it", "Compte-rendu en italien"], ["pt", "Compte-rendu en portugais"], ["nl", "Compte-rendu en néerlandais"]];
+const REP_LABELS = {
+  fr: ["Résumé", "Points abordés", "Décisions", "Actions", "Prochaines étapes"],
+  en: ["Summary", "Topics discussed", "Decisions", "Actions", "Next steps"],
+  es: ["Resumen", "Temas tratados", "Decisiones", "Acciones", "Próximos pasos"],
+  de: ["Zusammenfassung", "Besprochene Punkte", "Entscheidungen", "Aufgaben", "Nächste Schritte"],
+  it: ["Riepilogo", "Argomenti trattati", "Decisioni", "Azioni", "Prossimi passi"],
+  pt: ["Resumo", "Pontos abordados", "Decisões", "Ações", "Próximos passos"],
+  nl: ["Samenvatting", "Besproken punten", "Beslissingen", "Acties", "Volgende stappen"],
+};
+const repLangs = (sel) => REP_LANGS.map(([k, v]) => `<option value="${k}" ${(sel || "auto") === k ? "selected" : ""}>${v}</option>`).join("");
+
+// Traduction de la transcription : langue affichée par réunion (les segments gardent les horodatages d'origine)
+const TL_VIEW = {};
+const TR_LANGS = [["en", "Anglais"], ["fr", "Français"], ["es", "Espagnol"], ["de", "Allemand"], ["it", "Italien"], ["pt", "Portugais"], ["nl", "Néerlandais"], ["pl", "Polonais"], ["ru", "Russe"], ["ja", "Japonais"], ["zh", "Chinois"], ["ar", "Arabe"], ["tr", "Turc"], ["ko", "Coréen"]];
+const trName = (c) => (TR_LANGS.find(([k]) => k === c) || [c, c])[1];
+const trOptions = (m) => {
+  const have = m.translation_langs || [];
+  const cur = TL_VIEW[m.id] || "";
+  return `<option value="" data-act="orig" ${cur === "" ? "selected" : ""}>Texte d'origine</option>`
+    + (have.length ? `<optgroup label="Afficher">${have.map((c) => `<option value="show:${c}" ${cur === c ? "selected" : ""}>${trName(c)}</option>`).join("")}</optgroup>` : "")
+    + `<optgroup label="Traduire en…">${TR_LANGS.map(([k, v]) => `<option value="do:${k}">${v}${have.includes(k) ? " (refaire)" : ""}</option>`).join("")}</optgroup>`;
+};
+
 const reportBadge = (r) => {
   if (!r) return "";
   if (r.mode === "extractif") return `<div class="note">${esc(r.note || "Résumé automatique simplifié.")} <a href="#" id="to-set" class="fr-link">Ouvrir les Réglages</a></div>`;
@@ -252,6 +315,7 @@ async function meeting(id) {
   const m = await run(() => invoke("get_meeting", { id }));
   if (!m) return go("meetings");
   const bs = await invoke("list_briefs", { trashed: false });
+  const cfg = await invoke("get_settings");
   if (seq !== renderSeq || view !== "meeting") return; // un rendu plus récent a pris la main
   // mémorise la lecture en cours pour la reprendre après le redessin
   const old = $("#aud");
@@ -276,6 +340,8 @@ async function meeting(id) {
       if (cur) { cur.classList.add("now"); if (!a.paused) cur.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
     };
   };
+  const shown = TL_VIEW[id] && m.translations && m.translations[TL_VIEW[id]] ? TL_VIEW[id] : "";
+  const segsShown = shown ? m.translations[shown] : m.transcript;
   const body = m.stage === "error"
     ? `<div class="card"><b>La transcription a échoué</b><p class="meta" style="margin:6px 0 10px">${esc(m.error || "")}</p><button class="btn pri" id="retry">Réessayer</button> <button class="btn dng" id="del">Corbeille</button></div>`
     : m.stage === "needs_engine"
@@ -284,16 +350,28 @@ async function meeting(id) {
     ? `<div class="card"><div class="prog" style="width:100%"><b style="width:${m.progress}%"></b></div><p class="meta" style="margin-top:8px">${m.stage === "transcribing" ? `<span class="pill" id="tr-pct">${m.progress} %</span> ` : ""}${esc(m.stage_label)}…${m.transcribe_hw ? ` <span class="pill hw">${esc(m.transcribe_hw)}</span>` : ""}</p></div>`
     : `<div class="bar">
       <button class="btn pri" id="gen" ${m.report_state === "generating" ? "disabled" : ""}>${r ? "Régénérer" : "Générer"} le compte-rendu</button>
+      <select id="rl" style="width:auto" title="Langue de rédaction du compte-rendu">${repLangs(r && r.lang || cfg.report_lang)}</select>
       <button class="btn" id="ren">Renommer</button>
       <select id="bf" style="width:auto"><option value="">Aucune préparation liée</option>${bs.map((b) => `<option value="${b.id}" ${m.brief_id === b.id ? "selected" : ""}>${esc(b.subject)}</option>`).join("")}</select>
-      <select id="exp" style="width:auto"><option value="">Exporter…</option><optgroup label="Transcription"><option value="txt">Texte (.txt)</option><option value="srt">Sous-titres (.srt)</option><option value="vtt">Sous-titres (.vtt)</option><option value="json">Données (.json)</option></optgroup>${r ? `<optgroup label="Compte-rendu"><option value="report">Compte-rendu (.md)</option></optgroup>` : ""}${m.has_audio ? `<optgroup label="Enregistrement"><option value="audio">Audio</option></optgroup>` : ""}</select>
+      <select id="exp" style="width:auto"><option value="">Exporter…</option><optgroup label="${shown ? `Transcription (${trName(shown)})` : "Transcription"}"><option value="txt">Texte (.txt)</option><option value="srt">Sous-titres (.srt)</option><option value="vtt">Sous-titres (.vtt)</option><option value="json">Données (.json)</option></optgroup>${r ? `<optgroup label="Compte-rendu"><option value="report">Compte-rendu (.md)</option></optgroup>` : ""}${m.has_audio ? `<optgroup label="Enregistrement"><option value="audio">Audio</option></optgroup>` : ""}</select>
       <button class="btn dng" id="del">Corbeille</button></div>
     ${m.report_state === "generating" ? `<div class="card"><b>Génération du compte-rendu…</b> <span class="pill" id="rep-pct">${m.report_pct || 0} %</span> <span class="meta" id="rep-prog">${esc(m.report_progress || "")}</span> <span class="pill hw" id="rep-hw" ${m.report_hw ? "" : "hidden"}>${esc(m.report_hw || "")}</span>
       <div class="prog" style="width:100%;margin:8px 0"><b id="rep-bar" style="width:${m.report_pct || 0}%"></b></div>
       <p class="meta">Avec l'IA locale, une longue réunion peut prendre plusieurs minutes. Vous pouvez quitter cette page : la génération continue.</p></div>` : ""}
     ${m.report_state === "error" ? `<div class="card"><b>Échec de la génération</b><p class="meta" style="margin-top:4px">${esc(m.report_error || "")}</p></div>` : ""}
-    ${r ? `<div class="card">${reportBadge(r)}<h3 style="margin-top:0">Résumé</h3><p>${esc(r.summary)}</p><h3>Points abordés</h3>${lst(r.topics)}<h3>Décisions</h3>${lst(r.decisions)}<h3>Actions</h3>${lst(r.actions)}<h3>Prochaines étapes</h3>${lst(r.next_steps)}</div>` : ""}
-    <div class="card"><h3 style="margin-top:0">Transcription</h3>${m.transcript.map((s) => `<div class="seg" data-t="${s.start}" data-e="${s.end}" title="Écouter à partir d'ici"><span class="tm">${fmtT(s.start)}</span><span class="sp">${esc(s.speaker)}</span><span>${esc(s.text)}</span></div>`).join("")}</div>`;
+    ${r ? (() => { const L = REP_LABELS[r.lang]; const h = (i, fr, st = "") => L ? `<h3 data-nt${st ? ` style="${st}"` : ""}>${L[i]}</h3>` : `<h3${st ? ` style="${st}"` : ""}>${fr}</h3>`;
+      return `<div class="card">${reportBadge(r)}${h(0, "Résumé", "margin-top:0")}<p>${esc(r.summary)}</p>${h(1, "Points abordés")}${lst(r.topics)}${h(2, "Décisions")}${lst(r.decisions)}${h(3, "Actions")}${lst(r.actions)}${h(4, "Prochaines étapes")}${lst(r.next_steps)}</div>`; })() : ""}
+    <div class="card"><div class="bar" style="margin:0 0 8px;align-items:center"><h3 style="margin:0;flex:1">Transcription</h3>
+      ${m.translate_state === "translating" ? "" : `<select id="tl-sel" style="width:auto" title="Traduire la transcription">${trOptions(m)}</select>`}
+      ${shown ? `<button class="btn sm dng" id="tl-del" title="Supprimer cette traduction">Supprimer la traduction</button>` : ""}</div>
+      ${m.translate_state === "translating" ? `<div class="tl-status"><span class="meta">Traduction en ${esc(trName(m.translate_lang))}…</span>
+        <span class="pill" id="tl-label" ${m.translate_label ? "" : "hidden"}>${esc(m.translate_label || "")}</span>
+        <span class="pill hw" id="tl-hw" ${m.translate_hw ? "" : "hidden"}>${esc(m.translate_hw || "")}</span>
+        <span class="pill" id="tl-pct">${m.translate_pct || 0} %</span>
+        <button class="btn sm dng" id="tl-stop">Arrêter</button></div>` : ""}
+      ${shown && m.translation_models && m.translation_models[shown] ? `<p class="tl-status"><span class="pill" title="Modèle et matériel utilisés pour cette traduction">${esc(m.translation_models[shown])}</span></p>` : ""}
+      ${m.translate_state === "error" ? `<p class="meta" style="color:var(--danger);margin-bottom:8px">${esc(m.translate_error || "La traduction a échoué.")}</p>` : ""}
+      ${segsShown.map((s) => `<div class="seg" data-t="${s.start}" data-e="${s.end}" title="Écouter à partir d'ici"><span class="tm">${fmtT(s.start)}</span><span class="sp">${esc(s.speaker)}</span><span>${esc(s.text)}</span></div>`).join("")}</div>`;
   main.innerHTML = `<div class="bar"><button class="btn sm" id="back">← Réunions</button></div>
     <h1>${esc(m.title)}</h1><p class="sub">${fmtDate(m.created_at)} · ${origin}</p>${player}${body}`;
   $("#back").onclick = () => go("meetings");
@@ -321,7 +399,7 @@ async function meeting(id) {
       const tp = $("#tr-pct"); if (tp) tp.textContent = x.progress + " %"; }, 1500);
     return;
   }
-  $("#gen").onclick = () => run(async () => { await invoke("generate_report", { id }); meeting(id); });
+  $("#gen").onclick = () => run(async () => { await invoke("generate_report", { id, lang: $("#rl").value }); meeting(id); });
   const toSet = $("#to-set"); if (toSet) toSet.onclick = (e) => { e.preventDefault(); go("settings"); };
   if (m.report_state === "generating") {
     setPoll(async () => {
@@ -338,6 +416,28 @@ async function meeting(id) {
     const t = await askText("Nouveau titre", m.title);
     if (t) { await invoke("update_meeting", { id, title: t }); meeting(id); }
   });
+  const tsel = $("#tl-sel");
+  if (tsel) tsel.onchange = () => run(async () => {
+    const v = tsel.value;
+    if (v === "") { delete TL_VIEW[id]; return meeting(id); }
+    if (v.startsWith("show:")) { TL_VIEW[id] = v.slice(5); return meeting(id); }
+    const lang = v.slice(3);
+    tsel.value = TL_VIEW[id] || "";
+    await invoke("translate_meeting", { id, lang }); TL_VIEW[id] = lang; meeting(id);
+  });
+  const tdel = $("#tl-del"); if (tdel) tdel.onclick = () => run(async () => { if (!(await ask("Supprimer cette traduction ?", "Supprimer"))) return; await invoke("translation_remove", { id, lang: shown }); delete TL_VIEW[id]; meeting(id); });
+  const tstop = $("#tl-stop");
+  if (tstop) tstop.onclick = () => run(async () => { tstop.disabled = true; tstop.textContent = "Arrêt…"; await invoke("translate_stop"); });
+  if (m.translate_state === "translating") {
+    setPoll(async () => {
+      if (view !== "meeting") return;
+      const x = await invoke("get_meeting", { id });
+      if (x.translate_state !== "translating") return meeting(id);
+      const pe = $("#tl-pct"); if (pe) pe.textContent = (x.translate_pct || 0) + " %";
+      const le = $("#tl-label"); if (le) { le.textContent = x.translate_label || ""; le.hidden = !x.translate_label; }
+      const he = $("#tl-hw"); if (he) { he.textContent = x.translate_hw || ""; he.hidden = !x.translate_hw; }
+    }, 1500);
+  }
   $("#bf").onchange = (e) => run(() => invoke("update_meeting", { id, briefId: e.target.value }));
   $("#del").onclick = () => run(async () => { if (!(await ask("Placer cette réunion dans la corbeille ?", "Mettre à la corbeille"))) return; await invoke("update_meeting", { id, trashed: true }); toast("Placée dans la corbeille"); go("meetings"); });
   $("#exp").onchange = (e) => run(async () => {
@@ -345,7 +445,7 @@ async function meeting(id) {
     const ext = x === "report" ? "md" : x === "audio" ? ((m.audio_path.match(/\.([A-Za-z0-9]+)$/) || [])[1] || "wav") : x;
     const dest = await dialog.save({ defaultPath: `${m.title}.${ext}` });
     if (!dest) return;
-    await invoke("export_meeting", { id, format: x, dest }); toast("Exporté");
+    await invoke("export_meeting", { id, format: x, dest, lang: shown || null }); toast("Exporté");
   });
 }
 
@@ -536,7 +636,7 @@ async function settings() {
   const s = (await run(() => invoke("get_settings"))) || {};
   const langs = [["fr", "Français"], ["en", "Anglais"], ["es", "Espagnol"], ["de", "Allemand"], ["it", "Italien"], ["auto", "Détection auto"]];
   main.innerHTML = `<h1>Réglages</h1><p class="sub">Tout est enregistré automatiquement, sauf la connexion API.</p>
-    <div class="tabs" id="tabs" role="tablist">${[["tr", "Transcription"], ["ia", "Compte-rendu"], ["mod", "Modèles"], ["net", "Connexions"]].map(([k, v]) => `<button role="tab" data-tab="${k}" class="${setTab === k ? "on" : ""}">${v}</button>`).join("")}</div>
+    <div class="tabs" id="tabs" role="tablist">${[["tr", "Transcription"], ["ia", "Compte-rendu"], ["tl", "Traduction"], ["mod", "Modèles"], ["net", "Connexions"]].map(([k, v]) => `<button role="tab" data-tab="${k}" class="${setTab === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <section class="pane" data-pane="tr" ${setTab === "tr" ? "" : "hidden"}>
       <div class="card avn"><h3>Antivirus : ajoutez une exclusion</h3>
         <p class="meta">Les moteurs d'IA (whisper.cpp, llama.cpp) ne sont pas signés : votre antivirus peut les supprimer ou les bloquer (erreurs « accès refusé » ou « connexion fermée »). Pour l'éviter, ajoutez ce dossier aux exclusions de votre antivirus :</p>
@@ -553,10 +653,20 @@ async function settings() {
         <p class="meta">Les moteurs d'IA (whisper.cpp, llama.cpp) ne sont pas signés : votre antivirus peut les supprimer ou les bloquer (erreurs « accès refusé » ou « connexion fermée »). Pour l'éviter, ajoutez ce dossier aux exclusions de votre antivirus :</p>
         <p style="margin:8px 0"><code class="avn-path"></code> <button class="btn sm avn-copy">Copier le chemin</button></p>
         <p class="meta">Windows Defender : Sécurité Windows › Protection contre les virus et menaces › Gérer les paramètres › Exclusions › Ajouter une exclusion › Dossier.</p></div>
+      <div class="card"><h3>Langue du compte-rendu</h3>
+        <p class="meta" style="margin-bottom:8px">Le compte-rendu peut être rédigé dans une autre langue que celle de la réunion. Vous pouvez aussi la choisir réunion par réunion.</p>
+        <select id="rl-def" style="max-width:260px">${repLangs(s.report_lang)}</select></div>
       <div class="card"><h3>Calcul de la rédaction</h3><div id="ldev"></div></div>
       <div class="card"><h3>IA de rédaction</h3>
         <p class="meta" style="margin-bottom:10px">Un modèle installé sur cet ordinateur rédige le compte-rendu, sans rien envoyer en ligne. Sans modèle local ni API, seul un résumé simplifié est produit.</p>
         <div id="llms"></div></div>
+    </section>
+    <section class="pane" data-pane="tl" ${setTab === "tl" ? "" : "hidden"}>
+      <div class="card"><h3>Calcul de la traduction</h3><div id="tdev"></div></div>
+      <div class="card"><h3>Modèle de traduction</h3>
+        <p class="meta" style="margin-bottom:10px">Sert à traduire les transcriptions et, en direct, ce qui se dit pendant l'enregistrement. Tout reste sur cet ordinateur.</p>
+        <div id="trms"></div>
+        <p class="meta" style="margin-top:8px">Dossier des modèles de traduction : <code id="tdir"></code></p></div>
     </section>
     <section class="pane" data-pane="mod" ${setTab === "mod" ? "" : "hidden"}>
       <div class="card"><h3>Utiliser des modèles déjà présents</h3>
@@ -587,7 +697,7 @@ async function settings() {
     document.querySelectorAll("#tabs [data-tab]").forEach((x) => x.classList.toggle("on", x === b));
     document.querySelectorAll(".pane").forEach((x) => { x.hidden = x.dataset.pane !== setTab; });
   };
-  let curModel = s.whisper_model, curLlm = s.llm_local || "", curWdev = s.whisper_device || "auto", curDev = !s.llm_device || s.llm_device === "cpu" ? "auto" : s.llm_device, curRocm = s.rocm_root || "";
+  let curModel = s.whisper_model, curLlm = s.llm_local || "", curWdev = s.whisper_device || "auto", curDev = !s.llm_device || s.llm_device === "cpu" ? "auto" : s.llm_device, curRocm = s.rocm_root || "", curTr = s.translate_model || "", curTdev = s.translate_device || "auto";
   // Mémoire vidéo : un modèle ne tient sur le GPU que s'il y a de la place pour lui + le contexte (~1,5 Go)
   invoke("models_dir_info").then((r) => {
     document.querySelectorAll(".avn-path").forEach((e) => { e.textContent = r.path; });
@@ -596,7 +706,7 @@ async function settings() {
   let gpuVram = 0;
   const noFit = (bytes) => gpuVram > 0 && curDev !== "cpu_only" && bytes + 1.5 * 1073741824 > gpuVram;
   const fitMsg = (bytes) => `<br><span class="meta" style="color:var(--danger)">Trop volumineux pour la mémoire vidéo de votre carte (${(gpuVram / 1073741824).toFixed(0)} Go) : environ ${((bytes + 1.5 * 1073741824) / 1073741824).toFixed(1)} Go nécessaires. Une partie du modèle tournera sur le processeur : rédaction très lente.</span>`;
-  const saveAll = async () => invoke("set_settings", { settings: { llm_base_url: $("#u").value.trim(), llm_api_key: $("#k").value, llm_model: $("#m").value.trim(), whisper_model: curModel, whisper_lang: $("#wl").value, llm_local: curLlm, whisper_device: curWdev, llm_device: curDev, rocm_root: curRocm, auto_update: $("#au").checked } });
+  const saveAll = async () => invoke("set_settings", { settings: { llm_base_url: $("#u").value.trim(), llm_api_key: $("#k").value, llm_model: $("#m").value.trim(), whisper_model: curModel, whisper_lang: $("#wl").value, llm_local: curLlm, whisper_device: curWdev, llm_device: curDev, rocm_root: curRocm, auto_update: $("#au").checked, report_lang: $("#rl-def").value, translate_model: curTr, translate_device: curTdev } });
   const renderModels = async () => {
     const st = await invoke("engine_status"), d = st.download;
     $("#models").innerHTML = st.models.map((m) => {
@@ -629,7 +739,7 @@ async function settings() {
     const llm = st.llm;
     gpuVram = llm.vram || 0;
     const lrows = [`<div class="card mrow ${curLlm === "" ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="" ${curLlm === "" ? "checked" : ""}>
-      <span><b>Aucune IA locale</b><br><span class="meta">Utiliser l'API distante si elle est configurée, sinon un résumé simplifié</span></span></label></div>`].concat(llm.models.map((m) => {
+      <span><b>Aucune IA locale</b><br><span class="meta">Utiliser l'API distante si elle est configurée, sinon un résumé simplifié</span></span></label></div>`].concat(llm.models.filter((m) => !m.translator).map((m) => {
       const busy = d.active && d.model === m.name;
       const pct = m.partial ? Math.round((m.partial / m.bytes) * 100) : 0;
       const state = m.installed ? `<span class="pill ok">Installé</span>` : busy ? `<span class="pill">Téléchargement…</span>` : m.partial ? `<span class="pill warn">Interrompu ${pct} %</span>` : "";
@@ -643,6 +753,32 @@ async function settings() {
     $("#llms").querySelectorAll("[name=lm]").forEach((r) => r.onchange = () => run(async () => { curLlm = r.value; await saveAll(); renderModels(); if (typeof renderOllama === "function") renderOllama(); if (typeof renderGguf === "function") renderGguf(); }));
     $("#llms").querySelectorAll("[data-lget]").forEach((b) => b.onclick = () => run(async () => { await invoke("llm_install", { model: b.dataset.lget }); renderModels(); watchDownload(); }));
     $("#llms").querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => run(async () => { if (await ask("Supprimer ce modèle du disque ?")) { await invoke("llm_remove", { model: b.dataset.ldel }); curLlm = (await invoke("get_settings")).llm_local || ""; renderModels(); renderGguf(); } }));
+    // modèles de traduction (TranslateGemma)
+    const trRow = (m) => {
+      const busy = d.active && d.model === m.name;
+      const pct = m.partial ? Math.round((m.partial / m.bytes) * 100) : 0;
+      const state = m.installed ? `<span class="pill ok">Installé</span>` : busy ? `<span class="pill">Téléchargement…</span>` : m.partial ? `<span class="pill warn">Interrompu ${pct} %</span>` : "";
+      const act = m.installed ? `<button class="btn sm dng" data-ldel="${m.name}">Supprimer</button>` : busy ? "" : `<button class="btn sm" data-lget="${m.name}">${m.partial ? "Reprendre" : "Télécharger"}</button>`;
+      return `<div class="card mrow ${curTr === m.name ? "sel" : ""} ${noFit(m.bytes) ? "nofit" : ""}"><label class="chk" style="flex:1"><input type="radio" name="tm" value="${m.name}" ${curTr === m.name ? "checked" : ""} ${m.installed ? "" : "disabled"}>
+        <span><b>${esc(m.label)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta">${esc(m.desc)}</span><br><span class="meta" style="word-break:break-all">${m.installed ? "Emplacement" : "Sera installé dans"} : <code>${esc(m.path)}</code></span>${noFit(m.bytes) ? fitMsg(m.bytes) : ""}
+        ${busy ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}</span></label>${state}${act}</div>`;
+    };
+    const tdev = $("#tdev");
+    if (tdev) {
+      const tdefs = [["auto", "Automatique", "Carte graphique si possible (CUDA, ROCm ou Vulkan), sinon processeur"], ["cpu_only", "Processeur uniquement", "Plus lent, mais n'utilise pas la mémoire vidéo : utile si le GPU est occupé par Whisper"]];
+      tdev.innerHTML = tdefs.map(([k, v, d2]) => `<div class="card mrow ${curTdev === k ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="td" value="${k}" ${curTdev === k ? "checked" : ""}><span><b>${v}</b><br><span class="meta">${d2}</span></span></label></div>`).join("")
+        + `<p class="meta" style="margin-top:6px">Calcul utilisé actuellement : <span class="pill hw">${esc(curTdev === "cpu_only" ? "CPU" : llm.translate_hw)}</span></p>`;
+      tdev.querySelectorAll("[name=td]").forEach((r) => r.onchange = () => run(async () => { curTdev = r.value; await saveAll(); renderModels(); }));
+      const td = $("#tdir"); if (td) td.textContent = llm.translation_dir;
+    }
+    const trs = $("#trms");
+    if (trs) {
+      trs.innerHTML = `<div class="card mrow ${curTr === "" ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="tm" value="" ${curTr === "" ? "checked" : ""}>
+        <span><b>Même modèle que le compte-rendu</b><br><span class="meta">Pratique, mais un modèle de traduction dédié donne de meilleurs résultats</span></span></label></div>` + llm.models.filter((m) => m.translator).map(trRow).join("");
+      trs.querySelectorAll("[name=tm]").forEach((r) => r.onchange = () => run(async () => { curTr = r.value; await saveAll(); renderModels(); }));
+      trs.querySelectorAll("[data-lget]").forEach((b) => b.onclick = () => run(async () => { await invoke("llm_install", { model: b.dataset.lget }); renderModels(); watchDownload(); }));
+      trs.querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => run(async () => { if (await ask("Supprimer ce modèle du disque ?")) { await invoke("llm_remove", { model: b.dataset.ldel }); curTr = (await invoke("get_settings")).translate_model || ""; renderModels(); } }));
+    }
     const eng = llm.engines, gbusyL = d.active && d.phase === "llm-binary";
     const hasNv = llm.gpus.some((n) => /nvidia/i.test(n)), hasAmd = llm.gpus.some((n) => /amd|radeon/i.test(n) && !/graphics/i.test(n));
     const cudaOk = eng.cuda.installed && hasNv, rocmOk = eng.rocm.runtime && eng.rocm.installed;
@@ -741,6 +877,7 @@ async function settings() {
   $("#f-rescan").onclick = () => { foundExtra = null; renderFound(); };
   engineHook = () => view === "settings" && renderModels();
   $("#wl").onchange = () => run(saveAll);
+  $("#rl-def").onchange = () => run(saveAll);
   $("#au").onchange = () => run(saveAll);
   $("#ui-lang").onchange = (e) => { I18N.set(e.target.value); };
   $("#au-chk").onclick = () => run(async () => {

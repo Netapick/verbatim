@@ -37,7 +37,8 @@ fn sanitize(s: &str) -> String {
 
 fn gguf_item(src: PathBuf, label: &str, bytes: u64, source: &str) -> Item {
     let id = llm::LLMS.iter().find(|m| m.3 == bytes).map(|m| m.0.to_string()).unwrap_or_else(|| sanitize(label));
-    Item { dest: PathBuf::from("llm-models").join(format!("{id}.gguf")), name: label.to_string(), kind: "llm", src, bytes, source: source.into() }
+    let dir = if llm::is_translator(&id) { "translation-models" } else { "llm-models" };
+    Item { dest: PathBuf::from(dir).join(format!("{id}.gguf")), name: label.to_string(), kind: "llm", src, bytes, source: source.into() }
 }
 
 fn whisper_item(src: PathBuf, source: &str) -> Option<Item> {

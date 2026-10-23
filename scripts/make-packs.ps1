@@ -2,12 +2,17 @@
 #
 #   .\scripts\make-packs.ps1 -BaseUrl "https://exemple.com/verbatim/0.1.0"
 #   .\scripts\make-packs.ps1 -BaseUrl "..." -SkipZip       # ne régénère que packs.nsh (nouvelle URL)
+#   .\scripts\make-packs.ps1 -BaseUrl "..." -Rebuild ROCM  # ne refait que le pack ROCm (les autres zips existants sont réutilisés)
+#
+# Chaque pack a sa propre version dans son nom : un pack modifié reçoit un NOUVEAU nom (jamais le même fichier avec un autre
+# contenu), car les anciens installateurs vérifient la somme SHA-256 de l'ancien fichier.
 #
 # Produit dist\packs\*.zip (à mettre en ligne à l'adresse -BaseUrl) et src-tauri\installer\packs.nsh
 # (tailles, sommes SHA-256 et URL lues par l'installateur). Relancez ensuite : npx tauri build
 param(
     [Parameter(Mandatory)][string]$BaseUrl,
-    [switch]$SkipZip
+    [switch]$SkipZip,
+    [string[]]$Rebuild = @("CORE", "ROCM")
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -17,8 +22,8 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $ver = (Get-Content (Join-Path $root "src-tauri\tauri.conf.json") -Raw | ConvertFrom-Json).version
 
 $packs = [ordered]@{
-    CORE = @{ File = "verbatim-redist-core-$ver.zip"; Dirs = @("engine", "llm", "llm-vulkan", "models") }
-    ROCM = @{ File = "verbatim-redist-rocm-$ver.zip"; Dirs = @("engine-rocm", "llm-rocm", "rocm-runtime") }
+    CORE = @{ File = "verbatim-redist-core-0.1.0.zip"; Dirs = @("engine", "llm", "llm-vulkan", "models") }
+    ROCM = @{ File = "verbatim-redist-rocm-0.3.0.zip"; Dirs = @("engine-rocm", "llm-rocm", "rocm-runtime") }  # 0.3.0 : + whisper-server ROCm (direct)
 }
 
 Add-Type -AssemblyName System.IO.Compression
@@ -27,7 +32,7 @@ $nsh = @("; Généré par scripts/make-packs.ps1 : ne pas modifier à la main.",
 foreach ($k in $packs.Keys) {
     $pk = $packs[$k]
     $zip = Join-Path $out $pk.File
-    if (-not $SkipZip) {
+    if (-not $SkipZip -and ($Rebuild -contains $k)) {
         foreach ($d in $pk.Dirs) { if (-not (Test-Path (Join-Path $redist $d))) { throw "Dossier manquant : redist\$d" } }
         Write-Host "Pack $k -> $($pk.File)"
         Remove-Item $zip -Force -ErrorAction SilentlyContinue

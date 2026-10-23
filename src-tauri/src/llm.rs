@@ -32,7 +32,7 @@ const CUDA_RT_ZIP: &str =
 const CUDA_BYTES: u64 = 266_814_439 + 391_443_627;
 
 /// (id, libellé, description, taille exacte en octets, URL)
-pub const LLMS: [(&str, &str, &str, u64, &str); 4] = [
+pub const LLMS: [(&str, &str, &str, u64, &str); 6] = [
     (
         "qwen3.5-4b",
         "Qwen 3.5 — 4B (léger)",
@@ -61,7 +61,26 @@ pub const LLMS: [(&str, &str, &str, u64, &str); 4] = [
         18_973_870_528,
         "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q4_K_M.gguf",
     ),
+    (
+        "translategemma-4b",
+        "TranslateGemma 4B",
+        "Modèle de traduction de Google (55 langues) : ~3 Go de RAM, rapide, utilisable en direct",
+        2_489_909_312,
+        "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q4_K_M.gguf",
+    ),
+    (
+        "translategemma-12b",
+        "TranslateGemma 12B",
+        "Meilleure traduction, ~9 Go de RAM ; plus lent, surtout sans carte graphique",
+        7_300_793_664,
+        "https://huggingface.co/bullerwins/translategemma-12b-it-GGUF/resolve/main/translategemma-12b-it-Q4_K_M.gguf",
+    ),
 ];
+
+/// Modèle dédié à la traduction (invite spécifique, pas de compte-rendu).
+pub fn is_translator(id: &str) -> bool {
+    id.starts_with("translategemma")
+}
 
 fn dev_dir(dev: &str) -> &'static str {
     match dev {
@@ -182,8 +201,16 @@ pub fn local_ready(dir: &PathBuf, id: &str) -> bool {
         && model_info(id).map(|m| fs::metadata(model_file(dir, id)).map(|f| f.len() == m.3).unwrap_or(false)).unwrap_or(false)
 }
 
+/// Les modèles de rédaction sont dans `ia/llm-models`, ceux de traduction dans `ia/translation-models`.
 fn model_file(dir: &PathBuf, id: &str) -> PathBuf {
-    dir.join("llm-models").join(format!("{id}.gguf"))
+    dir.join(if is_translator(id) { "translation-models" } else { "llm-models" }).join(format!("{id}.gguf"))
+}
+
+/// Réglages avec le calcul propre à la traduction (processeur seul, ou meilleur GPU disponible).
+pub fn translate_cfg(cfg: &Settings) -> Settings {
+    let mut c = cfg.clone();
+    c.llm_device = if cfg.translate_device == "cpu_only" { "cpu_only".into() } else { "auto".into() };
+    c
 }
 fn model_info(id: &str) -> Option<&'static (&'static str, &'static str, &'static str, u64, &'static str)> {
     LLMS.iter().find(|m| m.0 == id)
@@ -197,7 +224,7 @@ pub fn status_json(dir: &PathBuf, selected: &str, cfg: &Settings) -> Value {
             let mp = model_file(dir, id);
             let installed = fs::metadata(&mp).map(|m| m.len() == *bytes).unwrap_or(false);
             let partial = if installed { 0 } else { fs::metadata(mp.with_extension("part")).map(|m| m.len()).unwrap_or(0) };
-            json!({ "name": id, "label": label, "desc": desc, "bytes": bytes, "installed": installed,
+            json!({ "name": id, "label": label, "desc": desc, "bytes": bytes, "installed": installed, "translator": is_translator(id),
                     "partial": partial, "selected": *id == selected, "path": mp.to_string_lossy() })
         })
         .collect();
@@ -205,6 +232,8 @@ pub fn status_json(dir: &PathBuf, selected: &str, cfg: &Settings) -> Value {
     json!({
         "binary": bin_path(dir).exists(), "binary_path": bin_path(dir).to_string_lossy(), "models": models,
         "device": cfg.llm_device,
+        "translate_hw": engine_hw(dir, &translate_cfg(cfg)),
+        "translation_dir": dir.join("translation-models").to_string_lossy(),
         "gpus": engine::gpu_names(),
         "vram": engine::gpu_vram(),
         "engines": {
@@ -275,6 +304,10 @@ fn unselect_llm(st: &AppState, value: &str) {
     let mut g = st.store.lock().unwrap();
     if g.settings.llm_local == value {
         g.settings.llm_local.clear();
+        let _ = st.save(&g);
+    }
+    if g.settings.translate_model == value {
+        g.settings.translate_model.clear();
         let _ = st.save(&g);
     }
 }
@@ -370,13 +403,13 @@ fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings) -> R<Server> {
 
 // ─── Appel de modèle (local ou distant) ────────────────────────────────────
 
-struct Backend {
+pub struct Backend {
     /// matériel de calcul affiché à l'utilisateur
-    hw: String,
+    pub hw: String,
     base: String,
     key: String,
     model: String,
-    label: String,
+    pub label: String,
     mode: &'static str, // "local" | "api" | "ollama"
     /// "openai" (llama.cpp, API distante) ou "ollama" (API native)
     kind: &'static str,
@@ -437,6 +470,97 @@ fn chat_json(be: &Backend, system: &str, user: &str, max_tokens: u32, on_frac: &
     }
     on_frac(1.0);
     parse_json_loose(&txt).ok_or_else(|| "Réponse du modèle non exploitable (JSON invalide).".to_string())
+}
+
+/// Réponse en texte libre (traduction) ; pas de mode JSON.
+pub fn chat_text(be: &Backend, system: &str, user: &str, max_tokens: u32) -> R<String> {
+    if be.kind == "ollama" {
+        let body = json!({
+            "model": be.model, "stream": false, "think": false, "keep_alive": "2m",
+            "options": { "temperature": 0.1, "num_ctx": 12288, "num_predict": max_tokens },
+            "messages": [{ "role": "system", "content": system }, { "role": "user", "content": user }]
+        });
+        let r: Value = ureq::post(&format!("{}/api/chat", be.base.trim_end_matches('/')))
+            .timeout(Duration::from_secs(be.timeout)).send_json(body).map_err(|e| format!("Appel du modèle impossible : {e}"))?
+            .into_json().map_err(|e| e.to_string())?;
+        let mut txt = r["message"]["content"].as_str().ok_or("Réponse vide d'Ollama.")?.to_string();
+        if let Some(i) = txt.rfind("</think>") { txt = txt[i + 8..].to_string(); }
+        return Ok(txt.trim().to_string());
+    }
+    let body = json!({
+        "model": be.model, "temperature": 0.1, "max_tokens": max_tokens, "stream": false,
+        "chat_template_kwargs": { "enable_thinking": false },
+        "messages": [{ "role": "system", "content": system }, { "role": "user", "content": user }]
+    });
+    let mut req = ureq::post(&format!("{}/chat/completions", be.base.trim_end_matches('/'))).timeout(Duration::from_secs(be.timeout));
+    if !be.key.is_empty() { req = req.set("Authorization", &format!("Bearer {}", be.key)); }
+    let r: Value = req.send_json(body).map_err(|e| format!("Appel du modèle impossible : {e}"))?.into_json().map_err(|e| e.to_string())?;
+    let mut txt = r["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
+    if let Some(i) = txt.rfind("</think>") { txt = txt[i + 8..].to_string(); }
+    if txt.trim().is_empty() { return Err("Réponse vide du modèle.".into()); }
+    Ok(txt.trim().to_string())
+}
+
+/// Complétion brute de llama-server (invite déjà au format du modèle, ex. TranslateGemma).
+pub fn raw_complete(be: &Backend, prompt: &str, max_tokens: u32, stop: &[&str]) -> R<String> {
+    let url = format!("{}/completion", be.base.trim_end_matches('/').trim_end_matches("/v1"));
+    let body = json!({ "prompt": prompt, "n_predict": max_tokens, "temperature": 0.0, "stream": false, "stop": stop, "cache_prompt": true });
+    let r: Value = ureq::post(&url).timeout(Duration::from_secs(be.timeout)).send_json(body)
+        .map_err(|e| format!("Appel du modèle impossible : {e}"))?.into_json().map_err(|e| e.to_string())?;
+    let txt = r["content"].as_str().unwrap_or("").trim().to_string();
+    if txt.is_empty() { return Err("Réponse vide du modèle.".into()); }
+    Ok(txt)
+}
+
+/// Prépare le moteur demandé par `sel` (« ollama:nom », « gguf:chemin », identifiant du catalogue, ou API distante),
+/// exécute `f`, puis l'arrête. Relance une fois sur le processeur si le moteur GPU a été coupé.
+pub fn with_backend<T>(app: &AppHandle, cfg: &Settings, sel: &str, status: &dyn Fn(&str), f: &dyn Fn(&Backend) -> R<T>) -> R<T> {
+    let st = app.state::<AppState>();
+    if let Some(name) = sel.strip_prefix("ollama:") {
+        status("Démarrage d'Ollama…");
+        ensure_ollama()?;
+        let be = Backend { base: OLLAMA_URL.into(), key: String::new(), model: name.to_string(), label: format!("Ollama · {name}"),
+            hw: "Ollama (matériel géré par Ollama)".to_string(), mode: "ollama", kind: "ollama", chunk_chars: 16_000, timeout: 3600 };
+        return f(&be);
+    }
+    let local: Option<(PathBuf, String)> = if let Some(path) = sel.strip_prefix("gguf:") {
+        let path = PathBuf::from(path);
+        if !path.exists() { return Err("Le fichier du modèle est introuvable.".into()); }
+        if !any_engine(&st.mdir) { return Err("Le moteur d'IA locale (llama.cpp) n'est pas installé : téléchargez d'abord un modèle dans Réglages.".into()); }
+        let name = gguf_display_name(&path);
+        Some((path, name))
+    } else if local_ready(&st.mdir, sel) {
+        let info = model_info(sel).unwrap();
+        Some((model_file(&st.mdir, sel), info.1.to_string()))
+    } else {
+        None
+    };
+    if let Some((path, label)) = local {
+        status("Chargement de l'IA locale…");
+        let attempt = |cfg: &Settings| -> R<T> {
+            let srv = start_server(&st.mdir, &path, cfg)?;
+            let be = Backend { base: format!("http://127.0.0.1:{}/v1", srv.port), key: String::new(), model: "local".into(), label: label.clone(),
+                hw: engine_hw(&st.mdir, cfg), mode: "local", kind: "openai", chunk_chars: 11_000, timeout: 1800 };
+            let r = f(&be);
+            drop(srv);
+            r
+        };
+        let mut res = attempt(cfg);
+        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" {
+            status("Moteur GPU interrompu : nouvel essai sur le processeur…");
+            let mut cpu = cfg.clone();
+            cpu.llm_device = "cpu_only".into();
+            res = attempt(&cpu);
+        }
+        return res.map_err(|e| crash_hint(&e));
+    }
+    if !cfg.llm_base_url.trim().is_empty() {
+        let m = if cfg.llm_model.is_empty() { "gpt-4o-mini".to_string() } else { cfg.llm_model.clone() };
+        let be = Backend { base: cfg.llm_base_url.clone(), key: cfg.llm_api_key.clone(), model: m.clone(), label: format!("API · {m}"),
+            hw: "Serveur distant (API)".to_string(), mode: "api", kind: "openai", chunk_chars: 40_000, timeout: 240 };
+        return f(&be);
+    }
+    Err("Aucun modèle d'IA disponible : installez un modèle dans Réglages › Compte-rendu.".into())
 }
 
 // ─── Ollama ────────────────────────────────────────────────────────────────
@@ -662,6 +786,24 @@ pub fn ollama_start() -> R<()> {
 
 // ─── Prompts ───────────────────────────────────────────────────────────────
 
+/// Nom (en français) de la langue de rédaction ; « auto » = celle de la transcription.
+pub fn lang_name(code: &str) -> &'static str {
+    match code {
+        "fr" => "français", "en" => "anglais", "es" => "espagnol", "de" => "allemand", "it" => "italien",
+        "pt" => "portugais", "nl" => "néerlandais", "pl" => "polonais", "ru" => "russe", "ja" => "japonais",
+        "zh" => "chinois", "ar" => "arabe", "tr" => "turc", "ko" => "coréen",
+        _ => "",
+    }
+}
+
+fn rules(lang: &str) -> String {
+    let write = match lang_name(lang) {
+        "" => "Écris dans la langue de la transcription, de façon claire et concise.".to_string(),
+        n => format!("Écris le compte-rendu en {n} (traduis les propos si besoin), de façon claire et concise."),
+    };
+    format!("{RULES}- {write}\n")
+}
+
 const RULES: &str = "Règles :\n\
 - N'utilise QUE les informations de la transcription ; n'invente ni chiffres, ni noms, ni décisions.\n\
 - La transcription vient d'une reconnaissance vocale automatique et peut contenir des erreurs : corrige l'orthographe des termes du glossaire fourni.\n\
@@ -669,28 +811,30 @@ const RULES: &str = "Règles :\n\
 - \"decisions\" : uniquement ce qui a été explicitement décidé ou validé.\n\
 - \"actions\" : chaque tâche à faire, au format « Responsable — action — échéance » (omets ce qui n'est pas dit).\n\
 - \"next_steps\" : points reportés, prochaine réunion, suites prévues.\n\
-- Reprends tels quels les chiffres, dates et noms propres cités.\n\
-- Écris en français, de façon claire et concise.\n";
+- Reprends tels quels les chiffres, dates et noms propres cités.\n";
 
-fn system_full() -> String {
+fn system_full(lang: &str) -> String {
+    let rules = rules(lang);
     format!(
-        "Tu es un assistant qui rédige des comptes-rendus de réunion professionnels, fidèles à la transcription fournie.\n{RULES}\
+        "Tu es un assistant qui rédige des comptes-rendus de réunion professionnels, fidèles à la transcription fournie.\n{rules}\
          Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"5 à 8 phrases qui racontent la réunion\", \
          \"topics\": [\"Sujet : ce qui a été dit (chiffres, positions)\"], \"decisions\": [\"…\"], \
          \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}. Liste vide s'il n'y a rien pour une section."
     )
 }
-fn system_map() -> String {
+fn system_map(lang: &str) -> String {
+    let rules = rules(lang);
     format!(
-        "Tu prends des notes sur un extrait d'une réunion (une seule partie de la réunion).\n{RULES}\
+        "Tu prends des notes sur un extrait d'une réunion (une seule partie de la réunion).\n{rules}\
          Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"2 à 4 phrases sur cette partie\", \
          \"topics\": [\"…\"], \"decisions\": [\"…\"], \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}."
     )
 }
-fn system_reduce() -> String {
+fn system_reduce(lang: &str) -> String {
+    let rules = rules(lang);
     format!(
         "On te donne les notes prises sur les parties successives d'une même réunion. Fusionne-les en un seul compte-rendu : \
-         ordre chronologique, sans doublons, sans rien ajouter.\n{RULES}\
+         ordre chronologique, sans doublons, sans rien ajouter.\n{rules}\
          Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"5 à 8 phrases qui racontent toute la réunion\", \
          \"topics\": [\"…\"], \"decisions\": [\"…\"], \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}."
     )
@@ -922,7 +1066,7 @@ fn build_context(title: &str, brief: Option<&Value>, glossary: &[String]) -> Str
 }
 
 /// Le chargement du modèle occupe 0-10 %, la rédaction 10-99 % répartis entre les étapes.
-fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &[String]) -> R<Value> {
+fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &[String], lang: &str) -> R<Value> {
     let parts = chunk(lines, be.chunk_chars);
     let n = parts.len();
     let steps = if n <= 1 { 1 } else { n + 1 } as f32;
@@ -932,13 +1076,13 @@ fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &
     if n <= 1 {
         set_progress(app, id, "Rédaction du compte-rendu…");
         let body = format!("{ctx}\nTranscription :\n{}", parts.first().cloned().unwrap_or_default());
-        return Ok(normalize(&chat_json(be, &system_full(), &body, 1400, &|f| set_pct(app, id, at(0, f)))?));
+        return Ok(normalize(&chat_json(be, &system_full(lang), &body, 1400, &|f| set_pct(app, id, at(0, f)))?));
     }
     let mut notes = Vec::new();
     for (i, p) in parts.iter().enumerate() {
         set_progress(app, id, &format!("Analyse de la partie {}/{}…", i + 1, n));
         let body = format!("{ctx}\nPartie {}/{} de la réunion. Transcription :\n{p}", i + 1, n);
-        notes.push(normalize(&chat_json(be, &system_map(), &body, 900, &|f| set_pct(app, id, at(i, f)))?));
+        notes.push(normalize(&chat_json(be, &system_map(lang), &body, 900, &|f| set_pct(app, id, at(i, f)))?));
     }
     set_progress(app, id, "Fusion des parties…");
     let merged = notes
@@ -948,10 +1092,10 @@ fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &
         .collect::<Vec<_>>()
         .join("\n");
     let body = format!("{ctx}\n{merged}");
-    Ok(normalize(&chat_json(be, &system_reduce(), &body, 1600, &|f| set_pct(app, id, at(n, f)))?))
+    Ok(normalize(&chat_json(be, &system_reduce(lang), &body, 1600, &|f| set_pct(app, id, at(n, f)))?))
 }
 
-fn produce(app: &AppHandle, id: &str) -> R<Value> {
+fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
     let st = app.state::<AppState>();
     let (cfg, title, segs, glossary, brief): (Settings, String, Vec<Segment>, Vec<String>, Option<Value>) = {
         let s = st.store.lock().unwrap();
@@ -979,6 +1123,7 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
     let ctx = build_context(&title, brief.as_ref(), &glossary);
     let stamp = |mut v: Value, mode: &str, model: &str, hw: &str| {
         v["mode"] = json!(mode);
+        v["lang"] = json!(lang);
         v["model"] = json!(model);
         v["generated_at"] = json!(chrono::Utc::now());
         v["hardware"] = json!(hw);
@@ -1001,7 +1146,7 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
         };
         let res = ensure_ollama().and_then(|_| {
             set_progress(app, id, "Chargement du modèle (la première fois peut être long)…");
-            run_with_backend(app, id, &be, &ctx, &lines)
+            run_with_backend(app, id, &be, &ctx, &lines, lang)
         });
         return match res {
             Ok(v) => Ok(stamp(v, be.mode, &be.label, &be.hw)),
@@ -1033,7 +1178,7 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
                     chunk_chars: 11_000,
                     timeout: 7200,
                 };
-                let r = run_with_backend(app, id, &be, &ctx, &lines);
+                let r = run_with_backend(app, id, &be, &ctx, &lines, lang);
                 drop(srv);
                 r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
             })
@@ -1069,7 +1214,7 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
                     chunk_chars: 11_000,
                     timeout: 1800,
                 };
-                let r = run_with_backend(app, id, &be, &ctx, &lines);
+                let r = run_with_backend(app, id, &be, &ctx, &lines, lang);
                 drop(srv);
                 r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
             })
@@ -1102,7 +1247,7 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
             chunk_chars: 40_000,
             timeout: 240,
         };
-        return match run_with_backend(app, id, &be, &ctx, &lines) {
+        return match run_with_backend(app, id, &be, &ctx, &lines, lang) {
             Ok(v) => Ok(stamp(v, be.mode, &be.label, &be.hw)),
             Err(e) => Ok(extractive(&title, &segs, &format!("L'API a échoué ({e}). Résumé simplifié affiché."))),
         };
@@ -1116,7 +1261,7 @@ fn produce(app: &AppHandle, id: &str) -> R<Value> {
 }
 
 #[tauri::command]
-pub fn generate_report(app: AppHandle, st: State<AppState>, id: String) -> R<()> {
+pub fn generate_report(app: AppHandle, st: State<AppState>, id: String, lang: Option<String>) -> R<()> {
     {
         let mut s = st.store.lock().unwrap();
         let m = s.meetings.iter_mut().find(|m| m.id == id).ok_or("Réunion introuvable")?;
@@ -1132,8 +1277,12 @@ pub fn generate_report(app: AppHandle, st: State<AppState>, id: String) -> R<()>
         m.report_pct = 0;
         st.save(&s)?;
     }
+    let lang = {
+        let s = st.store.lock().unwrap();
+        lang.filter(|l| !l.is_empty()).unwrap_or_else(|| s.settings.report_lang.clone())
+    };
     std::thread::spawn(move || {
-        let res = produce(&app, &id);
+        let res = produce(&app, &id, &lang);
         let st = app.state::<AppState>();
         let mut s = st.store.lock().unwrap();
         if let Some(m) = s.meetings.iter_mut().find(|m| m.id == id) {

@@ -170,6 +170,37 @@
     ["La transcription n'est pas encore terminée.", "The transcription is not finished yet."], ["Un compte-rendu est déjà en cours de génération.", "A report is already being generated."],
     ["Ollama a échoué", "Ollama failed"],
     ["Préparer la réunion", "Prepare the meeting"], ["Quels sont les points bloquants ?", "What are the blocking points?"], ["Quelles décisions sont attendues ?", "What decisions are expected?"],
+    // Langue du compte-rendu, traduction, direct (0.3)
+    ["Langue du compte-rendu", "Report language"], ["Langue de rédaction du compte-rendu", "Language the report is written in"],
+    ["Automatique", "Automatic"], ["Compte-rendu en français", "Report in French"], ["Compte-rendu en anglais", "Report in English"],
+    ["Compte-rendu en espagnol", "Report in Spanish"], ["Compte-rendu en allemand", "Report in German"], ["Compte-rendu en italien", "Report in Italian"],
+    ["Compte-rendu en portugais", "Report in Portuguese"], ["Compte-rendu en néerlandais", "Report in Dutch"],
+    ["Traduction", "Translation"], ["Calcul de la traduction", "Translation compute"], ["Processeur uniquement", "Processor only"],
+    ["Carte graphique si possible (CUDA, ROCm ou Vulkan), sinon processeur", "Graphics card if possible (CUDA, ROCm or Vulkan), otherwise processor"],
+    ["Plus lent, mais n'utilise pas la mémoire vidéo : utile si le GPU est occupé par Whisper", "Slower, but uses no video memory: useful if the GPU is busy with Whisper"],
+    ["Dossier des modèles de traduction :", "Translation models folder:"], ["Calcul utilisé actuellement :", "Compute currently used:"],
+    ["Portugais", "Portuguese"], ["Néerlandais", "Dutch"], ["Polonais", "Polish"], ["Russe", "Russian"], ["Japonais", "Japanese"], ["Chinois", "Chinese"], ["Arabe", "Arabic"], ["Turc", "Turkish"], ["Coréen", "Korean"],
+    ["Le compte-rendu peut être rédigé dans une autre langue que celle de la réunion. Vous pouvez aussi la choisir réunion par réunion.", "The report can be written in a language other than the meeting's. You can also choose it meeting by meeting."],
+    ["Modèle de traduction", "Translation model"],
+    ["Sert à traduire les transcriptions et, en direct, ce qui se dit pendant l'enregistrement. Tout reste sur cet ordinateur.", "Used to translate transcripts and, live, what is said during recording. Everything stays on this computer."],
+    ["Même modèle que le compte-rendu", "Same model as the report"], ["Pratique, mais un modèle de traduction dédié donne de meilleurs résultats", "Convenient, but a dedicated translation model gives better results"],
+    ["Modèle de traduction de Google (55 langues) : ~3 Go de RAM, rapide, utilisable en direct", "Google's translation model (55 languages): ~3 GB of RAM, fast, usable live"],
+    ["Meilleure traduction, ~9 Go de RAM ; plus lent, surtout sans carte graphique", "Better translation, ~9 GB of RAM; slower, especially without a graphics card"],
+    ["Traduire la transcription", "Translate the transcript"], ["Texte d'origine", "Original text"], ["Afficher", "Show"], ["Traduire en…", "Translate into…"],
+    ["Supprimer la traduction", "Delete translation"], ["Supprimer cette traduction", "Delete this translation"], ["Supprimer cette traduction ?", "Delete this translation?"],
+    ["La traduction a échoué.", "The translation failed."],
+    ["Transcription en direct", "Live transcription"], ["Sans traduction", "No translation"], ["Traduire en direct", "Translate live"],
+    ["Affiche le texte au fil de l'enregistrement ; la transcription complète est refaite à l'arrêt", "Shows the text as you record; the full transcription is redone when you stop"],
+    ["Chargement de Whisper…", "Loading Whisper…"], ["texte provisoire : la transcription complète est refaite à l'arrêt", "provisional text: the full transcription is redone when you stop"],
+    ["Langue de traduction inconnue.", "Unknown translation language."], ["Une traduction est déjà en cours.", "A translation is already in progress."],
+    ["La transcription est vide.", "The transcript is empty."], ["La transcription est déjà dans cette langue.", "The transcript is already in this language."],
+    ["Traduction interrompue (application fermée). Relancez-la.", "Translation interrupted (application closed). Run it again."],
+    ["Cette traduction n'existe pas encore.", "This translation does not exist yet."],
+    ["Aucun modèle d'IA disponible : installez un modèle dans Réglages › Compte-rendu.", "No AI model available: install a model in Settings › Report."],
+    ["Le fichier du modèle est introuvable.", "The model file could not be found."],
+    ["La transcription en direct nécessite whisper-server, absent de ce moteur Whisper. Réinstallez le moteur de transcription (Réglages › Transcription).", "Live transcription needs whisper-server, which is missing from this Whisper engine. Reinstall the transcription engine (Settings › Transcription)."],
+    ["Aucun modèle Whisper installé : installez au moins le modèle « Base » (Réglages › Transcription).", "No Whisper model installed: install at least the “Base” model (Settings › Transcription)."],
+    ["Délai dépassé au chargement de Whisper.", "Timed out while loading Whisper."],
   ].map(([k, v]) => [norm(k), v]));
 
   // ── Motifs : [expression, fonction(correspondance, t) → texte anglais] ──
@@ -232,6 +263,15 @@
   add(/^Préparer la réunion « (.*) »\.$/, (m) => `Prepare the meeting “${m[1]}”.`);
   add(/^Enregistrement récupéré \((.*)\)$/, (m) => `Recovered recording (${m[1]})`);
   add(/^Modèle « (.*) » introuvable$/, (m) => `Model “${m[1]}” not found`);
+  add(/^Traduction en (.*)…$/, (m) => `Translating into ${T(m[1])}…`);
+  add(/^(.*) \(refaire\)$/, (m) => `${T(m[1])} (redo)`);
+  add(/^Transcription \((.*)\)$/, (m) => `Transcription (${T(m[1])})`);
+  add(/^Traduire en (.*)$/, (m) => `Translate into ${T(m[1])}`);
+  add(/^Chargement de la traduction : (.*)$/s, (m) => `Loading the translation: ${T(m[1])}`);
+  add(/^Traduction en direct indisponible : (.*)$/s, (m) => `Live translation unavailable: ${T(m[1])}`);
+  add(/^Lancement de whisper-server impossible : (.*)$/s, (m) => `Could not start whisper-server: ${m[1]}`);
+  add(/^whisper-server s'est arrêté au démarrage \((.*)\)\.$/, (m) => `whisper-server stopped at startup (${m[1]}).`);
+  add(/^Whisper en direct : (.*)$/s, (m) => `Live Whisper: ${m[1]}`);
 
   // ── Langue ──
   let pref = "auto", installLang = "";

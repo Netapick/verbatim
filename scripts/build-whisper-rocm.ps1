@@ -1,7 +1,8 @@
 # Compile whisper.cpp avec ROCm/HIP (aucun binaire officiel n'existe). Prérequis :
 #   - Visual Studio Build Tools 2022 (C++), Python avec : pip install cmake ninja rocm-sdk-core rocm-sdk-devel rocm-sdk-libraries-custom
 #   - SDK ROCm de développement dans un dossier $HipRoot (copie de _rocm_sdk_core + en-têtes, .lib et cmake extraits de rocm_sdk_devel\_devel.tar)
-# Résultat : <Work>\whisper.cpp-1.9.2\build-hip\bin  (à passer à build-redist.ps1 -WhisperRocmFrom)
+#     (le hiproot se reconstitue avec : python scripts/make-hiproot.py <site-packages contenant rocm_sdk_devel> <hiproot>)
+# Résultat : <Work>\whisper.cpp-1.9.2\build-hip\bin  (whisper-cli.exe et whisper-server.exe ; à passer à build-redist.ps1 -WhisperRocmFrom)
 param(
     [Parameter(Mandatory)][string]$HipRoot,
     [string]$Work = (Join-Path $env:TEMP "verbatim-whisper-rocm"),
@@ -25,8 +26,11 @@ set PATH=$HipRoot\bin;$HipRoot\lib\llvm\bin;$py\Scripts;%PATH%
 cd /d "$src"
 cmake -S . -B build-hip -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_HIP=ON "-DAMDGPU_TARGETS=$Targets" -DCMAKE_C_COMPILER="$HipRoot\lib\llvm\bin\clang.exe" -DCMAKE_CXX_COMPILER="$HipRoot\lib\llvm\bin\clang++.exe" -DWHISPER_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_PREFIX_PATH="$HipRoot" -DHIP_PLATFORM=amd
 if errorlevel 1 exit /b 1
-cmake --build build-hip -j 8
+cmake --build build-hip -j 8 --target whisper-cli whisper-server
 "@ | Set-Content $bat -Encoding ascii
 cmd /c $bat
 if ($LASTEXITCODE -ne 0) { throw "Compilation échouée" }
+foreach ($f in "whisper-cli.exe", "whisper-server.exe", "whisper.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-hip.dll") {
+    if (-not (Test-Path "$src\build-hip\bin\$f")) { throw "Manquant après compilation : $f" }
+}
 Write-Host "OK : $src\build-hip\bin"
