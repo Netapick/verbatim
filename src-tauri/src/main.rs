@@ -268,6 +268,7 @@ fn meeting_view(m: &Meeting) -> Value {
     json!({
         "id": m.id, "title": m.title, "created_at": m.created_at, "source": m.source,
         "brief_id": m.brief_id, "has_audio": m.audio_path.is_some(), "audio_path": m.audio_path,
+        "play_path": m.audio_path.as_deref().map(engine::play_path),
         "stage": key, "stage_label": label, "progress": pct,
         "segments": m.transcript.len(), "error": m.error,
         "report_state": m.report_state, "report_error": m.report_error, "report_progress": m.report_progress, "report_pct": m.report_pct, "transcribe_hw": m.transcribe_hw, "report_hw": m.report_hw
@@ -400,7 +401,7 @@ fn update_meeting(st: State<AppState>, id: String, title: Option<String>, brief_
 fn purge_meeting(st: State<AppState>, id: String) -> R<()> {
     let mut s = st.store.lock().unwrap();
     if let Some(m) = s.meetings.iter().find(|m| m.id == id) {
-        if let Some(p) = &m.audio_path { let _ = fs::remove_file(p); }
+        if let Some(p) = &m.audio_path { let _ = fs::remove_file(p); let _ = fs::remove_file(engine::play_copy(p)); }
     }
     s.meetings.retain(|m| m.id != id);
     st.save(&s)

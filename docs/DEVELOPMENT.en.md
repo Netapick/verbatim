@@ -93,7 +93,7 @@ npx tauri build                  # installer (requires NSIS)
 
 ## Publishing a version
 
-1. Bump the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`, then commit.
+1. Bump the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`, add an entry to `CHANGELOG.md`, then commit.
 2. Push a `vX.Y.Z` tag: the `.github/workflows/release.yml` workflow builds the installer, has it signed by SignPath and publishes the release (see [SIGNATURE.en.md](SIGNATURE.en.md)). The release must be the most recent one for the automatic update to see it.
 
 ## Visual identity

@@ -259,7 +259,7 @@ async function meeting(id) {
   const r = m.report;
   const lst = (a) => (a && a.length) ? `<ul class="l">${a.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "<p class='meta'>—</p>";
   const origin = (m.source === "audio" ? "Audio · transcription Whisper locale" : "Transcription importée") + (m.source === "audio" && m.transcribe_hw ? " · " + m.transcribe_hw : "");
-  const player = m.has_audio ? `<div class="card player"><audio id="aud" controls preload="metadata" src="${esc(convertFileSrc(m.audio_path))}"></audio>
+  const player = m.has_audio ? `<div class="card player"><audio id="aud" controls preload="metadata" src="${esc(convertFileSrc(m.play_path || m.audio_path))}"></audio>
     <select id="spd" title="Vitesse de lecture">${[0.75, 1, 1.25, 1.5, 2].map((x) => `<option value="${x}" ${x === 1 ? "selected" : ""}>${x}×</option>`).join("")}</select></div>` : "";
   const bindPlayer = () => {
     const a = $("#aud"); if (!a) return;

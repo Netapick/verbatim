@@ -247,6 +247,7 @@ Une idée ou un besoin ? Ouvrez une [issue](https://github.com/Netapick/verbatim
 
 - [Présentation illustrée](docs/PRESENTATION.md) : le tour de l'application, avec captures d'écran.
 - [Documentation technique](docs/DEVELOPMENT.md) : architecture, construction, distribution, mises à jour.
+- [Historique des versions](CHANGELOG.md) : nouveautés de chaque version.
 - [Signature du code](docs/SIGNATURE.md) · [Politique de confidentialité](docs/PRIVACY.md)
 
 ## Licence

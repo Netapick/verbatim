@@ -249,6 +249,7 @@ Have an idea or a need? Open an [issue](https://github.com/Netapick/verbatim/iss
 
 - [Illustrated presentation](docs/PRESENTATION.en.md): a tour of the application, with screenshots.
 - [Technical documentation](docs/DEVELOPMENT.en.md): architecture, building, distribution, updates.
+- [Changelog](CHANGELOG.md): what changed in each version.
 - [Code signing](docs/SIGNATURE.en.md) · [Privacy policy](docs/PRIVACY.en.md)
 
 ## License

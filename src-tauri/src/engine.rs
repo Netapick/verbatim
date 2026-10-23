@@ -456,6 +456,21 @@ pub fn engine_remove(st: State<AppState>, model: String) -> R<()> {
     Ok(())
 }
 
+fn is_wav(path: &str) -> bool {
+    PathBuf::from(path).extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("wav")).unwrap_or(false)
+}
+
+/// Copie WAV 16 kHz mono d'un audio importé (`<id>.play.wav`), utilisée pour la lecture.
+pub fn play_copy(audio: &str) -> PathBuf {
+    PathBuf::from(audio).with_extension("play.wav")
+}
+
+/// Fichier à lire dans l'interface : la copie WAV si elle existe, sinon l'audio d'origine.
+pub fn play_path(audio: &str) -> String {
+    let c = play_copy(audio);
+    if !is_wav(audio) && c.exists() { c.to_string_lossy().into() } else { audio.to_string() }
+}
+
 /// Décode un audio (mp3, m4a/aac, ogg, flac, wav…) en WAV mono 16 kHz 16 bits.
 fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
     use symphonia::core::{
@@ -622,10 +637,16 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
         out = run(false);
     }
     let (status, last_err) = out?;
-    let _ = fs::remove_file(&tmp);
     set_transcribe_pct(app, id, 100);
     if !status.success() || !json_path.exists() {
+        let _ = fs::remove_file(&tmp);
         return Err(format!("Whisper a échoué : {last_err}"));
+    }
+    // Lecture : le positionnement d'un mp3 à débit variable est approximatif dans le lecteur
+    // de la fenêtre (écarts de plusieurs secondes), alors qu'il est exact sur un WAV. On garde
+    // donc le WAV transcrit comme copie de lecture, sur la même ligne de temps que le texte.
+    if is_wav(&audio) || fs::rename(&tmp, play_copy(&audio)).is_err() {
+        let _ = fs::remove_file(&tmp);
     }
     let raw = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
     let _ = fs::remove_file(&json_path);
