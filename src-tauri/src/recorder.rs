@@ -67,10 +67,14 @@ impl Sink {
     }
     /// Transmet à la transcription en direct ce qui a été écrit depuis le dernier appel.
     fn publish(&mut self) {
+        // jamais d'attente dans le rappel audio : si le lecteur du direct tient le verrou, on réessaie au rappel suivant
+        // (attendre ici provoque « A buffer underrun or overrun occurred »)
         if let Some(t) = &self.tap {
             if !self.pend.is_empty() {
-                t.lock().unwrap().data.extend_from_slice(&self.pend);
-                self.pend.clear();
+                if let Ok(mut g) = t.try_lock() {
+                    g.data.extend_from_slice(&self.pend);
+                    self.pend.clear();
+                }
             }
         }
     }

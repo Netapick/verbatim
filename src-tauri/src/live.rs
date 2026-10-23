@@ -169,14 +169,18 @@ fn infer(port: u16, pcm: &[i16], lang: &str, prompt: &str) -> R<Vec<(f64, f64, S
 fn mix(taps: &[Arc<Mutex<TapBuf>>], a: usize, b: usize) -> Vec<i16> {
     let mut acc = vec![0i32; b - a];
     for t in taps {
-        let g = t.lock().unwrap();
-        for (i, o) in acc.iter_mut().enumerate() {
-            let k = a + i;
-            if k >= g.base {
-                if let Some(v) = g.data.get(k - g.base) {
-                    *o += *v as i32;
-                }
+        // copie rapide sous le verrou, le mixage se fait ensuite sans le tenir
+        let (base, slice): (usize, Vec<i16>) = {
+            let g = t.lock().unwrap();
+            let from = a.max(g.base);
+            let to = b.min(g.base + g.data.len());
+            if from >= to {
+                continue;
             }
+            (from, g.data[from - g.base..to - g.base].to_vec())
+        };
+        for (i, v) in slice.iter().enumerate() {
+            acc[base - a + i] += *v as i32;
         }
     }
     let gain = if taps.len() > 1 { 0.9 } else { 1.0 };
