@@ -237,6 +237,15 @@ L'installateur et les moteurs ne sont pas encore signés. Voir la section sur l'
 
 Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 
+**Réalisé**
+- [x] **Interface en anglais** (français par défaut, choix dans Réglages › Général).
+- [x] **Mise à jour automatique** depuis les releases GitHub.
+- [x] **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA).
+- [x] **Langue du compte-rendu** au choix.
+- [x] **Traduction de la transcription** en 14 langues (TranslateGemma).
+- [x] **Transcription en direct** pendant la réunion, avec traduction en direct.
+- [x] **Thèmes et palettes** (dont Kawaii et Gamer).
+
 **Priorités**
 - **Plus de langues d'interface** (espagnol, allemand, italien).
 - **Séparation des intervenants** (diarisation) : attribuer chaque passage à son locuteur.

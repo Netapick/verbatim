@@ -239,6 +239,15 @@ The installer and the engines are not signed yet. See the section on [antivirus]
 
 These are working ideas, with no commitment on dates or order.
 
+**Done**
+- [x] **English interface** (French by default, selectable in Settings › General).
+- [x] **Automatic updates** from GitHub releases.
+- [x] **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA).
+- [x] **Report language** of your choice.
+- [x] **Transcript translation** into 14 languages (TranslateGemma).
+- [x] **Live transcription** during the meeting, with live translation.
+- [x] **Themes and palettes** (including Kawaii and Gamer).
+
 **Priorities**
 - **More interface languages** (Spanish, German, Italian).
 - **Speaker separation** (diarization): attribute each passage to its speaker.
