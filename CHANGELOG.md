@@ -29,6 +29,9 @@ Français · English below each version.
 - Le direct charge Whisper dès l'ouverture du panneau d'enregistrement (message de chargement, bouton « Démarrer » grisé tant que Whisper n'est pas prêt) ; Whisper est libéré à l'arrêt.
 - Rééchantillonnage de qualité (filtre passe-bas) à l'import et à l'enregistrement : moins de repliement des aigus dans la bande de la voix, donc une transcription plus fidèle.
 - Les données (`store.json`) sont écrites de façon atomique.
+- Nouveaux modèles Whisper **Large v3 Turbo Q8** (quasi identique à la version complète, recommandé pour le français) et **Large v3 Turbo complet** ; le Turbo compressé passe en Q5.
+- Direct : si `whisper-server` s'arrête brutalement, il est relancé automatiquement (3 fois au plus par enregistrement) ; sa sortie est consignée dans `verbatim-whisper-server.log` (dossier temporaire).
+- Direct : la capture audio ne fait plus que copier les échantillons, le traitement se fait dans un thread dédié (fin de l'erreur « buffer underrun or overrun »). Les silences et bruits sont écartés par une détection de parole (Earshot) avant l'envoi à Whisper, et les phrases inventées sur du bruit sont filtrées.
 
 ### English
 
@@ -57,6 +60,9 @@ Français · English below each version.
 - Live mode loads Whisper as soon as the recording panel opens (loading message, "Start" button greyed out until Whisper is ready); Whisper is released when you stop.
 - High-quality resampling (low-pass filter) on import and recording: less aliasing of high frequencies into the voice band, hence a more faithful transcription.
 - Data (`store.json`) is written atomically.
+- New Whisper models **Large v3 Turbo Q8** (nearly identical to the full version, recommended for French) and **Large v3 Turbo full**; the compressed Turbo is now Q5.
+- Live: if `whisper-server` stops abruptly it is restarted automatically (up to 3 times per recording); its output is logged to `verbatim-whisper-server.log` (temp folder).
+- Live: audio capture now only copies samples, processing runs on a dedicated thread (no more "buffer underrun or overrun" error). Silence and noise are discarded by speech detection (Earshot) before reaching Whisper, and phrases invented on noise are filtered out.
 
 ## 0.2.3
 
