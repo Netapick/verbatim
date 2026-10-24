@@ -100,6 +100,7 @@ impl Stream {
 
 /// Rééchantillonne un signal entier. La durée est conservée (même nombre d'échantillons à la fréquence d'arrivée qu'avant,
 /// à un échantillon près).
+#[cfg(test)]
 pub fn resample(x: &[f32], from: u32, to: u32) -> Vec<f32> {
     if from == to || x.is_empty() {
         return x.to_vec();

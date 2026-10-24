@@ -25,3 +25,6 @@ opt-level = 3        # décodage audio (symphonia) nettement plus rapide qu'en "
 lto = "fat"
 codegen-units = 1
 strip = true
+
+[profile.dev]
+opt-level = 2        # sans optimisation, le décodage audio est ~40 fois plus lent (60 s au lieu de 1,5 s pour 15 min)

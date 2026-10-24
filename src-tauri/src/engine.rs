@@ -502,12 +502,31 @@ fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
     let mut dec = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("Codec non pris en charge : {e}"))?;
-    let mut mono: Vec<f32> = Vec::new();
+    // deux threads : celui-ci décode, un second rééchantillonne vers 16 kHz au fil de l'eau (même résultat qu'en une passe)
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<f32>>(16);
+    let worker = std::thread::spawn(move || {
+        let mut rs = crate::resample::Stream::new(rate, 16000);
+        let (mut n_in, mut out) = (0usize, Vec::<f32>::new());
+        for chunk in rx {
+            n_in += chunk.len();
+            rs.push(&chunk, &mut out);
+        }
+        if rate != 16000 {
+            rs.push(&vec![0.0; rs.flush_len()], &mut out);
+            out.resize((n_in as f64 * 16000.0 / rate as f64) as usize, 0.0);
+        }
+        (n_in, out)
+    });
+    let mut mono: Vec<f32> = Vec::with_capacity(1 << 16);
+    let mut failure: Option<String> = None;
     loop {
         let pkt = match format.next_packet() {
             Ok(p) => p,
             Err(SErr::IoError(_)) | Err(SErr::ResetRequired) => break,
-            Err(e) => return Err(e.to_string()),
+            Err(e) => {
+                failure = Some(e.to_string());
+                break;
+            }
         };
         if pkt.track_id() != track.id {
             continue;
@@ -521,19 +540,27 @@ fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
                 for fr in sb.samples().chunks(ch) {
                     mono.push(fr.iter().sum::<f32>() / ch as f32);
                 }
+                if mono.len() >= 1 << 16 {
+                    let _ = tx.send(std::mem::replace(&mut mono, Vec::with_capacity(1 << 16)));
+                }
             }
             Err(SErr::DecodeError(_)) => continue,
             Err(_) => break,
         }
     }
-    if mono.is_empty() {
+    if !mono.is_empty() {
+        let _ = tx.send(mono);
+    }
+    drop(tx);
+    let (n_in, resampled) = worker.join().map_err(|_| "Rééchantillonnage interrompu.".to_string())?;
+    if let Some(e) = failure {
+        return Err(e);
+    }
+    if n_in == 0 {
         return Err("Audio vide ou illisible.".into());
     }
-    // rééchantillonnage de qualité vers 16 kHz : un filtre passe-bas évite que les aigus se replient dans la voix
-    let pcm: Vec<i16> = crate::resample::resample(&mono, rate, 16000)
-        .into_iter()
-        .map(|v| (v.clamp(-1.0, 1.0) * 32767.0) as i16)
-        .collect();
+    // rééchantillonnage de qualité vers 16 kHz (fait par le second thread) : un filtre passe-bas évite que les aigus se replient dans la voix
+    let pcm: Vec<i16> = resampled.into_iter().map(|v| (v.clamp(-1.0, 1.0) * 32767.0) as i16).collect();
     let dl = (pcm.len() * 2) as u32;
     let mut w = Vec::with_capacity(44 + pcm.len() * 2);
     w.extend_from_slice(b"RIFF");
@@ -568,6 +595,63 @@ fn set_status(app: &AppHandle, id: &str, status: &str, error: Option<String>, tr
     let _ = st.save(&s);
 }
 
+/// Écrit dans `dst` la partie [`from_ms`, `from_ms + len_ms`[ d'un WAV 16 kHz mono 16 bits.
+fn write_wav_part(src: &std::path::Path, dst: &std::path::Path, from_ms: u64, len_ms: u64) -> R<()> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let mut f = fs::File::open(src).map_err(|e| e.to_string())?;
+    f.seek(SeekFrom::Start(44 + from_ms * 32)).map_err(|e| e.to_string())?;
+    let bytes = len_ms * 32;
+    let mut out = std::io::BufWriter::new(fs::File::create(dst).map_err(|e| e.to_string())?);
+    let mut h = Vec::with_capacity(44);
+    h.extend_from_slice(b"RIFF");
+    h.extend_from_slice(&((36 + bytes) as u32).to_le_bytes());
+    h.extend_from_slice(b"WAVEfmt ");
+    h.extend_from_slice(&16u32.to_le_bytes());
+    h.extend_from_slice(&1u16.to_le_bytes());
+    h.extend_from_slice(&1u16.to_le_bytes());
+    h.extend_from_slice(&16000u32.to_le_bytes());
+    h.extend_from_slice(&32000u32.to_le_bytes());
+    h.extend_from_slice(&2u16.to_le_bytes());
+    h.extend_from_slice(&16u16.to_le_bytes());
+    h.extend_from_slice(b"data");
+    h.extend_from_slice(&(bytes as u32).to_le_bytes());
+    out.write_all(&h).map_err(|e| e.to_string())?;
+    std::io::copy(&mut f.take(bytes), &mut out).map_err(|e| e.to_string())?;
+    out.flush().map_err(|e| e.to_string())
+}
+
+/// Au-delà de cette durée (1 h), la transcription est découpée en `LONG_CHUNKS` morceaux traités en parallèle.
+const LONG_AUDIO_MS: u64 = 3_600_000;
+const LONG_CHUNKS: usize = 3;
+
+/// Points de coupe (en ms) en `n` morceaux égaux, décalés vers le moment le plus silencieux (±30 s)
+/// pour ne pas couper une phrase. `wav` : WAV 16 kHz mono 16 bits (en-tête de 44 octets).
+fn split_points(wav: &std::path::Path, total_ms: u64, n: usize) -> Vec<u64> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = match fs::File::open(wav) { Ok(f) => f, Err(_) => return Vec::new() };
+    let mut cuts = Vec::new();
+    for k in 1..n as u64 {
+        let target = total_ms * k / n as u64;
+        let from = target.saturating_sub(30_000);
+        let len = (60_000u64).min(total_ms - from);
+        let mut buf = vec![0u8; (len * 32) as usize];
+        if f.seek(SeekFrom::Start(44 + from * 32)).is_err() || f.read_exact(&mut buf).is_err() {
+            cuts.push(target);
+            continue;
+        }
+        // énergie par fenêtre de 200 ms (3 200 échantillons) ; on garde la plus calme
+        let best = buf
+            .chunks_exact(6400)
+            .enumerate()
+            .map(|(i, w)| (i, w.chunks_exact(2).map(|b| (i16::from_le_bytes([b[0], b[1]]) as i64).abs()).sum::<i64>()))
+            .min_by_key(|&(_, e)| e)
+            .map(|(i, _)| i as u64)
+            .unwrap_or(0);
+        cuts.push(from + best * 200 + 100);
+    }
+    cuts
+}
+
 fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
     let st = app.state::<AppState>();
     let (audio, cfg, glossary) = {
@@ -582,68 +666,135 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
     let tmp = st.dir.join(format!("{id}.16k.wav"));
     decode_to_wav16k(&audio, &tmp)?;
     set_status(app, id, "transcribing", None, None);
-    let base = st.dir.join(id);
-    let json_path = PathBuf::from(format!("{}.json", base.display()));
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 8);
     let try_gpu = cfg.whisper_device != "cpu";
+    // Au-delà d'une heure, une seule instance n'occupe pas tout le GPU : on découpe aux silences
+    // et on transcrit les morceaux en parallèle (CPU : une seule instance, le parallélisme n'y gagne rien).
+    let total_ms = fs::metadata(&tmp).map(|m| m.len().saturating_sub(44) / 32).unwrap_or(0);
+    let cuts = if total_ms > LONG_AUDIO_MS { split_points(&tmp, total_ms, LONG_CHUNKS) } else { Vec::new() };
+    let chunk_json = |i: usize| st.dir.join(format!("{id}.p{i}.json"));
+    let chunk_wav = |i: usize| st.dir.join(format!("{id}.p{i}.wav"));
     // `gpu` : moteur ROCm / CUDA s'il est utilisable, sinon CPU
-    let run = |gpu: bool| -> R<(std::process::ExitStatus, String)> {
+    let run = |gpu: bool| -> R<(bool, String)> {
+        // morceaux : (début en ms, durée en ms ; 0 = jusqu'à la fin)
+        let parts: Vec<(u64, u64)> = if gpu && !cuts.is_empty() {
+            let mut b = vec![0u64];
+            b.extend(&cuts);
+            b.push(0);
+            (0..b.len() - 1).map(|i| (b[i], if b[i + 1] == 0 { 0 } else { b[i + 1] - b[i] })).collect()
+        } else {
+            vec![(0, 0)]
+        };
+        let pcts: Vec<std::sync::atomic::AtomicU8> = parts.iter().map(|_| std::sync::atomic::AtomicU8::new(0)).collect();
+        for i in 0..LONG_CHUNKS {
+            let _ = fs::remove_file(chunk_json(i));
+        }
+        // plusieurs morceaux : on découpe le WAV nous-mêmes, aux points de silence calculés
+        if parts.len() > 1 {
+            for (i, &(off, dur)) in parts.iter().enumerate() {
+                write_wav_part(&tmp, &chunk_wav(i), off, if dur == 0 { total_ms - off } else { dur })?;
+            }
+        }
         let use_rocm = gpu && rocm_ready(&st.mdir, &cfg.rocm_root);
         let use_cuda = gpu && !use_rocm && cuda_available() && engine_gpu_bin(&st.mdir).exists();
         set_hw(app, id, &hw_label(if use_rocm { "rocm" } else if use_cuda { "cuda" } else { "cpu" }));
-        let mut cmd = std::process::Command::new(if use_rocm { engine_rocm_bin(&st.mdir) } else if use_cuda { engine_gpu_bin(&st.mdir) } else { engine_bin(&st.mdir) });
-        if use_rocm {
-            if let Some(dirs) = crate::llm::rocm_path_dirs(&st.mdir, &cfg.rocm_root) {
-                let mut p: Vec<std::ffi::OsString> = dirs.iter().map(|d| d.as_os_str().to_owned()).collect();
-                p.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).map(|x| x.into_os_string()));
-                if let Ok(j) = std::env::join_paths(p) { cmd.env("PATH", j); }
+        let build = |i: usize| -> std::process::Command {
+            let mut cmd = std::process::Command::new(if use_rocm { engine_rocm_bin(&st.mdir) } else if use_cuda { engine_gpu_bin(&st.mdir) } else { engine_bin(&st.mdir) });
+            if use_rocm {
+                if let Some(dirs) = crate::llm::rocm_path_dirs(&st.mdir, &cfg.rocm_root) {
+                    let mut p: Vec<std::ffi::OsString> = dirs.iter().map(|d| d.as_os_str().to_owned()).collect();
+                    p.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).map(|x| x.into_os_string()));
+                    if let Ok(j) = std::env::join_paths(p) { cmd.env("PATH", j); }
+                }
             }
-        }
-        cmd.arg("-m").arg(model_path(&st.mdir, &cfg.whisper_model)).arg("-f").arg(&tmp)
-            .args(["-l", &cfg.whisper_lang, "-oj", "-np", "-of"]).arg(&base);
-        cmd.args(["-t", &threads.to_string(), "-bs", "5"]);
-        if vad_path(&st.mdir).exists() {
-            // ignore les silences : moins d'hallucinations (« (musique) », répétitions)
-            cmd.arg("--vad").arg("-vm").arg(vad_path(&st.mdir));
-        }
-        if !glossary.is_empty() {
-            let p: Vec<&str> = glossary.iter().map(|t| t.term.as_str()).collect();
-            cmd.arg("--prompt").arg(format!("Termes : {}.", p.join(", ")));
-        }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-        }
-        // -pp : whisper.cpp écrit « progress =  42% » sur stderr
-        cmd.arg("-pp").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
+            let of = st.dir.join(format!("{id}.p{i}"));
+            cmd.arg("-m").arg(model_path(&st.mdir, &cfg.whisper_model)).arg("-f").arg(if parts.len() > 1 { chunk_wav(i) } else { tmp.clone() })
+                .args(["-l", &cfg.whisper_lang, "-oj", "-np", "-of"]).arg(&of);
+            // -bs 1 : décodage glouton, ~30 % plus rapide que -bs 5 pour un texte quasi identique
+            cmd.args(["-t", &threads.to_string(), "-bs", "1"]);
+            if vad_path(&st.mdir).exists() {
+                // ignore les silences : moins d'hallucinations (« (musique) », répétitions)
+                cmd.arg("--vad").arg("-vm").arg(vad_path(&st.mdir));
+            }
+            if !glossary.is_empty() {
+                let p: Vec<&str> = glossary.iter().map(|t| t.term.as_str()).collect();
+                cmd.arg("--prompt").arg(format!("Termes : {}.", p.join(", ")));
+            }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            }
+            // -pp : whisper.cpp écrit « progress =  42% » sur stderr
+            cmd.arg("-pp").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
+            cmd
+        };
         set_transcribe_pct(app, id, 0);
-        let mut child = cmd.spawn().map_err(|e| format!("Lancement de whisper impossible : {e}"))?;
-        crate::procs::adopt(&child);
-        let mut last = String::new();
-        if let Some(err) = child.stderr.take() {
-            for line in std::io::BufRead::lines(std::io::BufReader::new(err)).map_while(Result::ok) {
-                if let Some(p) = line.split("progress =").nth(1) {
-                    if let Ok(n) = p.trim().trim_end_matches('%').trim().parse::<u8>() {
-                        set_transcribe_pct(app, id, n);
-                    }
-                } else if !line.trim().is_empty() {
-                    last = line;
+        let mut children = Vec::new();
+        for i in 0..parts.len() {
+            let child = build(i).spawn().map_err(|e| format!("Lancement de whisper impossible : {e}"));
+            match child {
+                Ok(c) => {
+                    crate::procs::adopt(&c);
+                    children.push(c);
+                }
+                Err(e) => {
+                    for mut c in children { let _ = c.kill(); }
+                    return Err(e);
                 }
             }
         }
-        let status = child.wait().map_err(|e| e.to_string())?;
-        Ok((status, last))
+        let last = std::sync::Mutex::new(String::new());
+        let mut ok = true;
+        std::thread::scope(|sc| {
+            let hs: Vec<_> = children
+                .into_iter()
+                .enumerate()
+                .map(|(i, mut child)| {
+                    let (pcts, last) = (&pcts, &last);
+                    sc.spawn(move || {
+                        if let Some(err) = child.stderr.take() {
+                            for line in std::io::BufRead::lines(std::io::BufReader::new(err)).map_while(Result::ok) {
+                                if let Some(p) = line.split("progress =").nth(1) {
+                                    if let Ok(n) = p.trim().trim_end_matches('%').trim().parse::<u8>() {
+                                        pcts[i].store(n.min(100), std::sync::atomic::Ordering::Relaxed);
+                                        let sum: u32 = pcts.iter().map(|a| a.load(std::sync::atomic::Ordering::Relaxed) as u32).sum();
+                                        set_transcribe_pct(app, id, (sum / pcts.len() as u32) as u8);
+                                    }
+                                } else if !line.trim().is_empty() {
+                                    *last.lock().unwrap_or_else(|e| e.into_inner()) = line;
+                                }
+                            }
+                        }
+                        child.wait().map(|s| s.success()).unwrap_or(false)
+                    })
+                })
+                .collect();
+            for h in hs {
+                ok &= h.join().unwrap_or(false);
+            }
+        });
+        let last = last.into_inner().unwrap_or_default();
+        Ok((ok && (0..parts.len()).all(|i| chunk_json(i).exists()), last))
     };
     let mut out = run(try_gpu);
-    // échec du GPU (pilote, mémoire…) : on réessaie sur le CPU
-    if try_gpu && !matches!(&out, Ok((st, _)) if st.success() && json_path.exists()) {
+    // échec du GPU (pilote, mémoire…) : on réessaie sur le CPU (une seule instance)
+    if try_gpu && !matches!(&out, Ok((true, _))) {
         out = run(false);
     }
-    let (status, last_err) = out?;
+    let (ok, last_err) = out?;
     set_transcribe_pct(app, id, 100);
-    if !status.success() || !json_path.exists() {
+    // les fichiers JSON présents : un par morceau lancé (1 sur CPU)
+    for i in 0..LONG_CHUNKS {
+        let _ = fs::remove_file(chunk_wav(i));
+    }
+    let mut files: Vec<(usize, PathBuf)> = (0..LONG_CHUNKS).map(|i| (i, chunk_json(i))).filter(|(_, p)| p.exists()).collect();
+    files.sort();
+    // début de chaque morceau (s) : whisper-cli donne des temps relatifs au WAV du morceau
+    let starts: Vec<f64> = std::iter::once(0.0).chain(cuts.iter().map(|&c| c as f64 / 1000.0)).collect();
+    if !ok || files.is_empty() {
         let _ = fs::remove_file(&tmp);
+        for (_, f) in &files { let _ = fs::remove_file(f); }
         return Err(format!("Whisper a échoué : {last_err}"));
     }
     // Lecture : le positionnement d'un mp3 à débit variable est approximatif dans le lecteur
@@ -652,27 +803,50 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
     if is_wav(&audio) || fs::rename(&tmp, play_copy(&audio)).is_err() {
         let _ = fs::remove_file(&tmp);
     }
-    let raw = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let _ = fs::remove_file(&json_path);
-    let v: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-    let segs: Vec<Segment> = v["transcription"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|t| {
+    let mut segs: Vec<Segment> = Vec::new();
+    for (ci, f) in &files {
+        let shift = if files.len() > 1 { starts.get(*ci).copied().unwrap_or(0.0) } else { 0.0 };
+        let raw = fs::read_to_string(f).map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(f);
+        let v: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+        segs.extend(v["transcription"].as_array().cloned().unwrap_or_default().iter().filter_map(|t| {
             let text = t["text"].as_str()?.trim().to_string();
             if text.is_empty() || text == "[BLANK_AUDIO]" {
                 return None;
             }
             Some(Segment {
                 speaker: "Intervenant".into(),
-                start: t["offsets"]["from"].as_f64()? / 1000.0,
-                end: t["offsets"]["to"].as_f64()? / 1000.0,
+                start: t["offsets"]["from"].as_f64()? / 1000.0 + shift,
+                end: t["offsets"]["to"].as_f64()? / 1000.0 + shift,
                 text,
             })
-        })
-        .collect();
+        }));
+    }
+    // décodage glouton : un segment peut se répéter en boucle (« Extreme. Extreme. Extreme. »). On en garde 2 de suite au plus.
+    let mut run = 0;
+    let mut prev = String::new();
+    segs.retain(|g| {
+        let k = g.text.trim().to_lowercase();
+        run = if k == prev { run + 1 } else { 1 };
+        prev = k;
+        run <= 2
+    });
+    // le décodage glouton coupe à chaque marque de temps (~3 mots par ligne) : on recolle les fragments
+    // d'une même phrase (pas de ponctuation finale, pause < 1 s, 6 s au plus), comme avec le faisceau
+    let mut merged: Vec<Segment> = Vec::new();
+    for g in segs {
+        if let Some(l) = merged.last_mut() {
+            let ended = l.text.trim_end().ends_with(['.', '?', '!', '…']);
+            if !ended && g.start - l.end < 1.0 && g.end - l.start <= 6.0 {
+                l.text.push(' ');
+                l.text.push_str(&g.text);
+                l.end = g.end;
+                continue;
+            }
+        }
+        merged.push(g);
+    }
+    let segs = merged;
     if segs.is_empty() {
         return Err("Aucune parole détectée.".into());
     }
@@ -703,4 +877,27 @@ pub fn retry_transcription(app: AppHandle, st: State<AppState>, id: String) -> R
     }
     spawn_transcription(app, id);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn coupe_dans_le_silence() {
+        // 90 s de bruit, avec un silence de 1 s entre 40,0 s et 41,0 s : la coupe visée (45 s) doit s'y décaler
+        let total_ms = 90_000u64;
+        let mut w = vec![0u8; 44];
+        for i in 0..(total_ms * 16) {
+            let silent = (i >= 40_000 * 16) && (i < 41_000 * 16);
+            let v: i16 = if silent { 0 } else { 8000 + (i % 7) as i16 * 100 };
+            w.extend_from_slice(&v.to_le_bytes());
+        }
+        let p = std::env::temp_dir().join("verbatim-split-test.wav");
+        fs::write(&p, &w).unwrap();
+        let cuts = split_points(&p, total_ms, 2);
+        let _ = fs::remove_file(&p);
+        assert_eq!(cuts.len(), 1);
+        assert!((40_000..41_000).contains(&cuts[0]), "coupe à {} ms", cuts[0]);
+    }
 }

@@ -9,12 +9,22 @@ Français · English below each version.
 - Une transcription qui plante ne laisse plus la réunion bloquée en « Préparation de l'audio » ni les suivantes en attente : elle passe en erreur et peut être relancée.
 - Le compte-rendu et la traduction affichent le pourcentage de chargement du modèle d'IA.
 
+**Transcription plus rapide**
+- Whisper décode en glouton (`-bs 1`) : environ 30 % plus rapide pour un texte quasi identique (2 % d'écart de mots sur un enregistrement de 15 min). Une même phrase répétée plus de deux fois de suite (boucle de décodage) est réduite à deux. Les fragments d'une même phrase sont recollés (6 s au plus) pour garder des lignes de longueur normale.
+- Au-delà d'une heure, l'audio est découpé en 3 morceaux aux silences, transcrits en parallèle sur le GPU (1 h : environ 50 s au lieu de 89 s), puis recollés avec leurs horodatages. Sur processeur, une seule instance.
+- La préparation de l'audio décode et rééchantillonne en même temps (deux threads) : 15 min en moins d'une seconde, résultat identique. Les builds de développement sont optimisés (opt-level 2).
+
 ### English
 
 **Fixes**
 - Engines (llama.cpp, whisper.cpp, including translation) are stopped when you quit Verbatim, even after a crash or forced close. Closing the app while Whisper is loading no longer leaves an orphan process that blocked transcriptions on the next launch; orphans from a previous session are also killed at startup.
 - A crashing transcription no longer leaves the meeting stuck on "Preparing audio" nor the following ones waiting: it goes to an error state and can be retried.
 - The report and the translation show the AI model's loading percentage.
+
+**Faster transcription**
+- Whisper decodes greedily (`-bs 1`): about 30% faster for almost identical text (2% word difference on a 15 min recording). A sentence repeated more than twice in a row (decoding loop) is cut back to two. Fragments of the same sentence are merged back (6 s at most) to keep lines at a normal length.
+- Beyond one hour, the audio is split into 3 parts at silences, transcribed in parallel on the GPU (1 h: about 50 s instead of 89 s), then stitched back with their timestamps. On CPU, a single instance.
+- Audio preparation decodes and resamples at the same time (two threads): 15 min in under a second, identical result. Development builds are optimised (opt-level 2).
 
 ## 0.3.0
 
