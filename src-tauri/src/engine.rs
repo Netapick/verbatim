@@ -619,6 +619,7 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
         cmd.arg("-pp").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::piped());
         set_transcribe_pct(app, id, 0);
         let mut child = cmd.spawn().map_err(|e| format!("Lancement de whisper impossible : {e}"))?;
+        crate::procs::adopt(&child);
         let mut last = String::new();
         if let Some(err) = child.stderr.take() {
             for line in std::io::BufRead::lines(std::io::BufReader::new(err)).map_while(Result::ok) {
@@ -682,8 +683,12 @@ pub fn spawn_transcription(app: AppHandle, id: String) {
     set_status(&app, &id, "queued", None, None);
     std::thread::spawn(move || {
         let st = app.state::<AppState>();
-        let _guard = st.job_lock.lock().unwrap();
-        match run_whisper(&app, &id) {
+        // un verrou « empoisonné » par un plantage précédent ne doit pas bloquer la file
+        let _guard = st.job_lock.lock().unwrap_or_else(|e| e.into_inner());
+        // un plantage (décodage audio, par exemple) ne doit pas laisser la réunion bloquée en « préparation »
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_whisper(&app, &id)))
+            .unwrap_or_else(|_| Err("La transcription a planté (fichier audio illisible ?). Réessayez ou réimportez le fichier.".into()));
+        match res {
             Ok(segs) => set_status(&app, &id, "ready", None, Some(segs)),
             Err(e) => set_status(&app, &id, "error", Some(e), None),
         }

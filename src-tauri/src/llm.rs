@@ -354,7 +354,33 @@ fn crash_hint(e: &str) -> String {
     }
 }
 
-fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings) -> R<Server> {
+/// Avancement du chargement du modèle (0 à 99), estimé par le pic de mémoire du processus rapporté à la taille du fichier :
+/// llama.cpp n'écrit plus de progression, mais le modèle est lu en entier avant de répondre.
+fn load_percent(child: &Child, model_bytes: u64) -> u8 {
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        #[repr(C)]
+        struct Counters {
+            cb: u32,
+            page_faults: u32,
+            peak_working_set: usize,
+            rest: [usize; 7],
+        }
+        extern "system" {
+            fn K32GetProcessMemoryInfo(process: *mut std::ffi::c_void, counters: *mut Counters, cb: u32) -> i32;
+        }
+        let mut c = Counters { cb: std::mem::size_of::<Counters>() as u32, page_faults: 0, peak_working_set: 0, rest: [0; 7] };
+        if model_bytes > 0 && unsafe { K32GetProcessMemoryInfo(child.as_raw_handle(), &mut c, c.cb) } != 0 {
+            return (c.peak_working_set as u64 * 100 / model_bytes).min(99) as u8;
+        }
+    }
+    let _ = (child, model_bytes);
+    0
+}
+
+/// Lance llama-server et attend qu'il soit prêt. `on_pct` reçoit l'avancement du chargement du modèle (0 à 100).
+fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings, on_pct: &dyn Fn(u8)) -> R<Server> {
     let (bin, _dev, extra_path) = pick_engine(dir, cfg).ok_or("Moteur d'IA locale non installé (Réglages).")?;
     let port = {
         let l = std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
@@ -381,9 +407,12 @@ fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings) -> R<Server> {
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     let child = cmd.spawn().map_err(|e| format!("Lancement de l'IA locale impossible : {e}"))?;
+    crate::procs::adopt(&child);
+    let model_bytes = fs::metadata(model).map(|m| m.len()).unwrap_or(0);
     let mut srv = Server { child, port };
     let t0 = Instant::now();
     loop {
+        on_pct(load_percent(&srv.child, model_bytes));
         if let Ok(Some(status)) = srv.child.try_wait() {
             return Err(format!("L'IA locale s'est arrêtée au démarrage ({status}). Mémoire insuffisante ?"));
         }
@@ -392,6 +421,7 @@ fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings) -> R<Server> {
             .call()
             .is_ok()
         {
+            on_pct(100);
             return Ok(srv);
         }
         if t0.elapsed() > Duration::from_secs(300) {
@@ -538,7 +568,7 @@ pub fn with_backend<T>(app: &AppHandle, cfg: &Settings, sel: &str, status: &dyn 
     if let Some((path, label)) = local {
         status("Chargement de l'IA locale…");
         let attempt = |cfg: &Settings| -> R<T> {
-            let srv = start_server(&st.mdir, &path, cfg)?;
+            let srv = start_server(&st.mdir, &path, cfg, &|p| status(&format!("Chargement de l'IA locale… {p} %")))?;
             let be = Backend { base: format!("http://127.0.0.1:{}/v1", srv.port), key: String::new(), model: "local".into(), label: label.clone(),
                 hw: engine_hw(&st.mdir, cfg), mode: "local", kind: "openai", chunk_chars: 11_000, timeout: 1800 };
             let r = f(&be);
@@ -1029,6 +1059,14 @@ fn set_progress(app: &AppHandle, id: &str, txt: &str) {
     }
 }
 
+/// Avancement du chargement du modèle : texte « N % » et barre (de 3 à 10 % de la génération).
+fn load_progress<'a>(app: &'a AppHandle, id: &'a str) -> impl Fn(u8) + 'a {
+    move |p| {
+        set_progress(app, id, &format!("Chargement de l'IA locale… {p} %"));
+        set_pct(app, id, 3.0 + p as f32 * 0.07);
+    }
+}
+
 fn set_report_hw(app: &AppHandle, id: &str, hw: &str) {
     let st = app.state::<AppState>();
     let mut s = st.store.lock().unwrap();
@@ -1166,7 +1204,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
         set_progress(app, id, "Chargement de l'IA locale (gros modèle : plusieurs minutes possibles)…");
         set_pct(app, id, 3.0);
         let attempt = |cfg: &Settings| {
-            start_server(&st.mdir, &path, cfg).and_then(|srv| {
+            start_server(&st.mdir, &path, cfg, &load_progress(app, id)).and_then(|srv| {
                 let be = Backend {
                     base: format!("http://127.0.0.1:{}/v1", srv.port),
                     key: String::new(),
@@ -1202,7 +1240,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
         set_progress(app, id, "Chargement de l'IA locale…");
         set_pct(app, id, 3.0);
         let attempt = |cfg: &Settings| {
-            start_server(&st.mdir, &model_file(&st.mdir, &cfg.llm_local), cfg).and_then(|srv| {
+            start_server(&st.mdir, &model_file(&st.mdir, &cfg.llm_local), cfg, &load_progress(app, id)).and_then(|srv| {
                 let be = Backend {
                     base: format!("http://127.0.0.1:{}/v1", srv.port),
                     key: String::new(),

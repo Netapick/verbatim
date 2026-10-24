@@ -11,6 +11,7 @@ mod live;
 mod llm;
 use llm::{generate_report, llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
 mod models;
+mod procs;
 mod recorder;
 mod resample;
 mod translate;
@@ -665,7 +666,14 @@ fn main() {
             let pending: Vec<String> = app.state::<AppState>().store.lock().unwrap().meetings.iter()
                 .filter(|m| matches!(m.status.as_str(), "queued" | "converting" | "transcribing"))
                 .map(|m| m.id.clone()).collect();
-            for id in pending { spawn_transcription(app.handle().clone(), id); }
+            // avant de reprendre, on tue les moteurs orphelins d'un lancement précédent (fermeture pendant le chargement de Whisper)
+            let (h, mdir_c) = (app.handle().clone(), app.state::<AppState>().mdir.clone());
+            std::thread::spawn(move || {
+                let mut dirs = vec![mdir_c];
+                if let Some(r) = engine_paths::REDIST.get() { dirs.push(r.clone()); }
+                procs::kill_orphans(&dirs);
+                for id in pending { spawn_transcription(h.clone(), id); }
+            });
             // récupère les enregistrements interrompus
             let recovered = recorder::recover(&app.state::<AppState>().dir);
             if !recovered.is_empty() {
@@ -700,6 +708,11 @@ fn main() {
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
             update::update_check, update::update_install
         ])
-        .run(tauri::generate_context!())
-        .expect("erreur au lancement de Verbatim");
+        .build(tauri::generate_context!())
+        .expect("erreur au lancement de Verbatim")
+        .run(|_, event| {
+            if let tauri::RunEvent::Exit = event {
+                procs::kill_all();
+            }
+        });
 }

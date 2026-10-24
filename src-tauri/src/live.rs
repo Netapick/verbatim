@@ -163,6 +163,7 @@ fn spawn_server(cfg: &LiveCfg, gen: u64) -> R<Running> {
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     let child = cmd.spawn().map_err(|e| format!("Lancement de whisper-server impossible : {e}"))?;
+    crate::procs::adopt(&child);
     let model = cfg.model.file_stem().map(|s| s.to_string_lossy().replace("ggml-", "")).unwrap_or_default();
     let mut srv = Running { child, port, hw: cfg.hw.clone(), model };
     let t0 = Instant::now();

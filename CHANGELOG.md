@@ -2,6 +2,20 @@
 
 Français · English below each version.
 
+## 0.3.1
+
+**Correctifs**
+- Les moteurs (llama.cpp, whisper.cpp, traduction comprise) sont arrêtés quand on quitte Verbatim, même en cas de plantage ou de fermeture forcée. Fermer l'app pendant le chargement de Whisper ne laisse plus de processus orphelin qui bloquait les transcriptions au lancement suivant ; les orphelins d'une session précédente sont aussi tués au démarrage.
+- Une transcription qui plante ne laisse plus la réunion bloquée en « Préparation de l'audio » ni les suivantes en attente : elle passe en erreur et peut être relancée.
+- Le compte-rendu et la traduction affichent le pourcentage de chargement du modèle d'IA.
+
+### English
+
+**Fixes**
+- Engines (llama.cpp, whisper.cpp, including translation) are stopped when you quit Verbatim, even after a crash or forced close. Closing the app while Whisper is loading no longer leaves an orphan process that blocked transcriptions on the next launch; orphans from a previous session are also killed at startup.
+- A crashing transcription no longer leaves the meeting stuck on "Preparing audio" nor the following ones waiting: it goes to an error state and can be retried.
+- The report and the translation show the AI model's loading percentage.
+
 ## 0.3.0
 
 **Compte-rendu**
