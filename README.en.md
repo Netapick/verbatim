@@ -54,7 +54,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 - Local Whisper (whisper.cpp), with speech detection to limit hallucinations on silences.
 - French, English, Spanish, German, Italian, or automatic language detection.
-- **Live transcription** (checkbox in the recording panel): the text appears during the meeting with a few seconds of delay; when you stop, the full transcription is redone for maximum quality.
+- **Live transcription** (checkbox in the recording panel): Whisper loads when the panel opens (the "Start" button stays greyed out while loading); the text appears during the meeting with a few seconds of delay; when you stop, the full transcription is redone for maximum quality.
 - From the lightest model (Tiny, 75 MB) to the most accurate (Large v3), with compressed versions.
 - A glossary of acronyms and business terms is passed to the model to limit mistakes on proper names.
 
@@ -83,7 +83,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 - **Preparations**: objective, timed agenda and questions to ask, with customizable meeting types.
 - **Synchronized audio player** (0.75× to 2×): clicking a passage of the transcript starts playback at that moment.
 - **Export** to text, subtitles (.srt, .vtt), data (.json), report (.md) and the original audio, in the original or translated language.
-- **Light and dark theme**, French and English interface.
+- **Light (default), dark or automatic theme**, nine palettes including **Kawaii** and **Gamer**, French and English interface (Settings › General).
 
 ## Supported hardware
 

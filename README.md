@@ -52,7 +52,7 @@ Français · [English](README.en.md)
 
 - Whisper local (whisper.cpp), avec détection de parole pour limiter les hallucinations sur les silences.
 - Français, anglais, espagnol, allemand, italien, ou détection automatique de la langue.
-- **Transcription en direct** (case à cocher dans le panneau d'enregistrement) : le texte s'affiche pendant la réunion, avec quelques secondes de retard ; à l'arrêt, la transcription complète est refaite pour une qualité maximale.
+- **Transcription en direct** (case à cocher dans le panneau d'enregistrement) : Whisper se charge à l'ouverture du panneau (le bouton « Démarrer » reste grisé le temps du chargement) ; le texte s'affiche pendant la réunion, avec quelques secondes de retard ; à l'arrêt, la transcription complète est refaite pour une qualité maximale.
 - Du modèle le plus léger (Tiny, 75 Mo) au plus précis (Large v3), avec des versions compressées.
 - Un glossaire de sigles et de termes métier est transmis au modèle pour limiter les erreurs sur les noms propres.
 
@@ -81,7 +81,7 @@ Français · [English](README.en.md)
 - **Préparations** : objectif, ordre du jour chronométré et questions à poser, avec des types de réunion personnalisables.
 - **Lecteur audio synchronisé** (0,75× à 2×) : un clic sur un passage de la transcription lance la lecture à cet instant.
 - **Export** en texte, sous-titres (.srt, .vtt), données (.json), compte-rendu (.md) et audio d'origine, dans la langue d'origine ou traduite.
-- **Thème clair et sombre**, interface en français et en anglais.
+- **Thème clair (par défaut), sombre ou automatique**, neuf palettes dont **Kawaii** et **Gamer**, interface en français et en anglais (Réglages › Général).
 
 ## Matériel pris en charge
 

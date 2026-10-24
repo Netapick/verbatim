@@ -22,7 +22,12 @@ Français · English below each version.
 **Installateur**
 - Le pack ROCm est mis à jour (ajout de `whisper-server`). Une mise à jour depuis une version précédente ne télécharge que ce petit fichier (≈ 0,5 Mo) ; une installation neuve télécharge le pack complet (≈ 414 Mo). Les packs sont désormais sur la release v0.3.0.
 
+**Interface**
+- Nouvel onglet **Réglages › Général** : langue de l'interface, mises à jour, thème (clair par défaut, sombre ou automatique) et **palettes** qui changent toute l'application : Minuit, Ardoise, Océan, Forêt, Prune, Rose, Ambre, Graphite et deux thèmes à caractère, **Kawaii** (pastels, formes rondes, cœurs et étoiles, chat en fond) et **Gamer** (néon, police monospace). Kawaii et Gamer ont chacun leur animation au clic.
+
 **Divers**
+- Le direct charge Whisper dès l'ouverture du panneau d'enregistrement (message de chargement, bouton « Démarrer » grisé tant que Whisper n'est pas prêt) ; Whisper est libéré à l'arrêt.
+- Rééchantillonnage de qualité (filtre passe-bas) à l'import et à l'enregistrement : moins de repliement des aigus dans la bande de la voix, donc une transcription plus fidèle.
 - Les données (`store.json`) sont écrites de façon atomique.
 
 ### English
@@ -45,7 +50,12 @@ Français · English below each version.
 **Installer**
 - The ROCm pack is updated (adds `whisper-server`). Updating from a previous version only downloads this small file (≈ 0.5 MB); a fresh install downloads the full pack (≈ 414 MB). Packs now live on the v0.3.0 release.
 
+**Interface**
+- New **Settings › General** tab: interface language, updates, theme (light by default, dark or automatic) and **palettes** that restyle the whole app: Midnight, Slate, Ocean, Forest, Plum, Rose, Amber, Graphite and two character themes, **Kawaii** (pastels, round shapes, hearts and stars, a cat in the background) and **Gamer** (neon, monospace font). Kawaii and Gamer each have their own click animation.
+
 **Misc.**
+- Live mode loads Whisper as soon as the recording panel opens (loading message, "Start" button greyed out until Whisper is ready); Whisper is released when you stop.
+- High-quality resampling (low-pass filter) on import and recording: less aliasing of high frequencies into the voice band, hence a more faithful transcription.
 - Data (`store.json`) is written atomically.
 
 ## 0.2.3
