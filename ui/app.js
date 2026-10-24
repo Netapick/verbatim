@@ -1,6 +1,32 @@
 // Thème : choix mémorisé, sinon celui du système.
 const themeNow = () => document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (_) {}
+// Thème clair par défaut ; « auto » (choix explicite dans Réglages › Général) suit le système.
+try { const t = localStorage.getItem("theme") || "light"; if (t !== "auto") document.documentElement.dataset.theme = t; } catch (_) { document.documentElement.dataset.theme = "light"; }
+// Palettes : [clé, nom, teinte de l'accent, teinte des fonds, saturation des fonds, options]. « » = thème d'origine.
+// Options : s = vivacité de l'accent, L = luminosités de l'accent [clair : texte, bouton, survol ; sombre : texte, bouton, survol].
+const PALETTES = [["", "Verbatim", 231, 0, 0], ["midnight", "Minuit", 215, 222, 38], ["slate", "Ardoise", 205, 210, 12], ["ocean", "Océan", 182, 192, 34], ["forest", "Forêt", 150, 150, 24],
+  ["plum", "Prune", 285, 280, 26], ["rose", "Rose", 335, 335, 22], ["amber", "Ambre", 32, 30, 24], ["graphite", "Graphite", 0, 0, 0, { s: 0, L: [25, 25, 15, 80, 42, 52] }],
+  ["kawaii", "Kawaii", 330, 330, 60, { s: 1.2, L: [50, 55, 46, 78, 58, 66] }], ["gamer", "Gamer", 140, 265, 45, { s: 1.5, L: [30, 30, 24, 58, 30, 38] }]];
+function applyAccent() {
+  const st = document.documentElement.style, root = document.documentElement;
+  let k = ""; try { k = localStorage.getItem("palette") || ""; } catch (_) {}
+  const pal = PALETTES.find((x) => x[0] === k);
+  const props = ["--bg", "--panel", "--panel-2", "--ink", "--mute", "--line", "--line-2", "--brand", "--brand-2", "--brand-btn", "--brand-btn-h", "--brand-soft", "--side", "--side-2"];
+  if (k) root.dataset.palette = k; else delete root.dataset.palette;
+  root.dataset.mode = themeNow();
+  if (!pal || !pal[0]) { props.forEach((x) => st.removeProperty(x)); return; }
+  const [, , h, nh, ns, o = {}] = pal, dark = themeNow() === "dark", s = o.s ?? 1, L = o.L || [44, 44, 36, 76, 52, 62];
+  const sat = (x) => Math.min(100, Math.round(x * s));
+  const v = dark
+    ? [`hsl(${nh} ${ns}% 8%)`, `hsl(${nh} ${ns}% 11%)`, `hsl(${nh} ${ns}% 14%)`, `hsl(${nh} ${ns * 0.5}% 92%)`, `hsl(${nh} ${ns * 0.4}% 63%)`, `hsl(${nh} ${ns}% 18%)`, `hsl(${nh} ${ns}% 25%)`,
+      `hsl(${h} ${sat(85)}% ${L[3]}%)`, `hsl(${h} ${sat(85)}% ${L[3]}%)`, `hsl(${h} ${sat(60)}% ${L[4]}%)`, `hsl(${h} ${sat(70)}% ${L[5]}%)`, `hsl(${h} ${sat(85)}% 70% / .13)`,
+      `hsl(${nh} ${ns}% 5%)`, `hsl(${nh} ${ns}% 5%)`]
+    : [`hsl(${nh} ${ns}% 96%)`, `#fff`, `hsl(${nh} ${ns}% 98%)`, `hsl(${nh} ${ns + 10}% 10%)`, `hsl(${nh} ${ns * 0.4}% 42%)`, `hsl(${nh} ${ns}% 91%)`, `hsl(${nh} ${ns}% 84%)`,
+      `hsl(${h} ${sat(62)}% ${L[0]}%)`, `hsl(${h} ${sat(62)}% ${L[0]}%)`, `hsl(${h} ${sat(62)}% ${L[1]}%)`, `hsl(${h} ${sat(62)}% ${L[2]}%)`, `hsl(${h} ${sat(62)}% 44% / .08)`,
+      `hsl(${nh} ${ns + 10}% 11%)`, `hsl(${nh} ${ns + 10}% 11%)`];
+  props.forEach((x, i) => st.setProperty(x, v[i]));
+}
+applyAccent();
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const dialog = window.__TAURI__.dialog;
 const $ = (s, r = document) => r.querySelector(s);
@@ -114,6 +140,7 @@ document.getElementById("nav").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (b) go(b.dataset.view);
 });
 function go(v, arg) {
+  if (v !== "meetings" && PREP.state && !LIVE.state) { recPrepStop(); }
   view = v; clearInterval(poll); renderSeq++; main.onclick = null;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on",
     b.dataset.view === v || (v === "meeting" && b.dataset.view === "meetings") || (v === "brief" && b.dataset.view === "briefs")));
@@ -129,7 +156,32 @@ const lsGet = (k) => { try { return localStorage.getItem(k) || ""; } catch (_) {
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
 
 // Transcription en direct : l'état est gardé ici, les événements du moteur l'alimentent
-const LIVE = { segs: [], tr: {}, partial: "", state: "", msg: "", trMsg: "", wantTr: false };
+const LIVE = { segs: [], tr: {}, partial: "", state: "", msg: "", trMsg: "", wantTr: false, warn: "" };
+// Chargement de Whisper dès l'ouverture du panneau d'enregistrement : « Démarrer » reste grisé tant qu'il n'est pas prêt
+const PREP = { state: "", model: "", hw: "", msg: "" };
+function recPrepUI() {
+  const go = $("#r-go"), msg = $("#r-prep"), chk = $("#live-chk");
+  if (!go || !msg || !chk) return;
+  const want = chk.checked;
+  go.disabled = want && PREP.state === "loading";
+  go.title = go.disabled ? "Whisper est en cours de chargement…" : "";
+  const spin = `<span class="spin"></span>`;
+  msg.hidden = !want || !PREP.state;
+  msg.innerHTML = PREP.state === "loading" ? `${spin} Chargement de Whisper${PREP.model ? ` (modèle ${esc(PREP.model)})` : ""}… le bouton Démarrer sera disponible dans un instant.`
+    : PREP.state === "ready" ? `<span class="pill ok">Whisper prêt</span> ${PREP.model ? `<span class="pill">${esc(PREP.model)}</span> ` : ""}${PREP.hw ? `<span class="pill hw">${esc(PREP.hw)}</span>` : ""}`
+    : PREP.state === "error" ? `<span style="color:var(--danger)">Transcription en direct indisponible : ${esc(PREP.msg)}</span><br>L'enregistrement démarrera sans elle.` : "";
+}
+function recPrepStart() {
+  if (PREP.state === "ready") return recPrepUI();
+  PREP.state = "loading"; PREP.msg = "";
+  recPrepUI();
+  invoke("live_prepare").catch((e) => { PREP.state = "error"; PREP.msg = String(e); recPrepUI(); });
+}
+function recPrepStop() {
+  if (!PREP.state) return;
+  PREP.state = ""; PREP.model = ""; PREP.hw = "";
+  invoke("live_release").catch(() => {});
+}
 let liveRaf = 0;
 function liveRender() {
   if (liveRaf) return;
@@ -140,21 +192,27 @@ function liveRender() {
     const stateTxt = LIVE.state === "loading" ? "Chargement de Whisper…" : LIVE.state === "error" ? (LIVE.msg || "Erreur") : "";
     const old = box.querySelector(".live-lines"), stick = !old || old.scrollHeight - old.scrollTop - old.clientHeight < 40;
     box.innerHTML = `<div class="card live"><b>Transcription en direct</b> <span class="meta">texte provisoire : la transcription complète est refaite à l'arrêt</span>
-      ${LIVE.hw ? `<span class="pill hw">${esc(LIVE.hw)}</span>` : ""}${stateTxt ? `<p class="meta" style="margin-top:6px">${esc(stateTxt)}</p>` : ""}${LIVE.trMsg ? `<p class="meta" style="margin-top:6px">${esc(LIVE.trMsg)}</p>` : ""}
+      ${LIVE.hw ? `<span class="pill hw">${esc(LIVE.hw)}</span>` : ""}${stateTxt ? `<p class="meta" style="margin-top:6px">${esc(stateTxt)}</p>` : ""}${LIVE.warn ? `<p class="meta" style="margin-top:6px;color:var(--danger)">${esc(LIVE.warn)}</p>` : ""}${LIVE.state === "ready" && !LIVE.segs.length && !LIVE.partial && !LIVE.warn ? `<p class="meta" style="margin-top:6px">En attente de parole…</p>` : ""}${LIVE.trMsg ? `<p class="meta" style="margin-top:6px">${esc(LIVE.trMsg)}</p>` : ""}
       <div class="live-lines">${LIVE.segs.map((s) => `<div class="ll"><span class="tm">${fmtClock(Math.floor(s.start))}</span><span class="lt">${esc(s.text)}${LIVE.tr[s.i] ? `<br><span class="ltr">${esc(LIVE.tr[s.i])}</span>` : ""}</span></div>`).join("")}${LIVE.partial ? `<div class="ll part"><span class="tm"></span><span class="lt">${esc(LIVE.partial)}</span></div>` : ""}</div></div>`;
     const n = box.querySelector(".live-lines"); if (n && stick) n.scrollTop = n.scrollHeight;
   });
 }
-listen("live-segment", (e) => { LIVE.segs.push(e.payload); if (LIVE.segs.length > 400) LIVE.segs.shift(); LIVE.partial = ""; if (LIVE.state === "loading") LIVE.state = "ready"; liveRender(); });
-listen("live-partial", (e) => { LIVE.partial = e.payload.text || ""; liveRender(); });
+listen("live-segment", (e) => { LIVE.warn = ""; LIVE.segs.push(e.payload); if (LIVE.segs.length > 400) LIVE.segs.shift(); LIVE.partial = ""; if (LIVE.state === "loading") LIVE.state = "ready"; liveRender(); });
+listen("live-partial", (e) => { LIVE.warn = ""; LIVE.partial = e.payload.text || ""; liveRender(); });
 listen("live-translation", (e) => { LIVE.tr[e.payload.i] = e.payload.text; liveRender(); });
 listen("live-state", (e) => {
-  const { state, message } = e.payload;
-  if (state === "translate-loading") LIVE.trMsg = "Chargement de la traduction : " + message;
+  const { state, message, prep, model, hw } = e.payload;
+  if (prep) {
+    PREP.state = state; PREP.msg = message || ""; if (model) PREP.model = model; if (state === "ready") PREP.hw = message; else if (hw) PREP.hw = hw;
+    recPrepUI();
+    return;
+  }
+  if (state === "recording") { LIVE.state = "ready"; LIVE.hw = message; }
+  else if (state === "translate-loading") LIVE.trMsg = "Chargement de la traduction : " + message;
   else if (state === "translate-ready") LIVE.trMsg = "";
   else if (state === "translate-error") LIVE.trMsg = message;
-  else if (state === "warn") { LIVE.trMsg = LIVE.trMsg || ""; }
-  else { LIVE.state = state; LIVE.msg = message; if (state === "ready") LIVE.hw = message; }
+  else if (state === "warn") { LIVE.warn = message; }
+  else { LIVE.state = state; LIVE.msg = message; }
   liveRender();
 });
 
@@ -176,21 +234,26 @@ async function recPanel() {
         <input type="range" id="r-sysg" min="25" max="800" step="5" value="${Math.round(parseFloat(lsGet("rec.sysgain") || "1") * 100)}"></div>
     </div>
     <div style="margin-top:12px"><label class="chk" title="Affiche le texte au fil de l'enregistrement ; la transcription complète est refaite à l'arrêt"><input type="checkbox" id="live-chk" ${lsGet("rec.live") === "1" ? "checked" : ""}> Transcription en direct</label>
-      <select id="live-tr" style="margin-top:6px;max-width:260px" title="Traduire en direct" ${lsGet("rec.live") === "1" ? "" : "hidden"}><option value="">Sans traduction</option>${TR_LANGS.map(([k, v]) => `<option value="${k}" ${lsGet("rec.livetr") === k ? "selected" : ""}>Traduire en ${v}</option>`).join("")}</select></div>
+      <select id="live-tr" style="margin-top:6px;max-width:260px" title="Traduire en direct" ${lsGet("rec.live") === "1" ? "" : "hidden"}><option value="">Sans traduction</option>${TR_LANGS.map(([k, v]) => `<option value="${k}" ${lsGet("rec.livetr") === k ? "selected" : ""}>Traduire en ${v}</option>`).join("")}</select>
+      <p class="meta" id="r-prep" style="margin-top:8px" hidden></p></div>
     <div class="bar" style="margin:12px 0 0"><button class="btn rec" id="r-go">● Démarrer</button><button class="btn" id="r-x">Annuler</button></div>
     <p class="meta" style="margin-top:8px">Pour une visioconférence, cochez les deux : votre voix et celle de vos interlocuteurs sont enregistrées. Pour « Son du PC », choisissez la sortie sur laquelle vous écoutez (casque, haut-parleurs).</p></div>`;
-  $("#live-chk").onchange = (e) => { lsSet("rec.live", e.target.checked ? "1" : "0"); $("#live-tr").hidden = !e.target.checked; };
+  $("#live-chk").onchange = (e) => {
+    lsSet("rec.live", e.target.checked ? "1" : "0"); $("#live-tr").hidden = !e.target.checked;
+    if (e.target.checked) recPrepStart(); else { recPrepStop(); recPrepUI(); }
+  };
+  if ($("#live-chk").checked) recPrepStart(); else recPrepUI();
   $("#live-tr").onchange = (e) => lsSet("rec.livetr", e.target.value);
   const fmtG = fmtGain;
   const gv = (id, out) => { const e = $(id), o = $(out); e.oninput = () => { o.textContent = fmtG(e.value); }; o.textContent = fmtG(e.value); return e; };
   const gm = gv("#r-micg", "#r-micg-v"), gs = gv("#r-sysg", "#r-sysg-v");
-  $("#r-x").onclick = () => { box.innerHTML = ""; };
+  $("#r-x").onclick = () => { recPrepStop(); box.innerHTML = ""; };
   $("#r-go").onclick = () => run(async () => {
     const mic = $("#r-mic").checked, system = $("#r-sys").checked;
     const micDevice = $("#r-micdev").value, sysDevice = $("#r-sysdev").value;
     const micGain = gm.value / 100, sysGain = gs.value / 100;
-    const live = !!($("#live-chk") && $("#live-chk").checked), translateTo = live && $("#live-tr") ? $("#live-tr").value || null : null;
-    LIVE.hw = ""; LIVE.segs = []; LIVE.tr = {}; LIVE.partial = ""; LIVE.state = live ? "loading" : ""; LIVE.msg = ""; LIVE.trMsg = ""; LIVE.wantTr = !!translateTo;
+    const live = !!($("#live-chk") && $("#live-chk").checked) && PREP.state === "ready", translateTo = live && $("#live-tr") ? $("#live-tr").value || null : null;
+    LIVE.hw = live ? PREP.hw : ""; LIVE.segs = []; LIVE.tr = {}; LIVE.partial = ""; LIVE.warn = ""; LIVE.state = live ? "ready" : ""; LIVE.msg = ""; LIVE.trMsg = ""; LIVE.wantTr = !!translateTo;
     await invoke("rec_start", { mic, system, micDevice: micDevice || null, sysDevice: sysDevice || null, micGain, sysGain, live, translateTo });
     lsSet("rec.micgain", String(micGain)); lsSet("rec.sysgain", String(sysGain));
     lsSet("rec.mic", mic ? "1" : "0"); lsSet("rec.sys", system ? "1" : "0"); lsSet("rec.micdev", micDevice); lsSet("rec.sysdev", sysDevice);
@@ -221,7 +284,7 @@ async function recRefresh() {
       clearInterval(recTimer);
       const title = $("#r-title").value;
       const id = await invoke("rec_stop", { title });
-      LIVE.state = ""; liveRender();
+      LIVE.state = ""; PREP.state = ""; PREP.model = ""; PREP.hw = ""; liveRender();
       toast("Enregistrement ajouté — transcription lancée"); go("meeting", id);
     });
   };
@@ -631,12 +694,25 @@ async function trash() {
 }
 
 // ── Réglages ────────────────────────────────────────────────────────────
-let setTab = "tr";
+let setTab = "gen";
 async function settings() {
   const s = (await run(() => invoke("get_settings"))) || {};
   const langs = [["fr", "Français"], ["en", "Anglais"], ["es", "Espagnol"], ["de", "Allemand"], ["it", "Italien"], ["auto", "Détection auto"]];
   main.innerHTML = `<h1>Réglages</h1><p class="sub">Tout est enregistré automatiquement, sauf la connexion API.</p>
-    <div class="tabs" id="tabs" role="tablist">${[["tr", "Transcription"], ["ia", "Compte-rendu"], ["tl", "Traduction"], ["mod", "Modèles"], ["net", "Connexions"]].map(([k, v]) => `<button role="tab" data-tab="${k}" class="${setTab === k ? "on" : ""}">${v}</button>`).join("")}</div>
+    <div class="tabs" id="tabs" role="tablist">${[["gen", "Général"], ["tr", "Transcription"], ["ia", "Compte-rendu"], ["tl", "Traduction"], ["mod", "Modèles"], ["net", "Connexions"]].map(([k, v]) => `<button role="tab" data-tab="${k}" class="${setTab === k ? "on" : ""}">${v}</button>`).join("")}</div>
+    <section class="pane" data-pane="gen" ${setTab === "gen" ? "" : "hidden"}>
+      <div class="card"><h3>Langue de l'interface</h3>
+        <select id="ui-lang" style="max-width:260px"><option value="auto" ${I18N.pref === "auto" ? "selected" : ""}>Automatique</option><option value="fr" data-nt ${I18N.pref === "fr" ? "selected" : ""}>Français</option><option value="en" data-nt ${I18N.pref === "en" ? "selected" : ""}>English</option></select></div>
+      <div class="card"><h3>Apparence</h3>
+        <label style="margin-top:0">Thème</label>
+        <select id="th-mode" style="max-width:260px"><option value="light">Clair</option><option value="">Automatique (système)</option><option value="dark">Sombre</option></select>
+        <label>Palette de l'application</label>
+        <div class="palettes" id="accents"></div></div>
+      <div class="card"><h3>Mises à jour</h3>
+        <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. L'installation ne se lance jamais pendant un enregistrement, une transcription ou une rédaction.</p>
+        <label class="chk"><input type="checkbox" id="au" ${s.auto_update !== false ? "checked" : ""}> Installer automatiquement les nouvelles versions</label>
+        <div class="bar" style="margin:12px 0 0"><button class="btn" id="au-chk">Rechercher maintenant</button><span class="meta" id="au-msg"></span></div></div>
+    </section>
     <section class="pane" data-pane="tr" ${setTab === "tr" ? "" : "hidden"}>
       <div class="card avn"><h3>Antivirus : ajoutez une exclusion</h3>
         <p class="meta">Les moteurs d'IA (whisper.cpp, llama.cpp) ne sont pas signés : votre antivirus peut les supprimer ou les bloquer (erreurs « accès refusé » ou « connexion fermée »). Pour l'éviter, ajoutez ce dossier aux exclusions de votre antivirus :</p>
@@ -680,12 +756,6 @@ async function settings() {
       <div class="card"><h3>Ollama</h3>
         <p class="meta" style="margin-bottom:10px">Si Ollama est installé, Verbatim peut l'utiliser pour rédiger avec n'importe lequel de vos modèles.</p>
         <div id="ollama"></div></div>
-      <div class="card"><h3>Langue de l'interface</h3>
-        <select id="ui-lang" style="max-width:260px"><option value="auto" ${I18N.pref === "auto" ? "selected" : ""}>Automatique</option><option value="fr" data-nt ${I18N.pref === "fr" ? "selected" : ""}>Français</option><option value="en" data-nt ${I18N.pref === "en" ? "selected" : ""}>English</option></select></div>
-      <div class="card"><h3>Mises à jour</h3>
-        <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. L'installation ne se lance jamais pendant un enregistrement, une transcription ou une rédaction.</p>
-        <label class="chk"><input type="checkbox" id="au" ${s.auto_update !== false ? "checked" : ""}> Installer automatiquement les nouvelles versions</label>
-        <div class="bar" style="margin:12px 0 0"><button class="btn" id="au-chk">Rechercher maintenant</button><span class="meta" id="au-msg"></span></div></div>
       <div class="card"><h3>API distante (facultatif)</h3><p class="meta" style="margin-bottom:8px">Utilisée si aucun modèle local n'est sélectionné.</p>
         <label style="margin-top:0">URL de l'API</label><input id="u" placeholder="https://api.exemple.com/v1" value="${esc(s.llm_base_url)}">
         <label>Clé d'API</label><input id="k" type="password" value="${esc(s.llm_api_key)}"><label>Modèle</label><input id="m" placeholder="gpt-4o-mini" value="${esc(s.llm_model)}">
@@ -880,6 +950,27 @@ async function settings() {
   $("#rl-def").onchange = () => run(saveAll);
   $("#au").onchange = () => run(saveAll);
   $("#ui-lang").onchange = (e) => { I18N.set(e.target.value); };
+  $("#th-mode").value = lsGet("theme") || "light";
+  $("#th-mode").onchange = (e) => {
+    const t = e.target.value;
+    if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem("theme", t || "auto"); } catch (_) {}
+    applyAccent(); drawAccents();
+  };
+  const drawAccents = () => {
+    const cur = lsGet("palette"), dark = themeNow() === "dark";
+    $("#accents").innerHTML = PALETTES.map(([k, name, h, nh, ns, o = {}]) => {
+      const d = !k ? (dark ? [220, 22, 8] : [220, 20, 96]) : [nh, ns, dark ? 8 : 96];
+      const bg = `hsl(${d[0]} ${d[1]}% ${d[2]}%)`, pn = dark ? `hsl(${d[0]} ${d[1]}% 13%)` : "#fff", br = `hsl(${h} ${Math.min(100, Math.round(70 * (o.s ?? 1)))}% ${dark ? (o.L ? o.L[3] : 66) : (o.L ? o.L[1] + 8 : 46)}%)`;
+      return `<button type="button" class="pal ${cur === k ? "on" : ""}" data-ac="${k}" aria-pressed="${cur === k}" style="--pb:${bg};--pp:${pn};--pc:${br}"><span class="pv"><i></i><b></b><u></u></span><span class="pn">${name}</span></button>`;
+    }).join("");
+  };
+  $("#accents").onclick = (e) => {
+    const b = e.target.closest("[data-ac]"); if (!b) return;
+    try { b.dataset.ac ? localStorage.setItem("palette", b.dataset.ac) : localStorage.removeItem("palette"); } catch (_) {}
+    applyAccent(); drawAccents();
+  };
+  drawAccents();
   $("#au-chk").onclick = () => run(async () => {
     const msg = $("#au-msg"); msg.textContent = "Recherche…";
     const u = await invoke("update_check");
@@ -924,4 +1015,36 @@ $("#theme").onclick = () => {
   const t = themeNow() === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem("theme", t); } catch (_) {}
+  applyAccent();
 };
+
+// Animation au clic, propre à chaque thème (Kawaii et Gamer seulement), à l'endroit du curseur
+const FX = {
+  kawaii: () => {
+    const cols = ["#ff8fc7", "#c3b1ff", "#8fd3ff", "#8fe3c4", "#ffd34d"];
+    let h = "";
+    for (let n = 0; n < 9; n++) {
+      const a = Math.random() * 360, d = 20 + Math.random() * 26, s = 8 + Math.round(Math.random() * 6);
+      h += `<i class="kp" style="--a:${a.toFixed(0)}deg;--d:${d.toFixed(0)}px;--s:${s}px;--c:${cols[n % cols.length]};--r:${Math.round(Math.random() * 80 - 40)}deg">${n % 2 ? "★" : "♥"}</i>`;
+    }
+    return h;
+  },
+  gamer: () => {
+    const cols = ["#39ff88", "#ff3df2", "#2de2ff", "#ffe600"];
+    let h = `<i class="gx"></i>`;
+    for (let n = 0; n < 6; n++) h += `<i class="gp" style="--a:${n * 60 + Math.round(Math.random() * 20)}deg;--d:${22 + Math.round(Math.random() * 18)}px;--c:${cols[n % cols.length]}"></i>`;
+    return h;
+  },
+};
+document.addEventListener("pointerdown", (e) => {
+  const fxp = FX[document.documentElement.dataset.palette];
+  if (!fxp || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const b = e.target.closest && e.target.closest(".btn, nav button, .tabs button, .pal, .theme-btn, .lnk, .opt, .mrow");
+  if (!b || b.disabled) return;
+  const fx = document.createElement("div");
+  fx.className = "click-fx fx-" + document.documentElement.dataset.palette;
+  fx.style.left = e.clientX + "px"; fx.style.top = e.clientY + "px";
+  fx.innerHTML = fxp();
+  document.body.appendChild(fx);
+  setTimeout(() => fx.remove(), 750);
+});

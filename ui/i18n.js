@@ -191,7 +191,10 @@
     ["La traduction a échoué.", "The translation failed."],
     ["Transcription en direct", "Live transcription"], ["Sans traduction", "No translation"], ["Traduire en direct", "Translate live"],
     ["Affiche le texte au fil de l'enregistrement ; la transcription complète est refaite à l'arrêt", "Shows the text as you record; the full transcription is redone when you stop"],
-    ["Chargement de Whisper…", "Loading Whisper…"], ["texte provisoire : la transcription complète est refaite à l'arrêt", "provisional text: the full transcription is redone when you stop"],
+    ["Chargement de Whisper…", "Loading Whisper…"], ["Général", "General"], ["Apparence", "Appearance"], ["Thème", "Theme"], ["Automatique (système)", "Automatic (system)"],
+    ["Clair", "Light"], ["Sombre", "Dark"], ["Palette de l'application", "App palette"], ["Minuit", "Midnight"], ["Ardoise", "Slate"], ["Océan", "Ocean"], ["Forêt", "Forest"], ["Prune", "Plum"], ["Rose", "Pink"], ["Ambre", "Amber"], ["Graphite", "Graphite"], ["Kawaii", "Kawaii"], ["Gamer", "Gamer"], ["Whisper prêt", "Whisper ready"], ["En attente de parole…", "Waiting for speech…"], ["Whisper est en cours de chargement…", "Whisper is loading…"],
+    ["Whisper n'est pas encore chargé : attendez la fin du chargement avant de démarrer.", "Whisper is not loaded yet: wait for loading to finish before starting."],
+    ["Chargement annulé.", "Loading cancelled."], ["texte provisoire : la transcription complète est refaite à l'arrêt", "provisional text: the full transcription is redone when you stop"],
     ["Langue de traduction inconnue.", "Unknown translation language."], ["Une traduction est déjà en cours.", "A translation is already in progress."],
     ["La transcription est vide.", "The transcript is empty."], ["La transcription est déjà dans cette langue.", "The transcript is already in this language."],
     ["Traduction interrompue (application fermée). Relancez-la.", "Translation interrupted (application closed). Run it again."],
@@ -263,6 +266,9 @@
   add(/^Préparer la réunion « (.*) »\.$/, (m) => `Prepare the meeting “${m[1]}”.`);
   add(/^Enregistrement récupéré \((.*)\)$/, (m) => `Recovered recording (${m[1]})`);
   add(/^Modèle « (.*) » introuvable$/, (m) => `Model “${m[1]}” not found`);
+  add(/^Chargement de Whisper(?: \(modèle (.*)\))?… le bouton Démarrer sera disponible dans un instant\.$/, (m) => `Loading Whisper${m[1] ? " (model " + m[1] + ")" : ""}… the Start button will be available in a moment.`);
+  add(/^Transcription en direct indisponible : (.*)\nL'enregistrement démarrera sans elle\.$/s, (m) => `Live transcription unavailable: ${T(m[1])}. Recording will start without it.`);
+  add(/^Délai dépassé au chargement de Whisper\.$/, () => "Timed out while loading Whisper.");
   add(/^Traduction en (.*)…$/, (m) => `Translating into ${T(m[1])}…`);
   add(/^(.*) \(refaire\)$/, (m) => `${T(m[1])} (redo)`);
   add(/^Transcription \((.*)\)$/, (m) => `Transcription (${T(m[1])})`);

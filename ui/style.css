@@ -221,3 +221,69 @@ details summary:hover{color:var(--brand)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card.avn{--or:#f5a64a}}
 .tl-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
 .tl-status .pill{white-space:nowrap}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.palettes{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;margin-top:6px}
+.pal{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:10px;border:1px solid var(--line-2);background:var(--panel-2)}
+.pal:hover{border-color:var(--brand)}
+.pal.on{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand) inset;background:var(--brand-soft)}
+.pal:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.pal .pv{display:flex;height:40px;border-radius:6px;overflow:hidden;background:var(--pb);border:1px solid #8884}
+.pal .pv i{width:22%;background:var(--pp);opacity:.7}
+.pal .pv b{flex:1;margin:7px 6px;border-radius:4px;background:var(--pp)}
+.pal .pv u{width:10px;height:10px;border-radius:50%;background:var(--pc);align-self:flex-end;margin:0 6px 6px -20px}
+.pal .pn{font-size:12.5px;font-weight:600;color:var(--ink)}
+/* Palettes à caractère */
+:root[data-palette="gamer"]{--r:6px;--r-sm:4px}
+:root[data-palette="gamer"] h1,:root[data-palette="gamer"] h3,:root[data-palette="gamer"] .tabs button{font-family:var(--mono);letter-spacing:.02em}
+:root[data-palette="gamer"] .btn.pri{box-shadow:0 0 14px -2px var(--brand)}
+/* Kawaii : rose poudré, bleu ciel, menthe, jaune pâle et lavande ; formes rondes, cœurs et étoiles */
+:root[data-palette="kawaii"]{--r:20px;--r-sm:14px;--k-pink:#ff8fc7;--k-sky:#8fd3ff;--k-mint:#8fe3c4;--k-lemon:#ffe58a;--k-lav:#c3b1ff;
+  --font:"Nunito","Varela Round","Quicksand","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
+:root[data-palette="kawaii"] main{background-image:url("kawaii-cat.png"),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Ctext x='8' y='30' font-size='16' fill='%23ff8fc7' fill-opacity='.22'%3E%E2%99%A5%3C/text%3E%3Ctext x='70' y='62' font-size='14' fill='%23b9a4ff' fill-opacity='.28'%3E%E2%98%85%3C/text%3E%3Ctext x='24' y='98' font-size='14' fill='%2370d9b8' fill-opacity='.30'%3E%E2%9C%BF%3C/text%3E%3Ctext x='96' y='108' font-size='12' fill='%23ffd966' fill-opacity='.40'%3E%E2%98%85%3C/text%3E%3C/svg%3E");background-repeat:no-repeat,repeat;background-position:right 24px bottom 0,0 0;background-size:230px,auto;background-attachment:fixed,scroll}
+:root[data-palette="kawaii"] h1,:root[data-palette="kawaii"] .brand{font-weight:800;letter-spacing:0}
+:root[data-palette="kawaii"] h1::after{content:" ♡";color:var(--k-pink)}
+:root[data-palette="kawaii"] h3{letter-spacing:.03em;text-transform:none;font-size:14px;font-weight:800}
+:root[data-palette="kawaii"] h3::before{content:"★ ";color:var(--k-lemon);-webkit-text-stroke:.5px #e5b400}
+:root[data-palette="kawaii"] .btn,:root[data-palette="kawaii"] .pill,:root[data-palette="kawaii"] .tag,:root[data-palette="kawaii"] input,:root[data-palette="kawaii"] select,:root[data-palette="kawaii"] textarea{border-radius:99px}
+:root[data-palette="kawaii"] textarea{border-radius:18px}
+:root[data-palette="kawaii"] .card{border:2px solid var(--k-pink);box-shadow:0 8px 22px -14px var(--k-pink);background:var(--panel)}
+:root[data-palette="kawaii"] .card:nth-of-type(4n+2){border-color:var(--k-sky);box-shadow:0 8px 22px -14px var(--k-sky)}
+:root[data-palette="kawaii"] .card:nth-of-type(4n+3){border-color:var(--k-mint);box-shadow:0 8px 22px -14px var(--k-mint)}
+:root[data-palette="kawaii"] .card:nth-of-type(4n){border-color:var(--k-lav);box-shadow:0 8px 22px -14px var(--k-lav)}
+:root[data-palette="kawaii"] .btn{border-width:2px}
+:root[data-palette="kawaii"] .btn.pri{background:linear-gradient(135deg,var(--k-pink),var(--k-lav));border-color:transparent;color:#4a2a55;font-weight:800}
+:root[data-palette="kawaii"] .btn.pri:hover{filter:brightness(1.05);transform:translateY(-1px)}
+:root[data-palette="kawaii"] .pill:nth-of-type(4n+2){background:#8fd3ff33;color:#2a7fb0}
+:root[data-palette="kawaii"] .pill:nth-of-type(4n+3){background:#8fe3c433;color:#1f8a68}
+:root[data-palette="kawaii"] .pill:nth-of-type(4n){background:#ffe58a55;color:#9a7400}
+:root[data-palette="kawaii"] .prog{border-radius:99px}
+:root[data-palette="kawaii"] .prog b{background:linear-gradient(90deg,var(--k-pink),var(--k-lav),var(--k-sky),var(--k-mint));border-radius:99px}
+:root[data-palette="kawaii"] .tabs button.on{border-bottom-color:var(--k-pink)}
+:root[data-palette="kawaii"] .seg.now{box-shadow:inset 4px 0 0 var(--k-pink)}
+:root[data-palette="kawaii"] .pal.on{border-color:var(--k-pink)}
+/* barre latérale pastel (thème clair) avec un petit compagnon par rubrique */
+:root[data-palette="kawaii"][data-mode="light"] .side{background:linear-gradient(180deg,#ffd9ec,#e6dcff 55%,#d4f1ff);color:#6b4a7a;border-right:2px solid #ffffffaa}
+:root[data-palette="kawaii"][data-mode="light"] .brand{color:#c4408a}
+:root[data-palette="kawaii"][data-mode="light"] nav button{color:#7d5a8c}
+:root[data-palette="kawaii"][data-mode="light"] nav button:hover{background:#ffffff88;color:#c4408a}
+:root[data-palette="kawaii"][data-mode="light"] nav button.on{background:#fff;color:#c4408a;box-shadow:0 4px 12px -6px #c4408a}
+:root[data-palette="kawaii"][data-mode="light"] nav button.on::before{background:var(--k-pink)}
+:root[data-palette="kawaii"][data-mode="light"] .foot{color:#8a6c99}
+:root[data-palette="kawaii"][data-mode="light"] .theme-btn{color:#7d5a8c;border-color:#7d5a8c33}
+:root[data-palette="kawaii"][data-mode="light"] .theme-btn:hover{background:#fff8;color:#c4408a}
+:root[data-palette="kawaii"] nav button{border-radius:99px}
+/* Clic (Kawaii et Gamer seulement) : effet sous le curseur, propre à chaque thème */
+.click-fx{position:fixed;width:0;height:0;pointer-events:none;z-index:9999}
+.click-fx i{position:absolute;left:0;top:0;display:block;font-style:normal}
+/* Kawaii : petits cœurs et étoiles pastel qui s'envolent */
+.kp{font-size:var(--s);line-height:1;color:var(--c);margin:-.5em 0 0 -.5em;animation:fx-kp .7s ease-out forwards}
+@keyframes fx-kp{0%{transform:rotate(var(--a)) translateX(2px) rotate(calc(var(--a)*-1)) scale(.4);opacity:1}
+  100%{transform:rotate(var(--a)) translateX(var(--d)) rotate(calc(var(--a)*-1 + var(--r))) translateY(-10px) scale(1);opacity:0}}
+/* Gamer : viseur néon et pixels qui jaillissent (transform/opacity seulement, sans ombres : fluide) */
+.click-fx i{will-change:transform,opacity}
+.gx{width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid #39ff88;animation:fx-gx .4s ease-out forwards}
+.gp{width:5px;height:5px;margin:-2.5px 0 0 -2.5px;background:var(--c);animation:fx-gp .45s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes fx-gx{0%{transform:scale(.4) rotate(45deg);opacity:1}100%{transform:scale(2.4) rotate(45deg);opacity:0}}
+@keyframes fx-gp{0%{transform:rotate(var(--a)) translateX(4px);opacity:1}100%{transform:rotate(var(--a)) translateX(var(--d)) scale(.4);opacity:0}}
