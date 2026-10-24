@@ -696,6 +696,7 @@ fn main() {
             get_glossary, set_glossary, get_settings, set_settings,
             engine_status, engine_install, engine_install_gpu, download_cancel, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, models::install_lang, retry_transcription,
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
+            live::live_prepare, live::live_release,
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
             update::update_check, update::update_install
         ])

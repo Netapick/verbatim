@@ -189,7 +189,8 @@ pub fn rec_start(app: tauri::AppHandle, st: State<AppState>, mic: bool, system: 
     std::fs::create_dir_all(&rec_dir).map_err(|e| e.to_string())?;
     let rid = uuid::Uuid::new_v4().to_string();
     // transcription en direct : vérifie d'abord que le moteur et un modèle sont disponibles
-    let live_cfg = if live.unwrap_or(false) { Some(crate::live::prepare(&st, translate_to.filter(|l| !l.is_empty()))?) } else { None };
+    // (Whisper doit déjà être chargé : l'interface grise « Démarrer » tant qu'il ne l'est pas)
+    let live_cfg = if live.unwrap_or(false) { Some((crate::live::prepare(&st)?, crate::live::ensure_ready()?)) } else { None };
     let mut taps: Vec<Arc<Mutex<TapBuf>>> = Vec::new();
     let to_milli = |g: Option<f32>| (g.unwrap_or(1.0).clamp(0.25, 10.0) * 1000.0) as u32;
     let mk = |on: bool, tag: &str, g: Option<f32>| -> R<Option<Source>> {
@@ -241,7 +242,7 @@ pub fn rec_start(app: tauri::AppHandle, st: State<AppState>, mic: bool, system: 
     });
     match ready_rx.recv_timeout(Duration::from_secs(10)) {
         Ok(Ok(())) => {
-            let live_h = live_cfg.map(|c| crate::live::start(app, taps, c));
+            let live_h = live_cfg.map(|(c, port)| crate::live::start(app, taps, c, port, translate_to.filter(|l| !l.is_empty())));
             *slot = Some(Recorder { stop: stop_tx, join, started, clock, mic: m, sys: s, live: live_h });
             Ok(())
         }
@@ -447,4 +448,37 @@ pub fn rec_pause(st: State<AppState>, paused: bool) -> R<()> {
         _ => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Capture réelle du micro par défaut pendant 3 s : vérifie que la copie destinée au direct se remplit.
+    /// Lancer : cargo test --release capture_micro_vers_direct -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn capture_micro_vers_direct() {
+        let tap = Arc::new(Mutex::new(TapBuf::default()));
+        let path = std::env::temp_dir().join("vb-test-mic.pcm");
+        let src = Source {
+            pcm: Arc::new(Mutex::new(Sink::new(&path, Some(tap.clone())).unwrap())),
+            level: Arc::new(AtomicU32::new(0)),
+            gain: Arc::new(AtomicU32::new(1000)),
+            path: path.clone(),
+        };
+        let host = cpal::default_host();
+        let dev = pick(&host, true, &None).expect("aucun micro");
+        let started = Instant::now();
+        let clock = Arc::new(Mutex::new(Clock::default()));
+        let stream = open_stream(&dev, &src, started, clock, true).expect("flux");
+        std::thread::sleep(Duration::from_secs(3));
+        drop(stream);
+        let g = tap.lock().unwrap();
+        let peak = g.data.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
+        let written = src.pcm.lock().unwrap().len;
+        println!("échantillons du direct : {} (fichier : {}), crête {}", g.data.len(), written, peak);
+        assert!(g.data.len() > 16000 * 2, "la copie du direct ne se remplit pas");
+        assert!(g.data.len() + 4000 >= written);
+    }
 }
