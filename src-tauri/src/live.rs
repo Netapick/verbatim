@@ -25,13 +25,13 @@ const RATE: usize = 16_000;
 const MAX_WINDOW: usize = 28 * RATE;
 
 /// Ce qu'il faut pour lancer le serveur et la boucle (vérifié avant de charger Whisper).
+#[derive(Clone)]
 pub struct LiveCfg {
     server: PathBuf,
     /// runtime ROCm à mettre dans le PATH quand le serveur est celui de ROCm
     rocm_path: Vec<PathBuf>,
     hw: String,
     model: PathBuf,
-    vad: Option<PathBuf>,
     lang: String,
     terms: String,
     settings: Settings,
@@ -55,6 +55,12 @@ impl Drop for Running {
 }
 
 static SRV: Mutex<Option<Running>> = Mutex::new(None);
+/// Dernière configuration lancée, pour relancer le serveur s'il s'arrête en cours d'enregistrement.
+static LAST_CFG: Mutex<Option<LiveCfg>> = Mutex::new(None);
+/// Journal du serveur (sa sortie d'erreur), pour comprendre un arrêt brutal.
+fn server_log() -> PathBuf {
+    std::env::temp_dir().join("verbatim-whisper-server.log")
+}
 static LOADING: AtomicBool = AtomicBool::new(false);
 /// Incrémenté à chaque libération : un chargement en cours dont le numéro a changé s'abandonne.
 static GEN: AtomicU64 = AtomicU64::new(0);
@@ -104,9 +110,8 @@ pub fn prepare(st: &AppState) -> R<LiveCfg> {
     }
     let model = live_model(&st.mdir, &cfg.whisper_model, !rocm_path.is_empty())
         .ok_or("Aucun modèle Whisper installé : installez au moins le modèle « Base » (Réglages › Transcription).")?;
-    let vad = Some(crate::engine::vad_path(&st.mdir)).filter(|p| p.exists());
     let terms = s.glossary.iter().map(|t| t.term.clone()).collect::<Vec<_>>().join(", ");
-    Ok(LiveCfg { server, rocm_path, hw, model, vad, lang: cfg.whisper_lang.clone(), terms, settings: cfg })
+    Ok(LiveCfg { server, rocm_path, hw, model, lang: cfg.whisper_lang.clone(), terms, settings: cfg })
 }
 
 fn emit_state(app: &AppHandle, st: &str, msg: &str, extra: Value) {
@@ -137,10 +142,21 @@ fn spawn_server(cfg: &LiveCfg, gen: u64) -> R<Running> {
         .arg("-m")
         .arg(&cfg.model)
         .args(["--host", "127.0.0.1", "--port", &port.to_string(), "-l", &cfg.lang, "-t", "4"]);
-    if let Some(v) = &cfg.vad {
-        cmd.arg("--vad").arg("-vm").arg(v);
+    cmd.stdout(Stdio::null());
+    // journal en ajout (rotation au-delà de 2 Mo) : chaque lancement et chaque arrêt y laissent une trace
+    if std::fs::metadata(server_log()).map(|m| m.len() > 2_000_000).unwrap_or(false) {
+        let _ = std::fs::remove_file(server_log());
     }
-    cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    match std::fs::OpenOptions::new().create(true).append(true).open(server_log()) {
+        Ok(mut f) => {
+            use std::io::Write;
+            let _ = writeln!(f, "
+===== lancement de whisper-server ({}) =====", cfg.model.display());
+            cmd.stderr(f)
+        }
+        Err(_) => cmd.stderr(Stdio::null()),
+    };
+    *LAST_CFG.lock().unwrap() = Some(cfg.clone());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -211,6 +227,41 @@ pub fn live_prepare(app: AppHandle, st: State<AppState>) -> R<()> {
     Ok(())
 }
 
+/// Le serveur s'est arrêté brutalement : le relance (au plus 3 fois par enregistrement) et renvoie son nouveau port.
+/// `None` si Whisper a été libéré entre-temps ou si le relancement échoue.
+fn revive(restarts: &mut u32, emit: &Emit) -> Option<u16> {
+    let gen = GEN.load(Ordering::SeqCst);
+    {
+        let mut g = SRV.lock().unwrap();
+        let r = g.as_mut()?;
+        match r.child.try_wait() {
+            Ok(None) => return Some(r.port), // il tourne : l'erreur venait d'ailleurs
+            Ok(Some(st)) => {
+                use std::io::Write;
+                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(server_log()) {
+                    let _ = writeln!(f, "
+===== whisper-server arrêté : {st} =====");
+                }
+                emit("live-state", json!({ "state": "warn", "message": format!("Whisper en direct s'est arrêté ({st}), relancement…") }))
+            }
+            Err(_) => {}
+        }
+        if *restarts >= 3 {
+            return None;
+        }
+        *g = None;
+    }
+    *restarts += 1;
+    let cfg = LAST_CFG.lock().unwrap().clone()?;
+    let r = spawn_server(&cfg, gen).ok()?;
+    if GEN.load(Ordering::SeqCst) != gen {
+        return None;
+    }
+    let port = r.port;
+    *SRV.lock().unwrap() = Some(r);
+    Some(port)
+}
+
 /// Port du serveur chargé, ou une erreur claire si Whisper n'est pas encore prêt.
 pub fn ensure_ready() -> R<u16> {
     SRV.lock()
@@ -270,7 +321,7 @@ pub fn start(app: AppHandle, taps: Vec<Arc<Mutex<TapBuf>>>, cfg: LiveCfg, port: 
             })
         });
         emit_state(&app, "recording", &cfg.hw, json!({}));
-        run_loop(&emit, &taps, port, &cfg.lang, &cfg.terms, if have_tr { Some(&tx) } else { None }, &s);
+        run_loop(&emit, &taps, port, &|n| revive(n, &emit), &cfg.lang, &cfg.terms, if have_tr { Some(&tx) } else { None }, &s);
         drop(tx); // le thread de traduction se termine seul après les phrases en attente
         drop(tr_join);
     });
@@ -299,6 +350,11 @@ fn wav_bytes(pcm: &[i16]) -> Vec<u8> {
     b
 }
 
+/// Phrases que Whisper invente sur du bruit ou du silence (sous-titrages de ses données d'entraînement).
+fn is_hallucination(low: &str) -> bool {
+    ["sous-titrage", "sous-titres réalisés", "amara.org", "merci d'avoir regardé", "merci d’avoir regardé", "thanks for watching", "subtitles by"].iter().any(|k| low.contains(k))
+}
+
 fn infer(port: u16, pcm: &[i16], lang: &str, prompt: &str) -> R<Vec<(f64, f64, String)>> {
     let boundary = format!("----verbatim{}", uuid::Uuid::new_v4().simple());
     let mut body: Vec<u8> = Vec::new();
@@ -322,7 +378,7 @@ fn infer(port: u16, pcm: &[i16], lang: &str, prompt: &str) -> R<Vec<(f64, f64, S
         let text = s["text"].as_str().unwrap_or("").trim().to_string();
         let low = text.to_lowercase();
         // marqueurs de bruit / silence de Whisper
-        if text.is_empty() || (text.starts_with('[') && text.ends_with(']')) || (text.starts_with('(') && text.ends_with(')')) || low.contains("blank_audio") {
+        if text.is_empty() || (text.starts_with('[') && text.ends_with(']')) || (text.starts_with('(') && text.ends_with(')')) || low.contains("blank_audio") || is_hallucination(&low) {
             continue;
         }
         out.push((s["start"].as_f64().unwrap_or(0.0), s["end"].as_f64().unwrap_or(0.0), text));
@@ -367,7 +423,27 @@ fn trim(taps: &[Arc<Mutex<TapBuf>>], before: usize) {
     }
 }
 
-fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], port: u16, lang: &str, terms: &str, tx: Option<&mpsc::Sender<(usize, String)>>, stop: &AtomicBool) {
+/// Zone de parole d'une fenêtre : (premier, dernier) échantillon à envoyer à Whisper, avec une marge de chaque côté.
+/// Détection par Earshot (trames de 16 ms) : une parole doit durer au moins 3 trames de suite, et 20 trames (≈ 320 ms) au total.
+/// Le détecteur intégré de whisper-server (Silero) fait planter le serveur quand il ne trouve aucune parole ; il est donc
+/// désactivé et c'est cette détection qui écarte les silences et les bruits avant l'envoi.
+fn speech_span(pcm: &[i16]) -> Option<(usize, usize)> {
+    const FR: usize = 256;
+    let mut det = earshot::Detector::default();
+    let voiced: Vec<bool> = pcm.chunks_exact(FR).map(|f| det.predict_i16(f) >= 0.5).collect();
+    if voiced.iter().filter(|v| **v).count() < 20 {
+        return None;
+    }
+    let run = |i: usize| i + 2 < voiced.len() && voiced[i] && voiced[i + 1] && voiced[i + 2];
+    let first = (0..voiced.len()).find(|&i| run(i))?;
+    let last = (0..voiced.len()).rev().find(|&i| i >= 2 && voiced[i] && voiced[i - 1] && voiced[i - 2])?;
+    let lead = RATE * 3 / 10;
+    let tail = RATE / 2;
+    Some(((first * FR).saturating_sub(lead), ((last + 1) * FR + tail).min(pcm.len())))
+}
+
+fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], mut port: u16, revive: &dyn Fn(&mut u32) -> Option<u16>, lang: &str, terms: &str, tx: Option<&mpsc::Sender<(usize, String)>>, stop: &AtomicBool) {
+    let mut restarts = 0u32;
     let mut committed = 0usize; // échantillons déjà validés
     let mut counter = 0usize;
     let mut recent = String::new();
@@ -381,8 +457,9 @@ fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], port: u16, lang: &str, ter
         let start = committed.max(avail.saturating_sub(MAX_WINDOW));
         let pcm = mix(taps, start, avail);
         let peak = pcm.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
-        if peak < 150 {
-            // silence : on avance sans interroger Whisper (évite les hallucinations)
+        let span = if peak < 150 { None } else { speech_span(&pcm) };
+        let Some((lead, end)) = span else {
+            // pas de parole : on avance sans interroger Whisper (évite les hallucinations et un plantage du serveur)
             committed = avail.saturating_sub(RATE / 2);
             trim(taps, committed.saturating_sub(RATE));
             if !last_partial.is_empty() {
@@ -390,7 +467,8 @@ fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], port: u16, lang: &str, ter
                 emit("live-partial", json!({ "text": "" }));
             }
             continue;
-        }
+        };
+        let base = start + lead; // début de ce qui est envoyé : tout le reste de la boucle compte à partir de là
         let prompt = {
             let mut p = String::new();
             if !terms.is_empty() {
@@ -400,18 +478,21 @@ fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], port: u16, lang: &str, ter
             p.push_str(&tail);
             p
         };
-        let segs = match infer(port, &pcm, lang, &prompt) {
+        let segs = match infer(port, &pcm[lead..end], lang, &prompt) {
             Ok(s) => s,
             Err(e) => {
                 if stop.load(Ordering::Relaxed) {
                     break;
                 }
+                if let Some(p) = revive(&mut restarts) {
+                    port = p;
+                }
                 emit("live-state", json!({ "state": "warn", "message": e }));
                 continue;
             }
         };
-        let win = (avail - start) as f64 / RATE as f64;
-        let t_off = start as f64 / RATE as f64;
+        let win = (avail - base) as f64 / RATE as f64;
+        let t_off = base as f64 / RATE as f64;
         // une phrase est stable quand elle s'est terminée bien avant la fin de l'audio reçu
         let limit = win - if win > 20.0 { 2.0 } else { 1.2 };
         let mut last_end = None;
@@ -431,7 +512,7 @@ fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], port: u16, lang: &str, ter
             }
         }
         if let Some(e) = last_end {
-            committed = start + (e * RATE as f64) as usize;
+            committed = base + (e * RATE as f64) as usize;
         } else if win > 6.0 && partial.is_empty() {
             committed = avail.saturating_sub(RATE); // rien d'audible : on ne garde qu'une seconde de contexte
         }
@@ -457,6 +538,23 @@ fn run_loop(emit: &Emit, taps: &[Arc<Mutex<TapBuf>>], port: u16, lang: &str, ter
 mod tests {
     use super::*;
 
+    /// Zone de parole détectée par fenêtres successives sur un WAV mono 16 kHz : `VB_TEST_WAV`.
+    /// Lancer : cargo test --release speech_span_fichier -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn speech_span_fichier() {
+        let b = std::fs::read(std::env::var("VB_TEST_WAV").expect("VB_TEST_WAV")).unwrap();
+        let pcm: Vec<i16> = b[44..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
+        let mut line = String::new();
+        let mut end = RATE;
+        while end <= pcm.len() {
+            let w = &pcm[end.saturating_sub(MAX_WINDOW).max(end.saturating_sub(RATE * 3 / 2))..end];
+            line.push(if speech_span(w).is_some() { '#' } else { '.' });
+            end += RATE * 6 / 10;
+        }
+        println!("{line}");
+    }
+
     /// Banc d'essai sur fichier : `VB_TEST_WAV` (WAV mono 16 kHz), `VB_TEST_MODEL` (ggml-*.bin).
     /// Lancer : cargo test --release live_sur_fichier -- --ignored --nocapture
     #[test]
@@ -477,7 +575,6 @@ mod tests {
             rocm_path: vec![],
             hw: "CPU".into(),
             model: PathBuf::from(model),
-            vad: Some(redist.join("models").join("ggml-silero-v5.1.2.bin")),
             lang: "fr".into(),
             terms: String::new(),
             settings: Settings::default(),
@@ -491,7 +588,7 @@ mod tests {
         let emit = move |e: &str, v: Value| ev.lock().unwrap().push((e.to_string(), v));
         let stop = Arc::new(AtomicBool::new(false));
         let (s2, t2) = (stop.clone(), taps.clone());
-        let h = std::thread::spawn(move || run_loop(&emit, &t2, port, "fr", "", None, &s2));
+        let h = std::thread::spawn(move || run_loop(&emit, &t2, port, &|_| None, "fr", "", None, &s2));
         // l'audio arrive en temps réel par blocs de 100 ms, comme depuis le micro
         for chunk in pcm.chunks(1600) {
             tap.lock().unwrap().data.extend_from_slice(chunk);

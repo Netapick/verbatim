@@ -29,8 +29,12 @@ pub struct Clock {
 
 impl Clock {
     fn active(&self, started: Instant) -> Duration {
-        let paused_now = self.paused_since.map(|p| p.elapsed()).unwrap_or_default();
-        started.elapsed().saturating_sub(self.accum + paused_now)
+        self.active_at(started, Instant::now())
+    }
+    /// Durée active à l'instant `at` (le traitement audio tourne un peu après la capture).
+    fn active_at(&self, started: Instant, at: Instant) -> Duration {
+        let paused_now = self.paused_since.map(|p| at.saturating_duration_since(p)).unwrap_or_default();
+        at.saturating_duration_since(started).saturating_sub(self.accum + paused_now)
     }
 }
 
@@ -120,60 +124,85 @@ fn soft_limit(x: f32) -> f32 {
     }
 }
 
+/// Flux de capture : le rappel audio ne fait que copier les échantillons vers un thread de traitement
+/// (rééchantillonnage, disque, direct), car tout retard dans le rappel provoque
+/// « A buffer underrun or overrun occurred ».
+struct Capture {
+    stream: cpal::Stream,
+    tx: mpsc::Sender<Option<(Instant, Vec<f32>)>>,
+    worker: JoinHandle<()>,
+}
+
+impl Capture {
+    /// Arrête le flux puis attend que tout ce qui a été capté soit écrit.
+    fn close(self) {
+        drop(self.stream);
+        let _ = self.tx.send(None);
+        let _ = self.worker.join();
+    }
+}
+
 /// Construit un flux d'entrée sur `dev` et alimente `src`.
-fn open_stream(dev: &cpal::Device, src: &Source, started: Instant, clock: Arc<Mutex<Clock>>, input: bool) -> R<cpal::Stream> {
+fn open_stream(dev: &cpal::Device, src: &Source, started: Instant, clock: Arc<Mutex<Clock>>, input: bool) -> R<Capture> {
     let cfg = if input { dev.default_input_config() } else { dev.default_output_config() }
         .map_err(|e| format!("Configuration audio indisponible : {e}"))?;
     let (rate, ch) = (cfg.sample_rate() as f64, cfg.channels().max(1) as usize);
     let pcm = src.pcm.clone();
     let level = src.level.clone();
     let gain = src.gain.clone();
-    // rééchantillonnage de qualité vers 16 kHz (filtre passe-bas, sans décalage) ; tampons réutilisés d'un rappel à l'autre
-    let mut rs = crate::resample::Stream::new(cfg.sample_rate(), RATE as u32);
-    let mut mono_buf: Vec<f32> = Vec::new();
-    let mut res_buf: Vec<f32> = Vec::new();
-    let mut first = true;
+    let (tx, rx) = mpsc::channel::<Option<(Instant, Vec<f32>)>>();
+    let worker = std::thread::spawn(move || {
+        // rééchantillonnage de qualité vers 16 kHz (filtre passe-bas, sans décalage) ; tampons réutilisés d'un bloc à l'autre
+        let mut rs = crate::resample::Stream::new(rate as u32, RATE as u32);
+        let mut mono_buf: Vec<f32> = Vec::new();
+        let mut res_buf: Vec<f32> = Vec::new();
+        let mut first = true;
+        while let Ok(Some((at, data))) = rx.recv() {
+            let active = {
+                let c = clock.lock().unwrap();
+                if c.paused_since.is_some() {
+                    continue; // en pause : on jette l'audio
+                }
+                c.active_at(started, at)
+            };
+            let mut out = pcm.lock().unwrap();
+            // recalage : comble par du silence l'écart avec l'horloge active
+            let expected = (active.as_secs_f64() * RATE) as usize;
+            let incoming = (data.len() / ch) as f64 * RATE / rate;
+            if first || expected > out.len + incoming as usize + 1600 {
+                let target = expected.saturating_sub(incoming as usize);
+                out.pad_to(target);
+                first = false;
+            }
+            let mut peak = 0f32;
+            let g = gain.load(Ordering::Relaxed) as f32 / 1000.0;
+            mono_buf.clear();
+            mono_buf.extend(data.chunks(ch).map(|fr| fr.iter().sum::<f32>() / ch as f32));
+            res_buf.clear();
+            rs.push(&mono_buf, &mut res_buf);
+            for s in res_buf.iter() {
+                let v = soft_limit(*s * g);
+                peak = peak.max(v.abs());
+                out.put((v * 32767.0) as i16);
+            }
+            out.flush_if_due();
+            out.publish();
+            level.store((peak.min(1.0) * 1000.0) as u32, Ordering::Relaxed);
+        }
+    });
+    let txc = tx.clone();
     let stream = dev
         .build_input_stream::<f32, _, _>(
             cfg.config(),
             move |data: &[f32], _| {
-                let active = {
-                    let c = clock.lock().unwrap();
-                    if c.paused_since.is_some() {
-                        return; // en pause : on jette l'audio
-                    }
-                    c.active(started)
-                };
-                let mut out = pcm.lock().unwrap();
-                // recalage : comble par du silence l'écart avec l'horloge active
-                let expected = (active.as_secs_f64() * RATE) as usize;
-                let incoming = (data.len() / ch) as f64 * RATE / rate;
-                if first || expected > out.len + incoming as usize + 1600 {
-                    let target = expected.saturating_sub(incoming as usize);
-                    out.pad_to(target);
-                    first = false;
-                }
-                let mut peak = 0f32;
-                let g = gain.load(Ordering::Relaxed) as f32 / 1000.0;
-                mono_buf.clear();
-                mono_buf.extend(data.chunks(ch).map(|fr| fr.iter().sum::<f32>() / ch as f32));
-                res_buf.clear();
-                rs.push(&mono_buf, &mut res_buf);
-                for s in res_buf.iter() {
-                    let v = soft_limit(*s * g);
-                    peak = peak.max(v.abs());
-                    out.put((v * 32767.0) as i16);
-                }
-                out.flush_if_due();
-                out.publish();
-                level.store((peak.min(1.0) * 1000.0) as u32, Ordering::Relaxed);
+                let _ = txc.send(Some((Instant::now(), data.to_vec())));
             },
             |e| eprintln!("erreur flux audio : {e}"),
             None,
         )
         .map_err(|e| format!("Impossible d'ouvrir l'appareil audio : {e}"))?;
     stream.play().map_err(|e| e.to_string())?;
-    Ok(stream)
+    Ok(Capture { stream, tx, worker })
 }
 
 #[tauri::command]
@@ -215,7 +244,7 @@ pub fn rec_start(app: tauri::AppHandle, st: State<AppState>, mic: bool, system: 
     // Les flux WASAPI ne sont pas Send : ils vivent dans ce thread dédié.
     let join = std::thread::spawn(move || {
         let host = cpal::default_host();
-        let open = || -> R<Vec<cpal::Stream>> {
+        let open = || -> R<Vec<Capture>> {
             let mut v = Vec::new();
             if let Some((pcm, level, gain, path)) = &mc {
                 let d = pick(&host, true, &mic_device).ok_or("Aucun micro détecté.")?;
@@ -233,7 +262,9 @@ pub fn rec_start(app: tauri::AppHandle, st: State<AppState>, mic: bool, system: 
             Ok(streams) => {
                 let _ = ready_tx.send(Ok(()));
                 let _ = stop_rx.recv();
-                drop(streams);
+                for c in streams {
+                    c.close();
+                }
             }
             Err(e) => {
                 let _ = ready_tx.send(Err(e));
@@ -473,7 +504,7 @@ mod tests {
         let clock = Arc::new(Mutex::new(Clock::default()));
         let stream = open_stream(&dev, &src, started, clock, true).expect("flux");
         std::thread::sleep(Duration::from_secs(3));
-        drop(stream);
+        stream.close();
         let g = tap.lock().unwrap();
         let peak = g.data.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
         let written = src.pcm.lock().unwrap().len;
