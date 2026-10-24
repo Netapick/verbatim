@@ -128,7 +128,10 @@ fn open_stream(dev: &cpal::Device, src: &Source, started: Instant, clock: Arc<Mu
     let pcm = src.pcm.clone();
     let level = src.level.clone();
     let gain = src.gain.clone();
-    let mut pos = 0.0f64; // position fractionnaire dans le flux source
+    // rééchantillonnage de qualité vers 16 kHz (filtre passe-bas, sans décalage) ; tampons réutilisés d'un rappel à l'autre
+    let mut rs = crate::resample::Stream::new(cfg.sample_rate(), RATE as u32);
+    let mut mono_buf: Vec<f32> = Vec::new();
+    let mut res_buf: Vec<f32> = Vec::new();
     let mut first = true;
     let stream = dev
         .build_input_stream::<f32, _, _>(
@@ -150,21 +153,17 @@ fn open_stream(dev: &cpal::Device, src: &Source, started: Instant, clock: Arc<Mu
                     out.pad_to(target);
                     first = false;
                 }
-                let step = rate / RATE;
                 let mut peak = 0f32;
                 let g = gain.load(Ordering::Relaxed) as f32 / 1000.0;
-                let frames = data.len() / ch;
-                while (pos as usize) + 1 < frames {
-                    let i = pos as usize;
-                    let f = (pos - i as f64) as f32;
-                    let s = |k: usize| data[k * ch..k * ch + ch].iter().sum::<f32>() / ch as f32;
-                    let (a, b) = (s(i), s(i + 1));
-                    let v = soft_limit((a + (b - a) * f) * g);
+                mono_buf.clear();
+                mono_buf.extend(data.chunks(ch).map(|fr| fr.iter().sum::<f32>() / ch as f32));
+                res_buf.clear();
+                rs.push(&mono_buf, &mut res_buf);
+                for s in res_buf.iter() {
+                    let v = soft_limit(*s * g);
                     peak = peak.max(v.abs());
                     out.put((v * 32767.0) as i16);
-                    pos += step;
                 }
-                pos = (pos - frames as f64).max(0.0);
                 out.flush_if_due();
                 out.publish();
                 level.store((peak.min(1.0) * 1000.0) as u32, Ordering::Relaxed);

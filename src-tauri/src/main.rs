@@ -12,6 +12,7 @@ mod llm;
 use llm::{generate_report, llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
 mod models;
 mod recorder;
+mod resample;
 mod translate;
 mod update;
 use recorder::{rec_devices, rec_pause, rec_set_gain, rec_start, rec_status};

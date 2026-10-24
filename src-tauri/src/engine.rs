@@ -527,18 +527,10 @@ fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
     if mono.is_empty() {
         return Err("Audio vide ou illisible.".into());
     }
-    // rééchantillonnage linéaire vers 16 kHz
-    let ratio = rate as f64 / 16000.0;
-    let n = (mono.len() as f64 / ratio) as usize;
-    let pcm: Vec<i16> = (0..n)
-        .map(|i| {
-            let pos = i as f64 * ratio;
-            let i0 = pos as usize;
-            let fr = (pos - i0 as f64) as f32;
-            let a = mono[i0.min(mono.len() - 1)];
-            let b = mono[(i0 + 1).min(mono.len() - 1)];
-            ((a + (b - a) * fr).clamp(-1.0, 1.0) * 32767.0) as i16
-        })
+    // rééchantillonnage de qualité vers 16 kHz : un filtre passe-bas évite que les aigus se replient dans la voix
+    let pcm: Vec<i16> = crate::resample::resample(&mono, rate, 16000)
+        .into_iter()
+        .map(|v| (v.clamp(-1.0, 1.0) * 32767.0) as i16)
         .collect();
     let dl = (pcm.len() * 2) as u32;
     let mut w = Vec::with_capacity(44 + pcm.len() * 2);
