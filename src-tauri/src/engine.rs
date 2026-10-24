@@ -20,12 +20,14 @@ const VAD_URL: &str = "https://huggingface.co/ggml-org/whisper-vad/resolve/main/
 const VAD_BYTES: u64 = 885_098;
 
 /// (nom, libellé, description, taille exacte en octets)
-pub const MODELS: [(&str, &str, &str, u64); 6] = [
+pub const MODELS: [(&str, &str, &str, u64); 8] = [
     ("tiny", "Tiny", "Très rapide, précision limitée", 77_691_713),
     ("base", "Base", "Rapide, précision correcte", 147_951_465),
     ("small", "Small", "Bon équilibre vitesse / précision", 487_601_967),
     ("medium-q5_0", "Medium (compressé)", "Précis, ~3× plus lent que Small", 539_212_467),
-    ("large-v3-turbo-q5_0", "Large v3 Turbo (compressé)", "Très précis, recommandé pour le français", 574_041_195),
+    ("large-v3-turbo-q5_0", "Large v3 Turbo (compressé Q5)", "Très précis, un peu moins que les versions Q8 et complète", 574_041_195),
+    ("large-v3-turbo-q8_0", "Large v3 Turbo (Q8)", "Quasi identique à la version complète, recommandé pour le français", 874_188_075),
+    ("large-v3-turbo", "Large v3 Turbo (complet)", "Qualité maximale du Turbo, plus lourd", 1_624_555_275),
     ("large-v3-q5_0", "Large v3 (compressé)", "Précision maximale, le plus lent", 1_081_140_203),
 ];
 

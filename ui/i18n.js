@@ -146,8 +146,8 @@
     // Modèles (côté moteur)
     ["Très rapide, précision limitée", "Very fast, limited accuracy"], ["Rapide, précision correcte", "Fast, decent accuracy"],
     ["Bon équilibre vitesse / précision", "Good balance of speed and accuracy"], ["Medium (compressé)", "Medium (compressed)"],
-    ["Précis, ~3× plus lent que Small", "Accurate, ~3× slower than Small"], ["Large v3 Turbo (compressé)", "Large v3 Turbo (compressed)"],
-    ["Très précis, recommandé pour le français", "Very accurate, recommended for French"], ["Large v3 (compressé)", "Large v3 (compressed)"],
+    ["Précis, ~3× plus lent que Small", "Accurate, ~3× slower than Small"], ["Large v3 Turbo (compressé Q5)", "Large v3 Turbo (compressed Q5)"], ["Large v3 Turbo (Q8)", "Large v3 Turbo (Q8)"], ["Large v3 Turbo (complet)", "Large v3 Turbo (full)"],
+    ["Très précis, un peu moins que les versions Q8 et complète", "Very accurate, slightly below the Q8 and full versions"], ["Quasi identique à la version complète, recommandé pour le français", "Nearly identical to the full version, recommended for French"], ["Qualité maximale du Turbo, plus lourd", "Maximum Turbo quality, heavier"], ["Large v3 (compressé)", "Large v3 (compressed)"],
     ["Précision maximale, le plus lent", "Maximum accuracy, the slowest"],
     ["Qwen 3.5 — 4B (léger)", "Qwen 3.5 — 4B (light)"], ["Très économe : ~4 Go de RAM, rapide même sans carte graphique, compte-rendu correct", "Very frugal: ~4 GB of RAM, fast even without a graphics card, decent report"],
     ["Qwen 3.5 — 9B (équilibré, recommandé)", "Qwen 3.5 — 9B (balanced, recommended)"], ["Bon compromis qualité / mémoire : ~8 Go de RAM, repère bien décisions et actions", "Good quality / memory trade-off: ~8 GB of RAM, picks out decisions and actions well"],

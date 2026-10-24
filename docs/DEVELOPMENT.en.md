@@ -35,7 +35,7 @@ Microphone, PC sound (WASAPI loopback: video calls, videos) or both, mixed to 16
 ## Transcription
 
 - whisper.cpp v1.9.2 (official CPU binary); audio is decoded in Rust (symphonia: mp3, m4a/aac, ogg, flac, wav), converted to 16 kHz mono and transcribed offline. The glossary is passed to Whisper as the initial prompt. Speech detection (Silero VAD) limits hallucinations on silences.
-- Models: tiny, base, small, medium-q5_0, large-v3-turbo-q5_0, large-v3-q5_0, downloaded from Hugging Face (`ggerganov/whisper.cpp`).
+- Models: tiny, base, small, medium-q5_0, large-v3-turbo-q5_0, large-v3-turbo-q8_0, large-v3-turbo, large-v3-q5_0, downloaded from Hugging Face (`ggerganov/whisper.cpp`).
 - Resumable downloads: `.part` file kept, HTTP Range resume, progress kept across page changes; a stop button (`download_cancel`).
 - Computation: "Automatic" mode (GPU when available, fallback to the CPU) or "CPU only". NVIDIA: official whisper.cpp CUDA build (b5454, ≈ 685 MB, `ia/engine-gpu`). AMD: whisper.cpp has no official binary, so `scripts/build-whisper-rocm.ps1` builds it for HIP/ROCm on RDNA3 (≈ 180 MB, `redist/engine-rocm`).
 
