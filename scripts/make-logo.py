@@ -1,6 +1,7 @@
 """Dessine le logo de Verbatim (tuile d'application + forme d'onde) et exporte icônes et favicon.
 
-    python scripts/make-logo.py
+    python scripts/make-logo.py            # toutes les icônes
+    python scripts/make-logo.py --splash   # seulement la tuile de l'écran de démarrage (ui/logo-tile.png)
 
 Rendu raster supersamplé : dégradés, lueur, ombre portée, reflet. Les petites tailles (<= 48 px)
 utilisent un dessin simplifié (barres plus épaisses, sans liseré) pour rester lisibles.
@@ -48,7 +49,7 @@ def radial(size, cx, cy, radius, power=1.6):
     return np.clip(1 - d, 0, 1) ** power
 
 
-def render(size, small=False):
+def render(size, small=False, with_bars=True):
     S = size
     margin = 0.045 if not small else 0.02
     tile = squircle_mask(S, margin)
@@ -88,26 +89,27 @@ def render(size, small=False):
         hh = h * S
         bd.rounded_rectangle([bx, cy - hh / 2, bx + bar_w, cy + hh / 2], radius=bar_w / 2, fill=255)
 
-    # ombre portée douce
-    sh = bars.filter(ImageFilter.GaussianBlur(S * 0.022))
-    sh = ImageChops.offset(sh, 0, int(S * 0.018))
-    shadow = Image.new("RGBA", (S, S), (14, 8, 70, 0))
-    shadow.putalpha(sh.point(lambda v: int(v * 0.55)))
-    img = Image.alpha_composite(img, shadow)
+    if with_bars:
+        # ombre portée douce
+        sh = bars.filter(ImageFilter.GaussianBlur(S * 0.022))
+        sh = ImageChops.offset(sh, 0, int(S * 0.018))
+        shadow = Image.new("RGBA", (S, S), (14, 8, 70, 0))
+        shadow.putalpha(sh.point(lambda v: int(v * 0.55)))
+        img = Image.alpha_composite(img, shadow)
 
-    # lueur turquoise derrière les barres
-    if not small:
-        gb = bars.filter(ImageFilter.GaussianBlur(S * 0.035))
-        gcol = Image.new("RGBA", (S, S), (45, 230, 210, 0))
-        gcol.putalpha(gb.point(lambda v: int(v * 0.60)))
-        img = Image.alpha_composite(img, gcol)
+        # lueur turquoise derrière les barres
+        if not small:
+            gb = bars.filter(ImageFilter.GaussianBlur(S * 0.035))
+            gcol = Image.new("RGBA", (S, S), (45, 230, 210, 0))
+            gcol.putalpha(gb.point(lambda v: int(v * 0.60)))
+            img = Image.alpha_composite(img, gcol)
 
-    # remplissage des barres : blanc → turquoise clair (haut vers bas)
-    ty = np.clip((y - (cy - 0.36 * S)) / (0.72 * S), 0, 1)
-    fill = lerp_stops(ty, [(0.0, "#ffffff"), (0.55, "#e9fbff"), (1.0, "#8ff0e2")])
-    fimg = Image.fromarray(fill.astype(np.uint8), "RGB").convert("RGBA")
-    fimg.putalpha(bars)
-    img = Image.alpha_composite(img, fimg)
+        # remplissage des barres : blanc → turquoise clair (haut vers bas)
+        ty = np.clip((y - (cy - 0.36 * S)) / (0.72 * S), 0, 1)
+        fill = lerp_stops(ty, [(0.0, "#ffffff"), (0.55, "#e9fbff"), (1.0, "#8ff0e2")])
+        fimg = Image.fromarray(fill.astype(np.uint8), "RGB").convert("RGBA")
+        fimg.putalpha(bars)
+        img = Image.alpha_composite(img, fimg)
 
     # liseré intérieur lumineux (haut) / sombre (bas)
     if not small:
@@ -120,6 +122,12 @@ def render(size, small=False):
 
     img.putalpha(ImageChops.multiply(img.getchannel("A"), tile))
     return img
+
+
+def export_splash():
+    """Tuile sans barres (ui/logo-tile.png) : l'écran de démarrage anime les barres en CSS par-dessus."""
+    render(1024, with_bars=False).resize((192, 192), Image.LANCZOS).save(os.path.join(UI, "logo-tile.png"))
+    print("tuile exportée :", os.path.join(UI, "logo-tile.png"))
 
 
 def main():
@@ -145,4 +153,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--splash" in sys.argv:
+        export_splash()  # uniquement ui/logo-tile.png : les autres icônes ne sont pas régénérées
+    else:
+        main()
