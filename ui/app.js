@@ -75,17 +75,17 @@ const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Mat
 const { listen } = window.__TAURI__.event;
 const fmtSize = (n) => n >= 1073741824 ? (n / 1073741824).toFixed(2) + " Go" : (n / 1048576).toFixed(0) + " Mo";
 const dlPct = (d) => (d.total ? Math.min(100, Math.round((d.done / d.total) * 100)) : 0);
-const dlLabel = (d) => `${{ binary: "Moteur", vad: "Détection de parole", model: "Modèle", "llm-binary": "Moteur IA", "llm-model": "Modèle IA", copy: "Copie", "binary-gpu": "Moteur GPU", }[d.phase] || "Téléchargement"} : ${dlPct(d)} % (${fmtSize(d.done)} / ${fmtSize(d.total)})`;
+const dlLabel = (d) => `${{ binary: "Moteur", vad: "Détection de parole", model: "Modèle", "llm-binary": "Moteur IA", "llm-model": "Modèle IA", copy: "Copie", "binary-gpu": "Moteur GPU", diarization: "Séparation des voix", }[d.phase] || "Téléchargement"} : ${dlPct(d)} % (${fmtSize(d.done)} / ${fmtSize(d.total)})`;
 
 // L'état du téléchargement vit côté Rust : il survit aux changements de page.
 // Cette fonction se (re)branche dessus à chaque affichage concerné.
 let dlTimer = null, engineHook = null;
-// Bouton « Arrêter » à côté de chaque message de progression (le téléchargement reprendra plus tard).
+// Bouton « Arrêter » à côté de chaque message de progression : annule le téléchargement et supprime la partie déjà reçue.
 function dlStopButtons() {
   document.querySelectorAll("[data-dlmsg]").forEach((e) => {
     if (e.parentElement.querySelector("[data-dlstop]")) return;
     const b = document.createElement("button");
-    b.className = "btn sm dng"; b.dataset.dlstop = "1"; b.style.marginLeft = "10px"; b.textContent = "Arrêter";
+    b.className = "btn sm dng"; b.dataset.dlstop = "1"; b.style.marginLeft = "10px"; b.textContent = "Arrêter"; b.title = "Annule le téléchargement et supprime la partie déjà reçue";
     b.onclick = async (ev) => { ev.preventDefault(); ev.stopPropagation(); b.disabled = true; b.textContent = "Arrêt…"; try { await invoke("download_cancel"); } catch (x) {} };
     e.after(b);
   });
@@ -103,12 +103,38 @@ function watchDownload() {
       clearInterval(dlTimer); dlTimer = null;
       if (d.error === "Téléchargement annulé.") toast("Téléchargement arrêté — vous pourrez le reprendre.");
       else if (d.error) toast("Téléchargement interrompu : " + d.error + " — vous pourrez le reprendre.");
-      else toast("Moteur Whisper prêt");
+      else toast(d.phase === "diarization" ? "Modèles de séparation des intervenants prêts" : "Moteur Whisper prêt");
       if (engineHook) engineHook();
     }
   }, 700);
 }
 listen("engine-done", () => { if (engineHook) engineHook(); });
+listen("diarize-done", (e) => { if (!e.payload.ok) toast("Séparation des intervenants impossible : " + e.payload.error); });
+
+// Glisser-déposer : des fichiers déposés sur la fenêtre (quelle que soit la page) sont importés.
+const DROP_AUDIO = ["mp3", "wav", "m4a", "ogg", "flac", "aac", "webm", "mp4", "opus"], DROP_TEXT = ["txt", "srt", "vtt", "md"];
+const dropZone = document.createElement("div");
+dropZone.id = "dropzone"; dropZone.hidden = true;
+dropZone.innerHTML = `<div>Déposez vos fichiers ici pour les importer</div>`;
+document.body.appendChild(dropZone);
+listen("tauri://drag-enter", () => { dropZone.hidden = false; });
+listen("tauri://drag-leave", () => { dropZone.hidden = true; });
+listen("tauri://drag-drop", (e) => {
+  dropZone.hidden = true;
+  const ext = (p) => (p.split(".").pop() || "").toLowerCase();
+  const paths = (e.payload && e.payload.paths) || [];
+  const audio = paths.filter((p) => DROP_AUDIO.includes(ext(p))), text = paths.filter((p) => DROP_TEXT.includes(ext(p)));
+  if (!audio.length && !text.length) return toast("Fichier non géré par Verbatim.");
+  run(async () => {
+    if (audio.length) {
+      const n = await invoke("import_audio", { paths: audio });
+      toast(`${n} fichier(s) importé(s)`);
+    }
+    // une transcription déposée s'ouvre directement (seulement si aucun audio n'est importé en même temps)
+    if (text.length && !audio.length) { const id = await invoke("import_transcript", { path: text[0] }); return go("meeting", id); }
+    go("meetings");
+  });
+});
 
 // Bandeau « moteur non installé / téléchargement » pour le modèle choisi.
 async function engineBox() {
@@ -118,7 +144,7 @@ async function engineBox() {
   if (d.active) {
     watchDownload();
     return `<div class="card"><b>Téléchargement en cours…</b><div class="prog" style="width:100%;margin:8px 0"><b data-dlbar style="width:${dlPct(d)}%"></b></div>
-      <span class="meta" data-dlmsg>${esc(dlLabel(d))}</span><p class="meta" style="margin-top:6px">Vous pouvez changer de page ou fermer l'app : le téléchargement reprendra là où il s'est arrêté.</p></div>`;
+      <span class="meta" data-dlmsg>${esc(dlLabel(d))}</span><p class="meta" style="margin-top:6px">Vous pouvez changer de page ou fermer l'app : le téléchargement reprendra là où il s'est arrêté. « Arrêter » l'annule et supprime la partie déjà reçue.</p></div>`;
   }
   if (st.binary && m.installed) return "";
   const pct = m.partial ? Math.round((m.partial / m.bytes) * 100) : 0;
@@ -144,7 +170,7 @@ function go(v, arg) {
   view = v; clearInterval(poll); renderSeq++; main.onclick = null;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on",
     b.dataset.view === v || (v === "meeting" && b.dataset.view === "meetings") || (v === "brief" && b.dataset.view === "briefs")));
-  ({ meetings, meeting, briefs, brief, glossary, trash, settings })[v](arg);
+  return ({ meetings, meeting, briefs, brief, glossary, trash, settings })[v](arg);
 }
 
 // ── Enregistrement depuis le PC ─────────────────────────────────────────
@@ -249,6 +275,7 @@ async function recPanel() {
   const gm = gv("#r-micg", "#r-micg-v"), gs = gv("#r-sysg", "#r-sysg-v");
   $("#r-x").onclick = () => { recPrepStop(); box.innerHTML = ""; };
   $("#r-go").onclick = () => run(async () => {
+    if (!(await helloModal())) return; // l'enregistrement ne démarre qu'au clic sur « Compris »
     const mic = $("#r-mic").checked, system = $("#r-sys").checked;
     const micDevice = $("#r-micdev").value, sysDevice = $("#r-sysdev").value;
     const micGain = gm.value / 100, sysGain = gs.value / 100;
@@ -258,6 +285,29 @@ async function recPanel() {
     lsSet("rec.micgain", String(micGain)); lsSet("rec.sysgain", String(sysGain));
     lsSet("rec.mic", mic ? "1" : "0"); lsSet("rec.sys", system ? "1" : "0"); lsSet("rec.micdev", micDevice); lsSet("rec.sysdev", sysDevice);
     recRefresh();
+  });
+}
+
+// Rappel avant un enregistrement : se présenter permet à Verbatim de nommer les voix. Renvoie true au clic sur « Compris »
+// (ou tout de suite si « Ne plus afficher » a été coché), false si on annule.
+function helloModal() {
+  if (lsGet("rec.hello") === "0") return Promise.resolve(true);
+  return new Promise((res) => {
+    const o = document.createElement("div"); o.className = "modal";
+    o.innerHTML = `<div class="dlg" role="dialog" aria-modal="true"><h3 style="margin:0 0 10px;font-size:18px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink)">Dites bonjour</h3>
+      <p style="font-weight:400">Demandez à chaque personne de dire <b>« Bonjour, je suis&nbsp;… »</b> la première fois qu'elle prend la parole : Verbatim reconnaît sa voix et la nomme pendant toute la réunion.</p>
+      <label class="chk" style="margin-bottom:16px"><input type="checkbox" id="hello-never"> Ne plus afficher ce message</label>
+      <div class="acts"><button class="btn" id="hello-no">Annuler</button><button class="btn pri" id="hello-ok">Compris</button></div></div>`;
+    const done = (ok) => {
+      if (ok && o.querySelector("#hello-never").checked) lsSet("rec.hello", "0");
+      document.removeEventListener("keydown", key, true); o.remove(); res(ok);
+    };
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); done(false); } };
+    o.querySelector("#hello-ok").onclick = () => done(true);
+    o.querySelector("#hello-no").onclick = () => done(false);
+    o.onclick = (e) => { if (e.target === o) done(false); };
+    document.addEventListener("keydown", key, true);
+    document.body.appendChild(o); o.querySelector("#hello-ok").focus();
   });
 }
 
@@ -276,7 +326,8 @@ async function recRefresh() {
       ${s.mic != null ? `<label class="chk" title="Sensibilité du micro" style="gap:6px">Sensibilité <input type="range" id="r-live-g" min="25" max="800" step="5" value="${Math.round((s.mic_gain || 1) * 100)}" style="width:110px"><span class="pill" id="r-live-gv">${fmtGain((s.mic_gain || 1) * 100)}</span></label>` : ""}
       <input id="r-title" placeholder="Titre (facultatif)" style="max-width:240px">
       <button class="btn" id="r-pause">${s.paused ? "▶ Reprendre" : "❚❚ Pause"}</button>
-      <button class="btn pri" id="r-stop">■ Terminer</button></div>`;
+      <button class="btn pri" id="r-stop">■ Terminer</button>
+      ${lsGet("rec.hello") === "0" ? `<div class="rec-tip">Rappel : chaque personne dit <b>« Bonjour, je suis&nbsp;… »</b> en prenant la parole pour être reconnue et nommée.</div>` : ""}</div>`;
     const lg = $("#r-live-g");
     if (lg) lg.oninput = () => { $("#r-live-gv").textContent = fmtGain(lg.value); invoke("rec_set_gain", { source: "mic", gain: lg.value / 100 }).catch(() => {}); lsSet("rec.micgain", String(lg.value / 100)); };
     $("#r-pause").onclick = () => run(async () => { await invoke("rec_pause", { paused: !s.paused }); draw(); });
@@ -328,14 +379,26 @@ async function meetings() {
     const ms = (await run(() => invoke("list_meetings", { trashed: false }))) || [];
     const html = ms.length ? ms.map((m) => `<div class="card row" data-id="${m.id}">
       <span class="t">${esc(m.title)}</span><span class="meta">${fmtDate(m.created_at)}</span>
-      ${m.stage === "ready" ? `<span class="pill ok">Prête</span>` : m.stage === "error" ? `<span class="pill err">Échec</span>` : m.stage === "needs_engine" ? `<span class="pill warn">Moteur requis</span>` : `<div class="prog"><b style="width:${m.progress}%"></b></div><span class="pill">${esc(m.stage_label)}${m.stage === "transcribing" ? " · " + m.progress + " %" : ""}</span>`}
+      ${m.stage === "ready" ? `<span class="pill ok">Prête</span>` : m.stage === "error" ? `<span class="pill err">Échec</span>` : m.stage === "needs_engine" ? `<span class="pill warn">Moteur requis</span>` : `<div class="prog"><b style="width:${m.progress}%"></b></div><span class="pill">${esc(m.stage_label)}${m.stage === "transcribing" || m.stage === "diarizing" ? " · " + m.progress + " %" : ""}</span>`}
+      <button class="btn sm ico ren" data-ren="${m.id}" title="Renommer" aria-label="Renommer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button>
     </div>`).join("") : `<div class="empty">Aucune réunion pour le moment.</div>`;
     const list = $("#list");
     if (list && list.dataset.h !== html) { list.innerHTML = html; list.dataset.h = html; } // ne redessine que si ça a changé
     // plus rien en cours : inutile de continuer à interroger
     if (ms.length && ms.every((m) => m.stage === "ready" || m.stage === "error" || m.stage === "needs_engine")) clearInterval(poll);
   }
-  $("#list").onclick = (e) => { const c = e.target.closest(".row"); if (c) go("meeting", c.dataset.id); };
+  $("#list").onclick = (e) => {
+    const r = e.target.closest("[data-ren]");
+    if (r) { // renommer sans ouvrir la réunion
+      e.stopPropagation();
+      run(async () => {
+        const t = await askText("Nouveau titre", r.closest(".row").querySelector(".t").textContent);
+        if (t) { await invoke("update_meeting", { id: r.dataset.ren, title: t }); await draw(); }
+      });
+      return;
+    }
+    const c = e.target.closest(".row"); if (c) go("meeting", c.dataset.id);
+  };
   await draw();
   if (view === "meetings") setPoll(() => view === "meetings" && draw(), 1500);
 }
@@ -405,16 +468,20 @@ async function meeting(id) {
   };
   const shown = TL_VIEW[id] && m.translations && m.translations[TL_VIEW[id]] ? TL_VIEW[id] : "";
   const segsShown = shown ? m.translations[shown] : m.transcript;
+  // une couleur par intervenant dès qu'il y en a plusieurs
+  const speakers = [...new Set(m.transcript.map((s) => s.speaker))];
+  const spkColor = (n) => speakers.length > 1 ? `style="color:hsl(${Math.round((speakers.indexOf(n) * 137.5 + 230) % 360)} 62% var(--sp-l))"` : "";
   const body = m.stage === "error"
     ? `<div class="card"><b>La transcription a échoué</b><p class="meta" style="margin:6px 0 10px">${esc(m.error || "")}</p><button class="btn pri" id="retry">Réessayer</button> <button class="btn dng" id="del">Corbeille</button></div>`
     : m.stage === "needs_engine"
     ? `<div id="eng2"></div>`
     : m.stage !== "ready"
-    ? `<div class="card"><div class="prog" style="width:100%"><b style="width:${m.progress}%"></b></div><p class="meta" style="margin-top:8px">${m.stage === "transcribing" ? `<span class="pill" id="tr-pct">${m.progress} %</span> ` : ""}${esc(m.stage_label)}…${m.transcribe_hw ? ` <span class="pill hw">${esc(m.transcribe_hw)}</span>` : ""}</p></div>`
+    ? `<div class="card"><div class="prog" style="width:100%"><b style="width:${m.progress}%"></b></div><p class="meta" style="margin-top:8px">${m.stage === "transcribing" || m.stage === "diarizing" ? `<span class="pill" id="tr-pct">${m.progress} %</span> ` : ""}${esc(m.stage_label)}…${m.transcribe_hw ? ` <span class="pill hw">${esc(m.transcribe_hw)}</span>` : ""}</p></div>`
     : `<div class="bar">
       <button class="btn pri" id="gen" ${m.report_state === "generating" ? "disabled" : ""}>${r ? "Régénérer" : "Générer"} le compte-rendu</button>
       <select id="rl" style="width:auto" title="Langue de rédaction du compte-rendu">${repLangs(r && r.lang || cfg.report_lang)}</select>
       <button class="btn" id="ren">Renommer</button>
+      ${m.has_audio ? `<button class="btn" id="dia" title="Repère qui parle et attribue chaque passage à un intervenant">Identifier les intervenants</button>` : ""}
       <select id="bf" style="width:auto"><option value="">Aucune préparation liée</option>${bs.map((b) => `<option value="${b.id}" ${m.brief_id === b.id ? "selected" : ""}>${esc(b.subject)}</option>`).join("")}</select>
       <select id="exp" style="width:auto"><option value="">Exporter…</option><optgroup label="${shown ? `Transcription (${trName(shown)})` : "Transcription"}"><option value="txt">Texte (.txt)</option><option value="srt">Sous-titres (.srt)</option><option value="vtt">Sous-titres (.vtt)</option><option value="json">Données (.json)</option></optgroup>${r ? `<optgroup label="Compte-rendu"><option value="report">Compte-rendu (.md)</option></optgroup>` : ""}${m.has_audio ? `<optgroup label="Enregistrement"><option value="audio">Audio</option></optgroup>` : ""}</select>
       <button class="btn dng" id="del">Corbeille</button></div>
@@ -434,7 +501,7 @@ async function meeting(id) {
         <button class="btn sm dng" id="tl-stop">Arrêter</button></div>` : ""}
       ${shown && m.translation_models && m.translation_models[shown] ? `<p class="tl-status"><span class="pill" title="Modèle et matériel utilisés pour cette traduction">${esc(m.translation_models[shown])}</span></p>` : ""}
       ${m.translate_state === "error" ? `<p class="meta" style="color:var(--danger);margin-bottom:8px">${esc(m.translate_error || "La traduction a échoué.")}</p>` : ""}
-      ${segsShown.map((s) => `<div class="seg" data-t="${s.start}" data-e="${s.end}" title="Écouter à partir d'ici"><span class="tm">${fmtT(s.start)}</span><span class="sp">${esc(s.speaker)}</span><span>${esc(s.text)}</span></div>`).join("")}</div>`;
+      ${segsShown.map((s) => `<div class="seg" data-t="${s.start}" data-e="${s.end}" title="Écouter à partir d'ici"><span class="tm">${fmtT(s.start)}</span><span class="sp" data-sp="${esc(s.speaker)}" ${spkColor(s.speaker)} title="Renommer cet intervenant">${esc(s.speaker)}</span><span>${esc(s.text)}</span></div>`).join("")}</div>`;
   main.innerHTML = `<div class="bar"><button class="btn sm" id="back">← Réunions</button></div>
     <h1>${esc(m.title)}</h1><p class="sub">${fmtDate(m.created_at)} · ${origin}</p>${player}${body}`;
   $("#back").onclick = () => go("meetings");
@@ -478,6 +545,18 @@ async function meeting(id) {
   $("#ren").onclick = () => run(async () => {
     const t = await askText("Nouveau titre", m.title);
     if (t) { await invoke("update_meeting", { id, title: t }); meeting(id); }
+  });
+  const dia = $("#dia");
+  if (dia) dia.onclick = () => run(async () => {
+    if (m.transcript.some((s) => !/^Intervenant$/.test(s.speaker)) && !(await ask("Les intervenants actuels (et les noms que vous leur avez donnés) seront remplacés. Continuer ?", "Identifier"))) return;
+    await invoke("diarize_meeting", { id }); meeting(id);
+  });
+  main.querySelectorAll(".seg .sp").forEach((el) => el.onclick = (e) => {
+    e.stopPropagation();
+    run(async () => {
+      const from = el.dataset.sp, to = await askText(`Nouveau nom pour « ${from} »`, from);
+      if (to && to !== from) { await invoke("rename_speaker", { id, from, to }); meeting(id); }
+    });
   });
   const tsel = $("#tl-sel");
   if (tsel) tsel.onchange = () => run(async () => {
@@ -709,7 +788,7 @@ async function settings() {
         <label>Palette de l'application</label>
         <div class="palettes" id="accents"></div></div>
       <div class="card"><h3>Mises à jour</h3>
-        <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. L'installation ne se lance jamais pendant un enregistrement, une transcription ou une rédaction.</p>
+        <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. Avec l'option cochée, elle est téléchargée en arrière-plan ; l'installation ne démarre que lorsque vous cliquez sur « Mettre à jour » (l'application redémarre alors), et jamais pendant un enregistrement, une transcription ou une rédaction.</p>
         <label class="chk"><input type="checkbox" id="au" ${s.auto_update !== false ? "checked" : ""}> Installer automatiquement les nouvelles versions</label>
         <div class="bar" style="margin:12px 0 0"><button class="btn" id="au-chk">Rechercher maintenant</button><span class="meta" id="au-msg"></span></div></div>
     </section>
@@ -723,6 +802,10 @@ async function settings() {
         <div id="wcalc"></div></div>
       <div class="card"><h3>Modèle de transcription</h3><div id="models"></div>
         <p class="meta" style="margin-top:10px">Les modèles « compressés » sont presque aussi précis que les complets, pour moitié moins d'espace. Plus le modèle est gros, plus c'est lent.</p></div>
+      <div class="card"><h3>Séparation des intervenants</h3>
+        <p class="meta" style="margin-bottom:8px">Attribue chaque passage à un intervenant (« Intervenant 1 », « Intervenant 2 »…), renommable ensuite. Nombre détecté automatiquement ; calcul local, sur le processeur.</p>
+        <p class="meta" style="margin-bottom:12px"><b>Astuce :</b> si chacun dit « Bonjour, je suis Marie » en prenant la parole, sa voix est reconnue et nommée pendant toute la réunion.</p>
+        <div id="diar"></div></div>
     </section>
     <section class="pane" data-pane="ia" ${setTab === "ia" ? "" : "hidden"}>
       <div class="card avn"><h3>Antivirus : ajoutez une exclusion</h3>
@@ -791,20 +874,33 @@ async function settings() {
         ${busy ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}</span></label>${state}${act}</div>`;
     }).join("");
     const g = st.gpu, gbusy = d.active && d.phase === "binary-gpu";
-    const anyGpu = g.cuda || g.rocm, gcuda = !g.rocm && g.cuda;
-    const gname = g.rocm ? "AMD Radeon · ROCm" : g.cuda ? "NVIDIA · CUDA" : "";
-    const wstate = curWdev === "cpu" ? `<span class="pill">CPU</span>` : anyGpu && (g.rocm || g.installed) ? `<span class="pill ok">GPU actif · ${gname}</span>` : `<span class="pill warn">CPU (GPU indisponible)</span>`;
+    const wdev = ["cpu", "vulkan"].includes(curWdev) ? curWdev : "auto";
+    const anyGpu = g.cuda || g.rocm || g.vulkan, gcuda = !g.rocm && g.cuda;
+    const gname = wdev === "vulkan" && g.vulkan ? "Vulkan" : g.rocm ? "AMD Radeon · ROCm" : g.cuda ? "NVIDIA · CUDA" : g.vulkan ? "Vulkan" : "";
+    const wstate = wdev === "cpu" ? `<span class="pill">CPU</span>` : anyGpu && (g.rocm || g.installed || g.vulkan) ? `<span class="pill ok">GPU actif · ${gname}</span>` : `<span class="pill warn">CPU (GPU indisponible)</span>`;
     $("#wcalc").innerHTML = `<label>Calcul de la transcription ${wstate}</label>
       <div class="seg2">
-        <label class="opt ${curWdev !== "cpu" ? "sel" : ""}"><input type="radio" name="wd" value="auto" ${curWdev !== "cpu" ? "checked" : ""}><span><b>Automatique</b><br><span class="meta">${anyGpu ? "GPU (" + gname + "), repli sur le CPU en cas de problème" : "GPU si disponible, sinon CPU"}</span></span></label>
-        <label class="opt ${curWdev === "cpu" ? "sel" : ""}"><input type="radio" name="wd" value="cpu" ${curWdev === "cpu" ? "checked" : ""}><span><b>CPU uniquement</b><br><span class="meta">Processeur, compatible partout</span></span></label></div>
-      ${anyGpu ? "" : `<p class="meta" style="margin-top:8px;color:var(--danger)">Aucun GPU utilisable${g.names.length ? " (" + esc(g.names.join(", ")) + ")" : ""} : il faut une carte NVIDIA (CUDA) ou AMD RDNA3 (ROCm).</p>`}
+        <label class="opt ${wdev === "auto" ? "sel" : ""}"><input type="radio" name="wd" value="auto" ${wdev === "auto" ? "checked" : ""}><span><b>Automatique</b><br><span class="meta">${anyGpu ? "GPU (" + gname + "), repli sur le CPU en cas de problème" : "GPU si disponible, sinon CPU"}</span></span></label>
+        ${g.vulkan ? `<label class="opt ${wdev === "vulkan" ? "sel" : ""}"><input type="radio" name="wd" value="vulkan" ${wdev === "vulkan" ? "checked" : ""}><span><b>Vulkan</b><br><span class="meta">Force Vulkan (AMD, Intel, NVIDIA), même si ROCm ou CUDA sont disponibles</span></span></label>` : ""}
+        <label class="opt ${wdev === "cpu" ? "sel" : ""}"><input type="radio" name="wd" value="cpu" ${wdev === "cpu" ? "checked" : ""}><span><b>CPU uniquement</b><br><span class="meta">Processeur, compatible partout</span></span></label></div>
+      ${anyGpu ? "" : `<p class="meta" style="margin-top:8px;color:var(--danger)">Aucun GPU utilisable${g.names.length ? " (" + esc(g.names.join(", ")) + ")" : ""} : il faut une carte NVIDIA (CUDA), AMD RDNA3 (ROCm), ou un pilote Vulkan (AMD, Intel) avec le moteur Whisper Vulkan.</p>`}
       <details style="margin-top:10px"><summary class="meta">Moteurs et emplacements</summary>
         <p class="meta" style="word-break:break-all;margin-top:6px">CPU : <code>${esc(st.binary_path)}</code> ${st.binary ? "" : "(installé avec le premier modèle)"}</p>
         ${g.rocm_engine ? `<p class="meta" style="word-break:break-all">ROCm : <code>${esc(g.rocm_path)}</code></p>` : ""}
+        ${g.vulkan_engine ? `<p class="meta" style="word-break:break-all">Vulkan : <code>${esc(g.vulkan_path)}</code>${g.vulkan_driver ? "" : " (pilote Vulkan introuvable)"}</p>` : ""}
         ${gcuda ? `<p class="meta" style="word-break:break-all">CUDA : <code>${esc(g.path)}</code> ${g.installed ? "" : `<button class="btn sm" id="g-dl">Télécharger (${fmtSize(g.bytes)})</button>`}</p>${gbusy ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}` : ""}
       </details>`;
     $("#wcalc").querySelectorAll("[name=wd]").forEach((r) => r.onchange = () => run(async () => { curWdev = r.value; await saveAll(); renderModels(); }));
+    const dg = st.diarization, dbusy = d.active && d.phase === "diarization";
+    $("#diar").innerHTML = dg.installed
+      ? `<div class="bar" style="margin:0;justify-content:space-between"><span><span class="pill ok">Actif</span> <span class="meta">Modèles installés · ${fmtSize(dg.bytes)}</span></span><button class="btn sm dng" id="dia-del">Supprimer</button></div>
+        <details style="margin-top:8px"><summary class="meta">Emplacement et réunion déjà transcrite</summary>
+          <p class="meta" style="margin-top:6px;word-break:break-all">Modèles : <code>${esc(dg.path)}</code></p>
+          <p class="meta" style="margin-top:4px">Pour une réunion déjà transcrite, utilisez « Identifier les intervenants » dans la réunion.</p></details>`
+      : dbusy ? `<div class="prog" style="width:100%"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>`
+      : `<p class="meta" style="margin-bottom:8px">Deux petits modèles sont nécessaires (${fmtSize(dg.bytes)} en tout), téléchargés une seule fois.</p><button class="btn" id="dia-get">Télécharger (${fmtSize(dg.bytes)})</button>`;
+    const dGet = $("#dia-get"); if (dGet) dGet.onclick = () => run(async () => { await invoke("diarize_install"); renderModels(); watchDownload(); });
+    const dDel = $("#dia-del"); if (dDel) dDel.onclick = () => run(async () => { if (await ask("Supprimer les modèles de séparation des intervenants ? Les transcriptions suivantes n'auront plus d'intervenants distincts.")) { await invoke("diarize_remove"); renderModels(); } });
     const gd = $("#g-dl"); if (gd) gd.onclick = () => run(async () => { await invoke("engine_install_gpu"); renderModels(); watchDownload(); });
     const llm = st.llm;
     gpuVram = llm.vram || 0;
@@ -971,46 +1067,231 @@ async function settings() {
     applyAccent(); drawAccents();
   };
   drawAccents();
-  $("#au-chk").onclick = () => run(async () => {
+  $("#au-chk").onclick = async () => {
     const msg = $("#au-msg"); msg.textContent = "Recherche…";
-    const u = await invoke("update_check");
-    if (!u.available) { msg.textContent = "Vous avez la dernière version (v" + u.current + ")."; return; }
-    msg.textContent = "Version " + u.latest + " disponible.";
-    updateBanner(u);
-  });
+    try {
+      const u = await updCheck(true);
+      if (!u) { msg.textContent = "Vous avez la dernière version (v" + (await invoke("app_version")).version + ")."; return; }
+      msg.textContent = "Version " + u.version + " disponible.";
+    } catch (e) { msg.textContent = updErr(e); }
+  };
   renderModels(); renderOllama(); renderGguf(); renderFound();
   $("#save").onclick = () => run(async () => { await saveAll(); toast("Réglages enregistrés"); });
 }
 
-try { window.__TAURI__.app.getVersion().then((v) => { $("#ver").textContent = "Verbatim v" + v; }); } catch (_) {}
+// Version affichée : v{version}-{horodatage du build} ; la comparaison des versions se fait sur le numéro seul.
+invoke("app_version").then((v) => { const e = $("#ver"); e.textContent = v.label; e.title = "Verbatim " + v.label; }).catch(() => {});
 
-// ── Mise à jour (dernière release GitHub) ───────────────────────────────
-async function updateInstall(u) {
-  const b = $("#upd"); if (b) b.remove();
-  toast("Installation de la version " + u.latest + " : l'application va redémarrer…");
-  try { await invoke("update_install", { url: u.url, sha: u.sha }); }
-  catch (e) { toast(String(e)); updateBanner(u); }
+// ── Mise à jour : plugin officiel Tauri (téléchargement, signature, installation), redémarrage par l'installateur ──
+// phases : idle → available → downloading → ready → installing | error. `view` : fenêtre centrée affichée ("" = aucune).
+const UPD = { phase: "idle", update: null, version: "", notes: "", pct: 0, done: 0, total: 0, error: "", view: "", busy: "", dismissed: false, timer: null, last: 0 };
+const updMb = (n) => (n / 1048576).toFixed(0) + " Mo";
+function updErr(e) {
+  const s = String((e && e.message) || e);
+  if (/network|request|dns|connect|timed? ?out|error sending|offline/i.test(s)) return "Pas de connexion à internet. Vérifiez-la puis réessayez.";
+  if (/signature/i.test(s)) return "La signature de la mise à jour est invalide : elle n'a pas été installée.";
+  return s;
 }
-function updateBanner(u) {
-  let b = $("#upd");
-  if (!b) { b = document.createElement("div"); b.id = "upd"; document.body.appendChild(b); }
-  b.innerHTML = `<span><b>Version ${esc(u.latest)} disponible</b></span><button class="btn pri sm" id="upd-go">Mettre à jour</button><button class="btn sm" id="upd-x">Plus tard</button>`;
-  $("#upd-go").onclick = () => updateInstall(u);
-  $("#upd-x").onclick = () => b.remove();
+async function updBusy() {
+  try { const b = await invoke("update_busy"); UPD.busy = b.busy ? b.reason : ""; } catch (_) { UPD.busy = ""; }
 }
-async function updateStartup() {
+// Cherche une version plus récente ; renvoie la mise à jour ou null. `manual` : réaffiche le bandeau même s'il avait été ignoré.
+async function updCheck(manual) {
+  if (["downloading", "ready", "installing"].includes(UPD.phase)) return UPD.update;
+  const api = (window.__TAURI__ || {}).updater;
+  if (!api) throw new Error("La mise à jour n'est pas disponible dans cette version.");
+  const u = await api.check();
+  if (!u) { UPD.phase = "idle"; UPD.update = null; updRender(); return null; }
+  Object.assign(UPD, { phase: "available", update: u, version: u.version, notes: u.body || "", error: "" });
+  if (manual) UPD.dismissed = false;
+  updRender();
+  return u;
+}
+async function updDownload() {
+  Object.assign(UPD, { phase: "downloading", pct: 0, done: 0, total: 0, error: "" });
+  updRender();
   try {
-    const u = await invoke("update_check"); if (!u.available) return;
-    const [cfg, rec, ms] = await Promise.all([invoke("get_settings"), invoke("rec_status"), invoke("list_meetings", { trashed: false })]);
-    // jamais pendant un enregistrement, une transcription ou une rédaction : on propose seulement
-    const busy = rec.recording || ms.some((m) => !["ready", "error", "needs_engine"].includes(m.stage) || m.report_state === "generating");
-    if (cfg.auto_update !== false && !busy) return updateInstall(u);
-    updateBanner(u);
+    await UPD.update.download((ev) => {
+      if (ev.event === "Started") UPD.total = ev.data.contentLength || 0;
+      else if (ev.event === "Progress") {
+        UPD.done += ev.data.chunkLength;
+        if (UPD.total) UPD.pct = Math.min(100, Math.round((UPD.done / UPD.total) * 100));
+        if (Date.now() - UPD.last > 150) { UPD.last = Date.now(); updRender(); } // pas à chaque paquet reçu
+      } else if (ev.event === "Finished") UPD.pct = 100;
+    });
+    UPD.phase = "ready";
+  } catch (e) {
+    UPD.phase = "error"; UPD.error = updErr(e);
+    if (UPD.view) UPD.view = "error";
+  }
+  updRender();
+}
+// Installe puis redémarre : l'installateur (fenêtre passive) ferme l'application, installe, et la relance.
+async function updInstall() {
+  await updBusy();
+  if (UPD.busy) { UPD.view = "ready"; updRender(); return; }
+  UPD.phase = "installing"; UPD.view = "installing"; updRender();
+  try {
+    await invoke("update_prepare"); // arrête les moteurs d'IA (le plugin quitte sans passer par la fermeture normale)
+    await UPD.update.install();
+    await window.__TAURI__.process.relaunch();
+  } catch (e) {
+    UPD.phase = "error"; UPD.error = updErr(e); UPD.view = "error"; updRender();
+  }
+}
+// Bouton « Mettre à jour » du bandeau ou des notes : télécharge (fenêtre de progression) puis installe.
+async function updManual() {
+  try {
+    if (!UPD.update) { if (!(await updCheck(true))) return; }
+    UPD.dismissed = false;
+    if (UPD.phase !== "ready") {
+      UPD.view = "progress";
+      await updDownload();
+      if (UPD.phase !== "ready") return;
+    }
+    await updInstall();
+  } catch (e) { UPD.phase = "error"; UPD.error = updErr(e); UPD.view = "error"; updRender(); }
+}
+async function updAct(a) {
+  if (a === "go") return updManual();
+  if (a === "install") return updInstall();
+  if (a === "x") { UPD.dismissed = true; return updRender(); }
+  if (a === "notes") { UPD.view = "notes"; return updRender(); }
+  if (a === "ready") { UPD.view = "ready"; await updBusy(); return updRender(); }
+  UPD.view = ""; updRender(); // bg, later, close
+}
+function updRender() {
+  const bar = $("#upd-bar"), p = UPD.phase, v = esc(UPD.version), pct = UPD.pct;
+  let html = "";
+  if (!UPD.view) {
+    if (p === "available" && !UPD.dismissed) html = `<span class="msg"><b>La version ${v} est disponible.</b></span><button class="btn pri sm" data-u="go">Mettre à jour</button><button class="btn sm" data-u="notes">Notes de version</button><button class="btn sm" data-u="x" title="Ignorer pour cette session" aria-label="Ignorer pour cette session">×</button>`;
+    else if (p === "downloading") html = `<span class="msg">Téléchargement de la version ${v} : ${pct} %</span><div class="prog"><b style="width:${pct}%"></b></div>`;
+    else if (p === "ready") html = `<span class="msg"><b>La version ${v} est prête.</b> Redémarrez l'application pour l'installer.</span><button class="btn pri sm" data-u="ready">Mettre à jour</button>`;
+    else if (p === "error" && !UPD.dismissed) html = `<span class="msg">Mise à jour impossible : ${esc(UPD.error)}</span><button class="btn pri sm" data-u="go">Réessayer</button><button class="btn sm" data-u="x" aria-label="Fermer">×</button>`;
+  }
+  bar.hidden = !html;
+  if (bar.dataset.h !== html) { bar.innerHTML = html; bar.dataset.h = html; }
+  // fenêtre centrée (fond flouté)
+  let m = $("#upd-modal");
+  if (!UPD.view) { if (m) m.remove(); clearInterval(UPD.timer); UPD.timer = null; return; }
+  if (!m) {
+    m = document.createElement("div"); m.id = "upd-modal"; m.className = "modal";
+    m.onclick = (e) => {
+      const b = e.target.closest("[data-u]");
+      if (b) return updAct(b.dataset.u);
+      if (e.target === m && UPD.view !== "installing") updAct("close");
+    };
+    document.body.appendChild(m);
+  }
+  const busy = UPD.busy ? `<p class="meta upd-busy">${esc(UPD.busy)} Terminez-le avant de mettre à jour.</p>` : "";
+  const size = UPD.total ? ` · ${updMb(UPD.done)} / ${updMb(UPD.total)}` : "";
+  const body = {
+    progress: `<h3>Téléchargement de la version ${v}</h3><div class="prog wide"><b style="width:${pct}%"></b></div><p class="meta">${pct} %${size}</p><div class="acts"><button class="btn" data-u="close">Continuer en arrière-plan</button></div>`,
+    ready: `<h3>La version ${v} est prête</h3><p>Verbatim va se fermer puis redémarrer tout seul pour appliquer la mise à jour.</p>${busy}<div class="acts"><button class="btn" data-u="close">Plus tard</button><button class="btn pri" data-u="install" ${UPD.busy ? "disabled" : ""}>Mettre à jour</button></div>`,
+    installing: `<div class="spin" aria-hidden="true"></div><h3>Installation de la version ${v}…</h3><p>Verbatim va se fermer puis redémarrer tout seul. Cela peut prendre plusieurs minutes : ne l'éteignez pas.</p>`,
+    error: `<h3>Mise à jour impossible</h3><p>${esc(UPD.error)}</p><div class="acts"><button class="btn" data-u="close">Fermer</button><button class="btn pri" data-u="go">Réessayer</button></div>`,
+    notes: `<h3>Version ${v}</h3><pre class="upd-notes">${esc(UPD.notes || "Aucune note pour cette version.")}</pre><div class="acts"><button class="btn" data-u="close">Fermer</button><button class="btn pri" data-u="go">Mettre à jour</button></div>`,
+  }[UPD.view] || "";
+  const html2 = `<div class="dlg" role="dialog" aria-modal="true">${body}</div>`;
+  if (m.dataset.h !== html2) { m.innerHTML = html2; m.dataset.h = html2; }
+  // tant que la fenêtre propose d'installer, on surveille les travaux en cours (le bouton se dégrise tout seul)
+  if (["ready", "notes"].includes(UPD.view) && !UPD.timer) {
+    UPD.timer = setInterval(async () => { const old = UPD.busy; await updBusy(); if (old !== UPD.busy) updRender(); }, 2000);
+  } else if (!["ready", "notes"].includes(UPD.view)) { clearInterval(UPD.timer); UPD.timer = null; }
+}
+$("#upd-bar").onclick = (e) => { const b = e.target.closest("[data-u]"); if (b) updAct(b.dataset.u); };
+// Au démarrage : recherche, puis (si « installer automatiquement » est coché) téléchargement en arrière-plan.
+// Rien n'est installé ni redémarré sans un clic sur « Mettre à jour ».
+async function updStartup() {
+  try {
+    const u = await updCheck(false); if (!u) return;
+    const cfg = await invoke("get_settings");
+    if (cfg.auto_update === false) return;
+    await updDownload();
+    if (UPD.phase !== "ready") return;
+    await updBusy();
+    if (!UPD.busy) { UPD.view = "ready"; updRender(); } // sinon le bandeau « prête » reste affiché jusqu'au clic
   } catch (_) {}
 }
-setTimeout(updateStartup, 3000);
+setTimeout(updStartup, 3000);
 invoke("install_lang").then((v) => I18N.setInstall(v)).catch(() => {});
-go("meetings");
+// Fenêtre d'information avec des boutons ; renvoie la valeur du bouton cliqué (Échap ou clic à côté : la valeur du premier bouton).
+function infoModal(title, paras, buttons) {
+  return new Promise((res) => {
+    const o = document.createElement("div"); o.className = "modal";
+    o.innerHTML = `<div class="dlg" role="dialog" aria-modal="true"><h3 style="margin:0 0 10px;font-size:18px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--ink)"></h3>
+      ${paras.map(() => `<p style="font-weight:400;margin-bottom:12px"></p>`).join("")}
+      <div class="acts" style="margin-top:16px">${buttons.map((b, i) => `<button class="btn ${b.cls || ""}" data-i="${i}"></button>`).join("")}</div></div>`;
+    o.querySelector("h3").textContent = title;
+    o.querySelectorAll("p").forEach((p, i) => { p.textContent = paras[i]; });
+    o.querySelectorAll("[data-i]").forEach((b) => { b.textContent = buttons[b.dataset.i].label; });
+    const done = (v) => { document.removeEventListener("keydown", key, true); o.remove(); res(v); };
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); done(buttons[0].val); } };
+    o.onclick = (e) => { const b = e.target.closest("[data-i]"); if (b) done(buttons[b.dataset.i].val); else if (e.target === o) done(buttons[0].val); };
+    document.addEventListener("keydown", key, true);
+    document.body.appendChild(o);
+    const pri = o.querySelector(".pri") || o.querySelector("[data-i]"); if (pri) pri.focus();
+  });
+}
+
+// Fermeture de la fenêtre pendant un travail en cours : Rust la retient et demande confirmation (`app_quit` quitte vraiment).
+let closeAsking = false;
+listen("close-requested", async (e) => {
+  if (closeAsking) return;
+  closeAsking = true;
+  const reason = String(e.payload || "Un travail est en cours.");
+  const hint = /enregistrement/.test(reason) ? "Il sera arrêté ; ce qui est déjà enregistré sera récupéré au prochain lancement."
+    : /transcription/.test(reason) ? "Elle reprendra au prochain lancement."
+    : /téléchargement/.test(reason) ? "Il reprendra là où il s'est arrêté."
+    : /compte-rendu/.test(reason) ? "Il sera interrompu : il faudra le relancer."
+    : "Elle sera interrompue : il faudra la relancer.";
+  const quit = await infoModal("Fermer Verbatim ?", [reason, hint], [{ label: "Rester", cls: "pri", val: false }, { label: "Quitter quand même", cls: "dng2", val: true }]);
+  closeAsking = false;
+  if (quit) invoke("app_quit").catch(() => {});
+});
+
+// Première utilisation : aucun modèle de transcription installé → on invite à les choisir dans les Réglages.
+async function welcomeCheck() {
+  if (lsGet("welcome") === "1") return;
+  let st;
+  try { st = await invoke("engine_status"); } catch (_) { return; }
+  if (st.models.some((m) => m.installed)) { lsSet("welcome", "1"); return; }
+  // un seul bouton : quelle que soit la façon de fermer la fenêtre, on arrive dans les Réglages
+  await infoModal("Bienvenue dans Verbatim",
+    ["Verbatim travaille entièrement sur votre ordinateur : il lui faut d'abord des modèles d'IA.",
+     "Dans les Réglages, choisissez les modèles de transcription, de compte-rendu et de traduction (facultatif).",
+     "Chacun n'est téléchargé qu'une seule fois."],
+    [{ label: "Ouvrir les Réglages", cls: "pri", val: true }]);
+  lsSet("welcome", "1"); setTab = "tr"; go("settings");
+}
+
+// Écran de démarrage : la première page se charge pendant que Rust précharge Whisper et la séparation des intervenants
+// (`warm_status`). La barre suit le plus lent des deux : le temps minimal d'affichage (1,6 s, pour voir l'animation) ou le
+// préchargement ; au bout de 10 s on ouvre l'application quand même, le préchargement continue en arrière-plan.
+(async () => {
+  const sp = $("#splash"), fill = $("#sp-fill"), msg = sp && sp.querySelector(".sp-msg"), t0 = Date.now();
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let cur = 0; // la barre ne recule jamais
+  const step = (x) => { cur = Math.max(cur, x); if (fill) fill.style.transform = `scaleX(${cur})`; };
+  await sleep(60); step(0.05);
+  const first = Promise.resolve(go("meetings")).catch(() => {});
+  for (;;) {
+    const el = Date.now() - t0, timeFrac = Math.min(1, el / 1600);
+    let w = null;
+    try { w = await invoke("warm_status"); } catch (_) {}
+    const warmFrac = w ? (w.done ? 1 : Math.min(0.97, w.pct / 100)) : 1;
+    step(Math.min(timeFrac, warmFrac));
+    if (msg && w && w.label && !w.done) msg.textContent = w.label;
+    if ((timeFrac >= 1 && warmFrac >= 1) || el > 10000) break;
+    await sleep(120);
+  }
+  await first; step(1);
+  await sleep(300); // laisse la barre finir de se remplir
+  if (!sp) return;
+  sp.classList.add("out");
+  setTimeout(() => sp.remove(), 450);
+  setTimeout(welcomeCheck, 600);
+})();
 $("#theme").onclick = () => {
   const t = themeNow() === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = t;

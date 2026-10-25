@@ -5,3 +5,6 @@ redist/
 ia/
 dist/
 *.exe
+# clé privée de signature des mises à jour : ne jamais la versionner
+.secrets/
+*.key

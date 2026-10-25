@@ -1,25 +1,20 @@
-# Signature du code (SignPath)
+# Signature
 
 Français · [English](SIGNATURE.en.md)
 
-L'installateur est signé par [SignPath Foundation](https://signpath.org/) (gratuit pour les projets open source, licence MIT du dépôt). La signature se fait sur GitHub Actions : `.github/workflows/release.yml` construit l'installateur, l'envoie à SignPath, récupère la version signée et publie la release.
+## État
 
-## Ce qui est signé, et ce qui ne l'est pas
-- **Signé** : l'installateur `Verbatim_X.Y.Z_x64-setup.exe`.
-- **Non signé** : les moteurs tiers téléchargés (whisper.cpp, llama.cpp). SignPath ne signe que les fichiers du projet. Les antivirus peuvent donc encore les bloquer : voir « Si l'antivirus bloque un moteur » dans la présentation.
+- **Signature de code Windows** (certificat) : **aucune pour l'instant**. La demande à [SignPath Foundation](https://signpath.org/) a été refusée le 23/10/2026. Windows peut donc afficher un avertissement à l'installation. Une autre solution reste à choisir (nouvelle demande plus tard, certificat Certum open source, Azure Trusted Signing, Microsoft Store…).
+- **Signature des mises à jour** (minisign) : **oui**. Chaque release contient l'installateur, sa signature `.sig` et `latest.json`. L'application vérifie cette signature avec la clé publique de `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`) et refuse une mise à jour invalide. Elle ne remplace pas la signature de code : elle garantit que la mise à jour vient bien du projet.
+- **Moteurs tiers** (whisper.cpp, llama.cpp) : téléchargés tels que publiés par leurs auteurs, non signés par ce projet. Les antivirus peuvent les bloquer : voir « Si votre antivirus bloque un moteur » dans le [README](../README.md).
 
-## Mise en place (une seule fois, à faire par le propriétaire du dépôt)
-1. Faire la demande sur <https://signpath.org/apply> pour le dépôt `Netapick/verbatim` (licence MIT, dépôt public). La validation est manuelle.
-2. Dans SignPath, créer le projet de slug `verbatim`, avec :
-   - une **configuration d'artefact** : un fichier zip contenant `*_x64-setup.exe` (type PE, à signer) ;
-   - une **politique de signature** de slug `release-signing`, liée au dépôt GitHub (vérification d'origine).
-3. Installer l'application GitHub SignPath sur le dépôt, puis ajouter dans GitHub (Settings › Secrets and variables › Actions) :
-   - secret `SIGNPATH_API_TOKEN` : jeton d'API d'un utilisateur CI de SignPath ;
-   - variable `SIGNPATH_ORGANIZATION_ID` : identifiant de l'organisation SignPath.
+## Clé de signature des mises à jour
 
-## Publier une version signée
-1. Monter la version dans `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, puis commiter.
-2. `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. Le workflow publie la release avec l'installateur signé. La mise à jour automatique de l'app lit cette release (`releases/latest`) et vérifie son SHA-256.
+1. Génération (une seule fois) : `npx tauri signer generate -w .secrets/verbatim-updater.key`. Le dossier `.secrets/` et les fichiers `*.key` sont ignorés par git : **ne jamais commiter la clé privée**.
+2. Clé publique : dans `src-tauri/tauri.conf.json`, `plugins.updater.pubkey`.
+3. Clé privée : dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` (Settings › Secrets and variables › Actions), plus une copie de sauvegarde hors du dépôt. Si la clé a un mot de passe : secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+4. Perdre la clé privée oblige à republier l'application avec une nouvelle clé publique : les versions déjà installées ne pourraient plus se mettre à jour seules.
 
-Remarque : le dépôt ne publie plus d'exe construit localement ; les anciennes versions (0.1.0 à 0.2.1) restent non signées.
+## Publier une version
+
+Voir « Publier une version » dans [DEVELOPMENT.md](DEVELOPMENT.md) : monter la version, mettre à jour `CHANGELOG.md`, puis `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` construit, signe la mise à jour et publie la release.

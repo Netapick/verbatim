@@ -91,7 +91,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 |---|---|---|
 | **NVIDIA** | CUDA | CUDA, otherwise Vulkan |
 | **AMD Radeon RX 7000 / PRO W7000** (RDNA 3) | ROCm | ROCm, otherwise Vulkan |
-| Other AMD, Intel | Processor | Vulkan |
+| Other AMD, Intel | Vulkan | Vulkan |
 | No graphics card | Processor | Processor |
 
 **Automatic** mode picks the fastest available engine and falls back to the processor in case of problems. Models too large for your card's video memory are flagged in Settings.
@@ -190,7 +190,9 @@ Engines and models are stored in an `ia` folder next to the application. If you 
 
 ### Automatic updates
 
-At startup, Verbatim looks for the latest version published on GitHub, verifies its SHA-256 checksum, installs it, then restarts. This **never** happens during a recording, a transcription or report writing: a banner then offers the update. Can be turned off in **Settings › Connections**.
+At startup, Verbatim looks for the latest version published on GitHub. A **banner** at the top announces it, with its notes. Clicking **Update** opens a window in the centre that shows the download and then the installation, and the application restarts by itself. The update's signature (minisign) is verified before installation.
+
+With **Install automatically** (Settings › General), the version is downloaded in the background, but **nothing is installed until you click** "Update". The button stays greyed out, with the reason shown, during a recording, a transcription, report writing, a translation or a download.
 
 ### If your antivirus blocks an engine
 
@@ -209,6 +211,7 @@ Running the application as administrator does not help.
 | Audio, transcripts, reports, preparations, glossary, models | Downloading engines and models (GitHub, Hugging Face) |
 | All of the transcription and writing | The update check against the GitHub API (can be turned off) |
 | | A remote writing API, only if you configure one yourself |
+| Speakers' voices (computed on the fly, not kept) | |
 
 No personal data is collected and there is no telemetry. Full text: [privacy policy](docs/PRIVACY.en.md).
 
@@ -230,10 +233,10 @@ Your choice: the meeting's language (default) or another one, adjustable per mee
 No: it uses a local model, like the report. The only exception: if you configured a remote API yourself and no local model is installed, that API is used.
 
 **Does Verbatim tell speakers apart?**
-Not yet: a single "Intervenant" (speaker) is shown. It is an item of the [roadmap](#roadmap).
+Yes. After transcription, each passage is assigned to a speaker ("Speaker 1", "Speaker 2"…), with one colour per person. The computation runs on the processor, sends nothing online, and the number of speakers is determined automatically. Click a name to rename it, or "Identify speakers" for an already transcribed meeting. If each person introduces themselves when they start speaking ("Hello, I'm Marie"), Verbatim remembers their voice and names them throughout the meeting. The result remains approximate when voices are similar or sentences are very short.
 
 **Why does Windows or my antivirus show a warning?**
-The installer and the engines are not signed yet. See the section on [antivirus](#if-your-antivirus-blocks-an-engine); a free signing application is in progress.
+The installer and the engines have no Windows code signature. See the section on [antivirus](#if-your-antivirus-blocks-an-engine) and on [signing](#signing).
 
 ## Roadmap
 
@@ -241,8 +244,10 @@ These are working ideas, with no commitment on dates or order.
 
 **Done**
 - ✅ **English interface** (French by default, selectable in Settings › General).
-- ✅ **Automatic updates** from GitHub releases.
-- ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA).
+- ✅ **Built-in updates**: banner, download and installation inside the application, automatic restart, verified signature.
+- ✅ **Speaker separation** (diarization) and recognition of those who introduce themselves.
+- ✅ **Drag and drop** of audio files or transcripts.
+- ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
 - ✅ **Report language** of your choice.
 - ✅ **Transcript translation** into 14 languages (TranslateGemma).
 - ✅ **Live transcription** during the meeting, with live translation.
@@ -250,9 +255,7 @@ These are working ideas, with no commitment on dates or order.
 
 **Priorities**
 - **More interface languages** (Spanish, German, Italian).
-- **Speaker separation** (diarization): attribute each passage to its speaker.
-- **Whisper on Vulkan**: speed up transcription on AMD cards older than the RX 7000 series and on Intel.
-- **Code signing** of the installer (SignPath application in progress), to remove Windows warnings.
+- **Code signing** of the installer, to remove Windows warnings (the SignPath application was declined; another solution has yet to be chosen).
 
 **Under consideration**
 - **Android port**: record and browse on a phone, depending on the feasibility of running Whisper and a small writing model locally.
@@ -276,10 +279,8 @@ Have an idea or a need? Open an [issue](https://github.com/Netapick/verbatim/iss
 
 Code under the [MIT](LICENSE) license. Third-party components (whisper.cpp, llama.cpp, ROCm) remain under their respective licenses, detailed in each release's `THIRD-PARTY-LICENSES.md`.
 
-### Code signing policy
+### Signing
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-
-- Only the installer built from this repository by GitHub Actions (`.github/workflows/release.yml`) is signed; each signing request is manually approved.
-- Roles: [Netapick](https://github.com/Netapick) is author, reviewer and approver (multi-factor authentication enabled).
+- The installer has no Windows code signature (certificate): Windows may show a warning at installation.
+- The application's **updates** are signed with the project's own minisign key, built by GitHub Actions (`.github/workflows/release.yml`); the public key is in `src-tauri/tauri.conf.json`. The application refuses an update whose signature is invalid.
 - Third-party engines (whisper.cpp, llama.cpp) are downloaded as published by their authors and are not signed by this project.

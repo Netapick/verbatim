@@ -81,7 +81,19 @@ npx tauri build                         # installateur NSIS
 
 ## Mises à jour automatiques
 
-Au démarrage, l'app interroge `releases/latest` du dépôt GitHub, télécharge l'installateur (`*_x64-setup.exe`), vérifie son SHA-256 (champ `digest` de l'API), l'exécute en silence dans le même dossier puis se relance (`src-tauri/src/update.rs`). Jamais pendant un enregistrement, une transcription ou une rédaction. Désactivable dans Réglages › Connexions.
+La mise à jour utilise le plugin officiel `tauri-plugin-updater` (+ `tauri-plugin-process`), appelé depuis l'interface (`ui/app.js`, section « Mise à jour »). Au démarrage, l'app lit `latest.json` sur `releases/latest` du dépôt GitHub (`plugins.updater` dans `tauri.conf.json`), compare les versions, puis :
+
+- affiche un bandeau en haut (notes de version, bouton « Mettre à jour ») ;
+- au clic : fenêtre centrée à fond flouté, téléchargement avec progression, signature minisign vérifiée par le plugin, installation par l'installateur NSIS en mode passif (`installMode: "passive"`), puis redémarrage de l'application par l'installateur ;
+- avec « Installer automatiquement » (Réglages › Général), le téléchargement se fait en arrière-plan ; **rien n'est installé sans clic** sur « Mettre à jour ».
+
+`src-tauri/src/update.rs` fournit `update_busy` (refuse la mise à jour pendant un enregistrement, une transcription, une rédaction, une traduction ou un téléchargement), `update_prepare` (arrête les moteurs d'IA avant l'installation) et `app_version` (étiquette `v{version}-{horodatage}`).
+
+**Clé de signature.** `npx tauri signer generate -w .secrets/verbatim-updater.key` (déjà fait ; `.secrets/` et `*.key` sont ignorés par git). La clé publique est dans `tauri.conf.json` (`plugins.updater.pubkey`), la clé privée dans le secret GitHub `TAURI_SIGNING_PRIVATE_KEY` (et une copie hors dépôt). Ne jamais la commiter. Un build local de l'installateur (`tauri build`) signe aussi : définir d'abord `$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content .secrets/verbatim-updater.key -Raw` (PowerShell).
+
+**Étiquette de build.** `build.rs` fixe `VERBATIM_BUILD_TS` (`AAAAMMJJ-HHMM`, UTC) ; l'app affiche `v{version}-{horodatage}`, la CI le transmet pour que la release porte le même nom. Seule la version (`0.4.0`) sert à comparer.
+
+**Compatibilité.** Les versions ≤ 0.3.1 utilisent l'ancien parcours (installateur `*_x64-setup.exe` + SHA-256 de l'API) : la release doit continuer à publier cet installateur sous ce nom.
 
 ## Antivirus
 
@@ -103,7 +115,7 @@ npx tauri build                  # installateur (nécessite NSIS)
 ## Publier une version
 
 1. Monter le numéro dans `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` et `src-tauri/Cargo.lock`, ajouter une entrée à `CHANGELOG.md`, puis commiter.
-2. Pousser un tag `vX.Y.Z` : le workflow `.github/workflows/release.yml` construit l'installateur, le fait signer par SignPath et publie la release (voir [SIGNATURE.md](SIGNATURE.md)). La release doit être la plus récente pour que la mise à jour automatique la voie.
+2. Pousser un tag `vX.Y.Z` : le workflow `.github/workflows/release.yml` construit l'installateur, le signe pour la mise à jour intégrée (secret `TAURI_SIGNING_PRIVATE_KEY`) et publie la release avec l'installateur, le `.sig` et `latest.json`, puis y met les notes du `CHANGELOG.md`. La release doit être la plus récente pour que la mise à jour la voie. Un tag avec suffixe (`v0.4.1-beta`) est une préversion publiée en brouillon : jamais proposée.
 
 ## Identité visuelle
 

@@ -1,6 +1,6 @@
 [package]
 name = "verbatim"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 
 [build-dependencies]
@@ -9,6 +9,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"   # mise à jour dans l'app (téléchargement, signature minisign, installation)
+tauri-plugin-process = "2"   # redémarrage après la mise à jour
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
@@ -19,6 +21,8 @@ symphonia = { version = "0.5", features = ["all"] }
 cpal = "0.18.2"
 sha2 = "0.10"
 earshot = "1.2.2"
+regex = "1"             # détection des présentations (« bonjour, je suis X »)
+sherpa-onnx = "2.0.0"   # séparation des intervenants (ONNX Runtime embarqué, sur CPU)
 
 [profile.release]
 opt-level = 3        # décodage audio (symphonia) nettement plus rapide qu'en "s"

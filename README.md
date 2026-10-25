@@ -89,7 +89,7 @@ Français · [English](README.en.md)
 |---|---|---|
 | **NVIDIA** | CUDA | CUDA, sinon Vulkan |
 | **AMD Radeon RX 7000 / PRO W7000** (RDNA 3) | ROCm | ROCm, sinon Vulkan |
-| Autres AMD, Intel | Processeur | Vulkan |
+| Autres AMD, Intel | Vulkan | Vulkan |
 | Sans carte graphique | Processeur | Processeur |
 
 Le mode **Automatique** choisit le moteur le plus rapide disponible et revient sur le processeur en cas de problème. Les modèles trop volumineux pour la mémoire vidéo de votre carte sont signalés dans les Réglages.
@@ -188,7 +188,9 @@ Les moteurs et les modèles sont rangés dans un dossier `ia` à côté de l'app
 
 ### Mises à jour automatiques
 
-Au démarrage, Verbatim cherche la dernière version publiée sur GitHub, vérifie son empreinte SHA-256, l'installe, puis se relance. Cela n'arrive **jamais** pendant un enregistrement, une transcription ou une rédaction : une bannière propose alors la mise à jour. Désactivable dans **Réglages › Connexions**.
+Au démarrage, Verbatim cherche la dernière version publiée sur GitHub. Un **bandeau** en haut l'annonce, avec ses notes. En cliquant sur **Mettre à jour**, une fenêtre au centre montre le téléchargement puis l'installation, et l'application redémarre toute seule. La signature de la mise à jour (minisign) est vérifiée avant l'installation.
+
+Avec **Installer automatiquement** (Réglages › Général), la version est téléchargée en arrière-plan, mais **rien n'est installé sans votre clic** sur « Mettre à jour ». Le bouton reste grisé, avec la raison affichée, pendant un enregistrement, une transcription, une rédaction, une traduction ou un téléchargement.
 
 ### Si votre antivirus bloque un moteur
 
@@ -207,6 +209,7 @@ Lancer l'application en administrateur n'aide pas.
 | Audio, transcriptions, comptes-rendus, préparations, glossaire, modèles | Téléchargement des moteurs et des modèles (GitHub, Hugging Face) |
 | Toute la transcription et la rédaction | Recherche de mise à jour auprès de l'API GitHub (désactivable) |
 | | Une API distante de rédaction, uniquement si vous la configurez vous-même |
+| Les voix des intervenants (calculées à la volée, non conservées) | |
 
 Aucune donnée personnelle n'est collectée, et il n'y a aucune télémétrie. Texte complet : [politique de confidentialité](docs/PRIVACY.md).
 
@@ -228,10 +231,10 @@ Au choix : dans la langue de la réunion (par défaut) ou dans une autre, régla
 Non : elle utilise un modèle local, comme le compte-rendu. Seule exception : si vous avez configuré vous-même une API distante et qu'aucun modèle local n'est installé, c'est cette API qui est utilisée.
 
 **Verbatim distingue-t-il les intervenants ?**
-Pas encore : un seul « Intervenant » est affiché. C'est une piste de la [feuille de route](#feuille-de-route).
+Oui. Après la transcription, chaque passage est attribué à un intervenant (« Intervenant 1 », « Intervenant 2 »…), avec une couleur par personne. Le calcul se fait sur le processeur, sans rien envoyer en ligne, et le nombre d'intervenants est déterminé automatiquement. Cliquez sur un nom pour le renommer, ou sur « Identifier les intervenants » pour une réunion déjà transcrite. Si chaque personne se présente en prenant la parole (« Bonjour, je suis Marie »), Verbatim retient sa voix et la nomme tout au long de la réunion. Le résultat reste approximatif quand des voix se ressemblent ou que les phrases sont très courtes.
 
 **Pourquoi Windows ou mon antivirus affiche-t-il un avertissement ?**
-L'installateur et les moteurs ne sont pas encore signés. Voir la section sur l'[antivirus](#si-votre-antivirus-bloque-un-moteur) ; une demande de signature gratuite est en cours.
+L'installateur et les moteurs n'ont pas de signature de code Windows. Voir la section sur l'[antivirus](#si-votre-antivirus-bloque-un-moteur) et la [signature](#signature).
 
 ## Feuille de route
 
@@ -239,8 +242,10 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 
 **Réalisé**
 - ✅ **Interface en anglais** (français par défaut, choix dans Réglages › Général).
-- ✅ **Mise à jour automatique** depuis les releases GitHub.
-- ✅ **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA).
+- ✅ **Mise à jour intégrée** : bandeau, téléchargement et installation dans l'application, redémarrage automatique, signature vérifiée.
+- ✅ **Séparation des intervenants** (diarisation) et reconnaissance de ceux qui se présentent.
+- ✅ **Glisser-déposer** de fichiers audio ou de transcriptions.
+- ✅ **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA), y compris Whisper en Vulkan pour les AMD d'avant la série RX 7000 et Intel.
 - ✅ **Langue du compte-rendu** au choix.
 - ✅ **Traduction de la transcription** en 14 langues (TranslateGemma).
 - ✅ **Transcription en direct** pendant la réunion, avec traduction en direct.
@@ -248,9 +253,7 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 
 **Priorités**
 - **Plus de langues d'interface** (espagnol, allemand, italien).
-- **Séparation des intervenants** (diarisation) : attribuer chaque passage à son locuteur.
-- **Whisper en Vulkan** : accélérer la transcription sur les cartes AMD d'avant la série RX 7000 et sur Intel.
-- **Signature de code** de l'installateur (demande SignPath en cours), pour supprimer les avertissements de Windows.
+- **Signature de code** de l'installateur, pour supprimer les avertissements de Windows (la demande à SignPath a été refusée ; une autre solution est à choisir).
 
 **À l'étude**
 - **Portage Android** : enregistrement et consultation sur téléphone, selon la faisabilité de l'exécution locale de Whisper et d'un petit modèle de rédaction.
@@ -274,10 +277,8 @@ Une idée ou un besoin ? Ouvrez une [issue](https://github.com/Netapick/verbatim
 
 Code sous licence [MIT](LICENSE). Les composants tiers (whisper.cpp, llama.cpp, ROCm) restent sous leurs licences respectives, détaillées dans `THIRD-PARTY-LICENSES.md` de chaque release.
 
-### Code signing policy
+### Signature
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-
-- Seul l'installateur construit depuis ce dépôt par GitHub Actions (`.github/workflows/release.yml`) est signé ; chaque signature est approuvée manuellement.
-- Rôles : [Netapick](https://github.com/Netapick) est auteur, relecteur et approbateur (authentification multifacteur activée).
+- L'installateur n'a pas de signature de code Windows (certificat) : Windows peut afficher un avertissement à l'installation.
+- Les **mises à jour** de l'application sont signées par une clé minisign propre au projet, construites par GitHub Actions (`.github/workflows/release.yml`) ; la clé publique est dans `src-tauri/tauri.conf.json`. L'application refuse une mise à jour dont la signature est invalide.
 - Les moteurs tiers (whisper.cpp, llama.cpp) sont téléchargés tels que publiés par leurs auteurs et ne sont pas signés par ce projet.

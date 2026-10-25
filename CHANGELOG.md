@@ -2,6 +2,54 @@
 
 Français · English below each version.
 
+## 0.4.0
+
+**Séparation des intervenants**
+- Chaque passage est attribué à son intervenant (« Intervenant 1 », « Intervenant 2 »…), calculé sur le processeur après la transcription ; le nombre d'intervenants est déterminé automatiquement. Les modèles (environ 34 Mo) sont téléchargés avec le moteur Whisper, ou depuis Réglages › Transcription.
+- Quand une personne se présente (« Bonjour, je suis Marie »), sa voix est retenue et elle est nommée tout au long de la réunion. Les voix qui ne se présentent pas gardent leur numéro.
+- Couleur par intervenant, clic sur un nom pour le renommer (partout, traductions comprises), bouton « Identifier les intervenants » pour une réunion déjà transcrite.
+
+**Whisper en Vulkan**
+- La transcription (et le direct) utilise le GPU sur les cartes AMD d'avant la série RX 7000 et sur Intel, où ROCm n'existe pas. Le moteur (17 Mo à télécharger) est téléchargé par l'installateur quand une telle carte est détectée ; il s'ajoute au choix « Vulkan » de Réglages › Transcription. Mesuré sur une RX 7800 XT : environ 7 fois plus rapide que le processeur (120 s d'audio en 8,6 s contre 59,6 s, texte identique).
+
+**Mise à jour intégrée**
+- Un bandeau en haut annonce la nouvelle version (avec les notes). Une fenêtre centrée sur fond flouté montre le téléchargement (progression), puis l'installation : l'application se ferme et redémarre toute seule. Avec « Installer automatiquement », la version est téléchargée en arrière-plan et rien n'est installé avant votre clic sur « Mettre à jour ».
+- La mise à jour est refusée (bouton grisé, raison affichée) pendant un enregistrement, une transcription, une rédaction, une traduction ou un téléchargement.
+- Les mises à jour sont signées (minisign) et vérifiées avant l'installation.
+
+**Autres**
+- Écran de démarrage : logo animé et barre de chargement. Pendant ce temps, Whisper est chargé (il reste prêt pour l'enregistrement en direct jusqu'à la fermeture) et la séparation des intervenants est chargée en mémoire : la première transcription démarre plus vite. Whisper est libéré pendant la rédaction d'un compte-rendu, pour laisser la mémoire à l'IA locale, et se recharge à l'ouverture du panneau d'enregistrement.
+- L'IA locale du compte-rendu reste chargée après sa première utilisation (les comptes-rendus suivants démarrent tout de suite) ; elle est arrêtée si le modèle ou le matériel change, à la suppression d'un modèle, et tous les moteurs sont arrêtés à la fermeture de l'application.
+- La séparation des intervenants affiche son avancement en pourcentage (estimé d'après la vitesse de la séparation précédente).
+- Réunions : bouton pour renommer directement depuis la liste ; fenêtre au démarrage d'un enregistrement rappelant de dire « Bonjour, je suis… » ; l'application s'ouvre maximisée et le contenu occupe toute la largeur.
+- Glisser-déposer : déposez des fichiers audio (ou une transcription) sur la fenêtre pour les importer.
+- La version affichée est de la forme `v0.4.0-20261025-1130` (version et horodatage du build).
+- Compte-rendu : si le modèle est coupé par la limite de longueur, la rédaction est relancée avec une limite plus large ; l'erreur indique la cause.
+
+### English
+
+**Speaker separation**
+- Each passage is assigned to its speaker ("Speaker 1", "Speaker 2"…), computed on the processor after transcription; the number of speakers is determined automatically. The models (about 34 MB) are downloaded with the Whisper engine, or from Settings › Transcription.
+- When someone introduces themselves ("Hello, I'm Marie"), their voice is remembered and they are named throughout the meeting. Voices that do not introduce themselves keep their number.
+- A colour per speaker, click a name to rename it (everywhere, translations included), an "Identify speakers" button for an already transcribed meeting.
+
+**Whisper on Vulkan**
+- Transcription (and live) uses the GPU on AMD cards older than the RX 7000 series and on Intel, where ROCm does not exist. The engine (17 MB to download) is downloaded by the installer when such a card is detected; it adds the "Vulkan" choice in Settings › Transcription. Measured on an RX 7800 XT: about 7 times faster than the processor (120 s of audio in 8.6 s versus 59.6 s, identical text).
+
+**Built-in update**
+- A banner at the top announces the new version (with its notes). A centred window on a blurred background shows the download (progress), then the installation: the application closes and restarts by itself. With "Install automatically", the version is downloaded in the background and nothing is installed until you click "Update".
+- Updating is refused (greyed-out button, reason shown) during a recording, a transcription, report writing, a translation or a download.
+- Updates are signed (minisign) and verified before installation.
+
+**Other**
+- Start-up screen: animated logo and loading bar. Meanwhile, Whisper is loaded (it stays ready for live recording until the application closes) and speaker separation is loaded into memory: the first transcription starts faster. Whisper is released while a report is being written, to leave the memory to the local AI, and reloads when the recording panel opens.
+- The local report AI stays loaded after its first use (later reports start right away); it is stopped if the model or hardware changes, when a model is deleted, and all engines are stopped when the application closes.
+- Speaker separation shows its progress as a percentage (estimated from the speed of the previous separation).
+- Meetings: a button to rename straight from the list; a window when starting a recording reminding to say “Hello, I'm…”; the application opens maximised and the content uses the full width.
+- Drag and drop: drop audio files (or a transcript) on the window to import them.
+- The displayed version looks like `v0.4.0-20261025-1130` (version and build timestamp).
+- Report: if the model is cut off by the length limit, writing is retried with a larger limit; the error states the cause.
+
 ## 0.3.1
 
 **Correctifs**

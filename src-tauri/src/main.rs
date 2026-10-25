@@ -6,6 +6,8 @@ use serde_json::{json, Value};
 use std::{fs, path::PathBuf, sync::Mutex};
 use tauri::{Manager, State};
 
+mod diarize;
+mod warm;
 mod engine;
 mod live;
 mod llm;
@@ -26,9 +28,11 @@ pub mod engine_paths {
     pub static REDIST: OnceLock<PathBuf> = OnceLock::new();
     /// `dir/rel` si présent (installé par l'utilisateur), sinon `redist/rel` (livré avec l'application).
     pub fn pick(dir: &PathBuf, rel: &str) -> PathBuf {
-        let p = dir.join(rel);
+        // `rel` peut mélanger « / » et « \ » : on le découpe pour n'avoir que le séparateur du système (affichage des chemins)
+        let rel: PathBuf = rel.split(['/', '\\']).collect();
+        let p = dir.join(&rel);
         if !p.exists() {
-            if let Some(q) = REDIST.get().map(|r| r.join(rel)).filter(|q| q.exists()) {
+            if let Some(q) = REDIST.get().map(|r| r.join(&rel)).filter(|q| q.exists()) {
                 return q;
             }
         }
@@ -38,6 +42,8 @@ pub mod engine_paths {
     pub fn engine_gpu_bin(dir: &PathBuf) -> PathBuf { dir.join("engine-gpu").join("whisper-cli.exe") }
     pub fn engine_rocm_bin(dir: &PathBuf) -> PathBuf { pick(dir, "engine-rocm/whisper-cli.exe") }
     pub fn engine_rocm_server(dir: &PathBuf) -> PathBuf { pick(dir, "engine-rocm/whisper-server.exe") }
+    pub fn engine_vulkan_bin(dir: &PathBuf) -> PathBuf { pick(dir, "engine-vulkan/whisper-cli.exe") }
+    pub fn engine_vulkan_server(dir: &PathBuf) -> PathBuf { pick(dir, "engine-vulkan/whisper-server.exe") }
     pub fn model_path(dir: &PathBuf, m: &str) -> PathBuf { dir.join("models").join(format!("ggml-{m}.bin")) }
     pub fn engine_ready(dir: &PathBuf, model: &str) -> bool { engine_bin(dir).exists() && model_path(dir, model).exists() }
 }
@@ -260,6 +266,7 @@ fn stage(m: &Meeting) -> (&'static str, &'static str, u8) {
         "queued" => ("queued", "En attente", 5),
         "converting" => ("converting", "Préparation de l'audio", 0),
         "transcribing" => ("transcribing", "Transcription en cours", m.transcribe_pct),
+        "diarizing" => ("diarizing", "Identification des intervenants", m.transcribe_pct),
         "error" => ("error", "Échec", 100),
         "needs_engine" => ("needs_engine", "Moteur Whisper requis", 0),
         _ => ("ready", "Prête", 100),
@@ -636,6 +643,19 @@ fn models_dir(fallback: &PathBuf) -> PathBuf {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        // fermeture pendant un travail en cours : on la retient et l'interface demande confirmation (`app_quit` quitte vraiment)
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if let Some(st) = window.app_handle().try_state::<AppState>() {
+                    if let Some(reason) = update::busy_now(&st) {
+                        api.prevent_close();
+                        let _ = tauri::Emitter::emit(window, "close-requested", reason);
+                    }
+                }
+            }
+        })
         .setup(|app| {
             let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
             fs::create_dir_all(&dir)?;
@@ -664,7 +684,7 @@ fn main() {
             app.manage(AppState { dir, mdir, store: Mutex::new(store), job_lock: Mutex::new(()), rec: Mutex::new(None) });
             // reprend les transcriptions interrompues par une fermeture de l'app
             let pending: Vec<String> = app.state::<AppState>().store.lock().unwrap().meetings.iter()
-                .filter(|m| matches!(m.status.as_str(), "queued" | "converting" | "transcribing"))
+                .filter(|m| matches!(m.status.as_str(), "queued" | "converting" | "transcribing" | "diarizing"))
                 .map(|m| m.id.clone()).collect();
             // avant de reprendre, on tue les moteurs orphelins d'un lancement précédent (fermeture pendant le chargement de Whisper)
             let (h, mdir_c) = (app.handle().clone(), app.state::<AppState>().mdir.clone());
@@ -672,6 +692,8 @@ fn main() {
                 let mut dirs = vec![mdir_c];
                 if let Some(r) = engine_paths::REDIST.get() { dirs.push(r.clone()); }
                 procs::kill_orphans(&dirs);
+                // seulement après : le nettoyage tuerait le whisper-server qu'on vient de lancer
+                warm::start(&h); // charge Whisper et la séparation des intervenants pendant l'écran de démarrage
                 for id in pending { spawn_transcription(h.clone(), id); }
             });
             // récupère les enregistrements interrompus
@@ -706,7 +728,8 @@ fn main() {
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
             live::live_prepare, live::live_release,
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
-            update::update_check, update::update_install
+            update::app_version, update::update_busy, update::update_prepare, update::app_quit, warm::warm_status,
+            diarize::diarize_install, diarize::diarize_remove, diarize::diarize_meeting, diarize::rename_speaker
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Verbatim")

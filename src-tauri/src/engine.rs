@@ -43,9 +43,15 @@ struct Dl {
 }
 static DL: Mutex<Dl> = Mutex::new(Dl { active: false, model: String::new(), phase: String::new(), done: 0, total: 0, error: None });
 
-/// Demande d'arrêt du téléchargement en cours (les `.part` sont conservés pour une reprise).
+/// Demande d'annulation du téléchargement en cours : le fichier partiel (`.part`) est supprimé. Une fermeture de l'application
+/// ou une coupure réseau, elles, le conservent pour une reprise.
 static CANCEL: AtomicBool = AtomicBool::new(false);
 const CANCELLED: &str = "Téléchargement annulé.";
+
+/// Un téléchargement (moteur, modèle) est en cours.
+pub fn dl_active() -> bool {
+    DL.lock().map(|d| d.active).unwrap_or(false)
+}
 
 #[tauri::command]
 pub fn download_cancel() {
@@ -141,12 +147,17 @@ pub fn engine_status(st: State<AppState>) -> R<Value> {
             "rocm_path": engine_rocm_bin(&st.mdir).to_string_lossy(),
             "rocm_engine": engine_rocm_bin(&st.mdir).exists(),
             "names": gpu_names(),
+            "vulkan": vulkan_ready(&st.mdir),
+            "vulkan_driver": vulkan_driver(),
+            "vulkan_engine": engine_vulkan_bin(&st.mdir).exists(),
+            "vulkan_path": engine_vulkan_bin(&st.mdir).to_string_lossy(),
             "installed": engine_gpu_bin(&st.mdir).exists(),
             "path": engine_gpu_bin(&st.mdir).to_string_lossy(),
             "bytes": WHISPER_GPU_BYTES,
             "selected": st.store.lock().unwrap().settings.whisper_device != "cpu",
         },
         "vad": vad_path(&st.mdir).exists(),
+        "diarization": { "installed": crate::diarize::ready(&st.mdir), "bytes": crate::diarize::total_bytes(), "path": crate::diarize::dir_path(&st.mdir).to_string_lossy() },
         "models": models,
         "download": { "active": dl.active, "model": dl.model, "phase": dl.phase, "done": dl.done, "total": dl.total, "error": dl.error },
     }))
@@ -184,6 +195,9 @@ pub fn download_to(url: &str, dst: &PathBuf, expected: u64, phase: &str, model: 
         let (mut buf, mut done, mut last) = (vec![0u8; 128 * 1024], have, 0u64);
         loop {
             if CANCEL.load(Ordering::SeqCst) {
+                // « Arrêter » annule vraiment : la partie déjà reçue est supprimée (pas de reprise)
+                drop(f);
+                let _ = fs::remove_file(&part);
                 return Err(CANCELLED.into());
             }
             let n = rd.read(&mut buf).map_err(|e| format!("Connexion interrompue : {e}"))?;
@@ -259,7 +273,7 @@ pub fn hw_label(dev: &str) -> String {
     }
 }
 
-fn set_transcribe_pct(app: &AppHandle, id: &str, pct: u8) {
+pub(crate) fn set_transcribe_pct(app: &AppHandle, id: &str, pct: u8) {
     let st = app.state::<AppState>();
     let mut s = st.store.lock().unwrap();
     if let Some(m) = s.meetings.iter_mut().find(|m| m.id == id) {
@@ -288,6 +302,28 @@ fn rocm_ready(dir: &PathBuf, root: &str) -> bool {
     engine_rocm_bin(dir).exists()
         && crate::llm::rocm_path_dirs(dir, root).is_some()
         && gpu_names().iter().any(|n| { let u = n.to_uppercase(); u.contains("AMD") || u.contains("RADEON") })
+}
+
+/// Pilote Vulkan présent (`vulkan-1.dll` : AMD, Intel, NVIDIA), une vraie carte graphique et le moteur Whisper Vulkan livré.
+pub fn vulkan_ready(dir: &PathBuf) -> bool {
+    vulkan_driver()
+        && engine_vulkan_bin(dir).exists()
+        && gpu_names().iter().any(|n| {
+            let u = n.to_uppercase();
+            !(u.contains("BASIC") || u.contains("REMOTE") || u.contains("VIRTUAL") || u.contains("PARSEC"))
+        })
+}
+
+/// Le chargeur Vulkan est installé avec les pilotes graphiques.
+pub fn vulkan_driver() -> bool {
+    std::env::var("SystemRoot")
+        .map(|r| PathBuf::from(r).join("System32").join("vulkan-1.dll").exists())
+        .unwrap_or(false)
+}
+
+/// whisper-server Vulkan utilisable pour la transcription en direct.
+pub fn vulkan_server_ready(dir: &PathBuf) -> bool {
+    vulkan_ready(dir) && crate::engine_paths::engine_vulkan_server(dir).exists()
 }
 
 /// Pilote NVIDIA présent (nvcuda.dll) : condition pour utiliser le build CUDA.
@@ -401,6 +437,9 @@ fn install_all(dir: &PathBuf, model: &str) -> R<()> {
     if fs::metadata(&mp).map(|m| m.len() != bytes).unwrap_or(true) {
         download_to(&model_url(model), &mp, bytes, "model", model)?;
     }
+    // séparation des intervenants : un échec (réseau, annulation) n'empêche pas d'utiliser Whisper,
+    // les modèles se téléchargent à nouveau depuis les Réglages
+    let _ = crate::diarize::install(dir);
     Ok(())
 }
 
@@ -482,7 +521,7 @@ pub fn play_path(audio: &str) -> String {
 }
 
 /// Décode un audio (mp3, m4a/aac, ogg, flac, wav…) en WAV mono 16 kHz 16 bits.
-fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
+pub(crate) fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
     use symphonia::core::{
         audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SErr, formats::FormatOptions,
         io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
@@ -581,7 +620,7 @@ fn decode_to_wav16k(src: &str, dst: &PathBuf) -> R<()> {
     fs::write(dst, w).map_err(|e| e.to_string())
 }
 
-fn set_status(app: &AppHandle, id: &str, status: &str, error: Option<String>, transcript: Option<Vec<Segment>>) {
+pub(crate) fn set_status(app: &AppHandle, id: &str, status: &str, error: Option<String>, transcript: Option<Vec<Segment>>) {
     let st = app.state::<AppState>();
     let mut s = st.store.lock().unwrap();
     if let Some(m) = s.meetings.iter_mut().find(|m| m.id == id) {
@@ -674,10 +713,16 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
     let cuts = if total_ms > LONG_AUDIO_MS { split_points(&tmp, total_ms, LONG_CHUNKS) } else { Vec::new() };
     let chunk_json = |i: usize| st.dir.join(format!("{id}.p{i}.json"));
     let chunk_wav = |i: usize| st.dir.join(format!("{id}.p{i}.wav"));
-    // `gpu` : moteur ROCm / CUDA s'il est utilisable, sinon CPU
+    // `gpu` : moteur ROCm / CUDA / Vulkan (dans cet ordre) s'il est utilisable, sinon CPU
     let run = |gpu: bool| -> R<(bool, String)> {
-        // morceaux : (début en ms, durée en ms ; 0 = jusqu'à la fin)
-        let parts: Vec<(u64, u64)> = if gpu && !cuts.is_empty() {
+        // « vulkan » dans les Réglages force Vulkan même si ROCm ou CUDA sont disponibles (test, ou pilote ROCm capricieux)
+        let force_vulkan = cfg.whisper_device == "vulkan";
+        let use_rocm = gpu && !force_vulkan && rocm_ready(&st.mdir, &cfg.rocm_root);
+        let use_cuda = gpu && !force_vulkan && !use_rocm && cuda_available() && engine_gpu_bin(&st.mdir).exists();
+        let use_vulkan = gpu && !use_rocm && !use_cuda && vulkan_ready(&st.mdir);
+        // morceaux : (début en ms, durée en ms ; 0 = jusqu'à la fin). Le découpage en parallèle est mesuré sur ROCm et CUDA ;
+        // en Vulkan (cartes plus modestes, parfois partagées avec l'affichage), une seule instance.
+        let parts: Vec<(u64, u64)> = if (use_rocm || use_cuda) && !cuts.is_empty() {
             let mut b = vec![0u64];
             b.extend(&cuts);
             b.push(0);
@@ -695,11 +740,17 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
                 write_wav_part(&tmp, &chunk_wav(i), off, if dur == 0 { total_ms - off } else { dur })?;
             }
         }
-        let use_rocm = gpu && rocm_ready(&st.mdir, &cfg.rocm_root);
-        let use_cuda = gpu && !use_rocm && cuda_available() && engine_gpu_bin(&st.mdir).exists();
-        set_hw(app, id, &hw_label(if use_rocm { "rocm" } else if use_cuda { "cuda" } else { "cpu" }));
+        set_hw(app, id, &hw_label(if use_rocm { "rocm" } else if use_cuda { "cuda" } else if use_vulkan { "vulkan" } else { "cpu" }));
         let build = |i: usize| -> std::process::Command {
-            let mut cmd = std::process::Command::new(if use_rocm { engine_rocm_bin(&st.mdir) } else if use_cuda { engine_gpu_bin(&st.mdir) } else { engine_bin(&st.mdir) });
+            let mut cmd = std::process::Command::new(if use_rocm {
+                engine_rocm_bin(&st.mdir)
+            } else if use_cuda {
+                engine_gpu_bin(&st.mdir)
+            } else if use_vulkan {
+                engine_vulkan_bin(&st.mdir)
+            } else {
+                engine_bin(&st.mdir)
+            });
             if use_rocm {
                 if let Some(dirs) = crate::llm::rocm_path_dirs(&st.mdir, &cfg.rocm_root) {
                     let mut p: Vec<std::ffi::OsString> = dirs.iter().map(|d| d.as_os_str().to_owned()).collect();
@@ -797,12 +848,6 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
         for (_, f) in &files { let _ = fs::remove_file(f); }
         return Err(format!("Whisper a échoué : {last_err}"));
     }
-    // Lecture : le positionnement d'un mp3 à débit variable est approximatif dans le lecteur
-    // de la fenêtre (écarts de plusieurs secondes), alors qu'il est exact sur un WAV. On garde
-    // donc le WAV transcrit comme copie de lecture, sur la même ligne de temps que le texte.
-    if is_wav(&audio) || fs::rename(&tmp, play_copy(&audio)).is_err() {
-        let _ = fs::remove_file(&tmp);
-    }
     let mut segs: Vec<Segment> = Vec::new();
     for (ci, f) in &files {
         let shift = if files.len() > 1 { starts.get(*ci).copied().unwrap_or(0.0) } else { 0.0 };
@@ -831,13 +876,34 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
         prev = k;
         run <= 2
     });
+    // séparation des intervenants, sur les fragments d'origine : on ne recolle ensuite que ceux d'une même voix.
+    // Un échec ne fait pas perdre la transcription : les segments restent attribués à « Intervenant ».
+    let mut voice: Option<Vec<f32>> = None;
+    if !segs.is_empty() && crate::diarize::ready(&st.mdir) {
+        set_status(app, id, "diarizing", None, None);
+        set_transcribe_pct(app, id, 0);
+        let res = crate::diarize::load(&tmp).and_then(|s| crate::diarize::diarize(&s, &st.mdir, &|p| set_transcribe_pct(app, id, p)).map(|t| (s, t)));
+        match res {
+            Ok((samples, turns)) => {
+                crate::diarize::assign(&mut segs, &turns);
+                voice = Some(samples);
+            }
+            Err(e) => eprintln!("Séparation des intervenants impossible : {e}"),
+        }
+    }
+    // Lecture : le positionnement d'un mp3 à débit variable est approximatif dans le lecteur
+    // de la fenêtre (écarts de plusieurs secondes), alors qu'il est exact sur un WAV. On garde
+    // donc le WAV transcrit comme copie de lecture, sur la même ligne de temps que le texte.
+    if is_wav(&audio) || fs::rename(&tmp, play_copy(&audio)).is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
     // le décodage glouton coupe à chaque marque de temps (~3 mots par ligne) : on recolle les fragments
     // d'une même phrase (pas de ponctuation finale, pause < 1 s, 6 s au plus), comme avec le faisceau
     let mut merged: Vec<Segment> = Vec::new();
     for g in segs {
         if let Some(l) = merged.last_mut() {
             let ended = l.text.trim_end().ends_with(['.', '?', '!', '…']);
-            if !ended && g.start - l.end < 1.0 && g.end - l.start <= 6.0 {
+            if !ended && l.speaker == g.speaker && g.start - l.end < 1.0 && g.end - l.start <= 6.0 {
                 l.text.push(' ');
                 l.text.push_str(&g.text);
                 l.end = g.end;
@@ -846,7 +912,13 @@ fn run_whisper(app: &AppHandle, id: &str) -> R<Vec<Segment>> {
         }
         merged.push(g);
     }
-    let segs = merged;
+    let mut segs = merged;
+    // présentations (« bonjour, je suis X ») : les voix qui se présentent prennent leur nom
+    if let Some(samples) = &voice {
+        if let Err(e) = crate::diarize::identify(samples, &st.mdir, &mut segs) {
+            eprintln!("Reconnaissance des présentations impossible : {e}");
+        }
+    }
     if segs.is_empty() {
         return Err("Aucune parole détectée.".into());
     }

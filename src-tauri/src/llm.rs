@@ -11,6 +11,7 @@ use std::{
     fs,
     path::PathBuf,
     process::{Child, Command, Stdio},
+    sync::Mutex,
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Manager, State};
@@ -287,6 +288,7 @@ fn install_binary(dir: &PathBuf, dev: &str) -> R<()> {
 
 #[tauri::command]
 pub fn llm_install_engine(app: AppHandle, st: State<AppState>, device: String) -> R<()> {
+    release_server(); // un moteur en marche verrouille ses fichiers
     let dir = st.mdir.clone();
     engine::run_job(app, String::new(), "llm-binary", move || install_binary(&dir, &device))
 }
@@ -294,6 +296,7 @@ pub fn llm_install_engine(app: AppHandle, st: State<AppState>, device: String) -
 #[tauri::command]
 pub fn llm_install(app: AppHandle, st: State<AppState>, model: String) -> R<()> {
     model_info(&model).ok_or("Modèle inconnu.")?;
+    release_server();
     let dir = st.mdir.clone();
     let m = model.clone();
     engine::run_job(app, model, "llm-binary", move || install(&dir, &m))
@@ -315,6 +318,7 @@ fn unselect_llm(st: &AppState, value: &str) {
 #[tauri::command]
 pub fn llm_remove(st: State<AppState>, model: String) -> R<()> {
     model_info(&model).ok_or("Modèle inconnu.")?;
+    release_server();
     unselect_llm(&st, &model);
     let mp = model_file(&st.mdir, &model);
     let _ = fs::remove_file(&mp);
@@ -333,6 +337,25 @@ impl Drop for Server {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+impl Server {
+    /// Le processus tourne toujours et répond.
+    fn alive(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+            && ureq::get(&format!("http://127.0.0.1:{}/health", self.port)).timeout(Duration::from_secs(2)).call().is_ok()
+    }
+}
+
+/// Serveur d'IA locale laissé en marche entre deux utilisations ; `key` = modèle, matériel et runtime.
+struct Cached {
+    key: String,
+    srv: Server,
+}
+static CACHE: Mutex<Option<Cached>> = Mutex::new(None);
+
+/// Arrête le serveur d'IA locale laissé en marche (avant de supprimer ou remplacer ses fichiers).
+pub fn release_server() {
+    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 /// Dossiers à ajouter au PATH pour charger le runtime ROCm (utilisé aussi par Whisper).
@@ -476,6 +499,7 @@ fn chat_json(be: &Backend, system: &str, user: &str, max_tokens: u32, on_frac: &
     let expected = (max_tokens as f32 * 0.6).max(1.0);
     let mut txt = String::new();
     let mut chunks = 0u32;
+    let mut finish = String::new();
     for line in std::io::BufRead::lines(std::io::BufReader::new(resp.into_reader())) {
         let line = line.map_err(|e| e.to_string())?;
         let Some(data) = line.strip_prefix("data:") else { continue };
@@ -484,6 +508,9 @@ fn chat_json(be: &Backend, system: &str, user: &str, max_tokens: u32, on_frac: &
             break;
         }
         if let Ok(v) = serde_json::from_str::<Value>(data) {
+            if let Some(f) = v["choices"][0]["finish_reason"].as_str() {
+                finish = f.to_string();
+            }
             if let Some(t) = v["choices"][0]["delta"]["content"].as_str() {
                 txt.push_str(t);
                 chunks += 1;
@@ -495,7 +522,17 @@ fn chat_json(be: &Backend, system: &str, user: &str, max_tokens: u32, on_frac: &
         return Err("Réponse vide du modèle.".into());
     }
     on_frac(1.0);
-    parse_json_loose(&txt).ok_or_else(|| "Réponse du modèle non exploitable (JSON invalide).".to_string())
+    if let Some(v) = parse_json_loose(&txt) {
+        return Ok(v);
+    }
+    // réponse coupée par la limite de longueur : le JSON est incomplet, on recommence avec une limite plus large
+    if finish == "length" {
+        if max_tokens < 4000 {
+            return chat_json(be, system, user, (max_tokens * 2).min(4000), on_frac);
+        }
+        return Err("Réponse du modèle coupée : elle dépasse la longueur maximale autorisée.".into());
+    }
+    Err(format!("Réponse du modèle non exploitable (JSON invalide{}).", if finish.is_empty() { String::new() } else { format!(" ; fin : {finish}") }))
 }
 
 /// Réponse en texte libre (traduction) ; pas de mode JSON.
@@ -562,13 +599,35 @@ pub fn with_backend<T>(app: &AppHandle, cfg: &Settings, sel: &str, status: &dyn 
         None
     };
     if let Some((path, label)) = local {
-        status("Chargement de l'IA locale…");
         let attempt = |cfg: &Settings| -> R<T> {
-            let srv = start_server(&st.mdir, &path, cfg, &|p| status(&load_text(p)))?;
+            // le serveur reste chargé après le compte-rendu (les suivants démarrent tout de suite) ; il est arrêté si le modèle ou
+            // le matériel change, à la suppression d'un modèle ou d'un moteur, et à la fermeture de l'application
+            let key = format!("{}|{}|{}", path.display(), cfg.llm_device, cfg.rocm_root);
+            let cached = CACHE.lock().unwrap_or_else(|e| e.into_inner()).take();
+            let fresh = || -> R<Server> {
+                status("Chargement de l'IA locale…");
+                start_server(&st.mdir, &path, cfg, &|p| status(&load_text(p)))
+            };
+            let mut srv = match cached {
+                Some(mut c) => {
+                    if c.key == key && c.srv.alive() {
+                        c.srv
+                    } else {
+                        drop(c); // libère la mémoire de l'ancien modèle avant de charger le nouveau
+                        fresh()?
+                    }
+                }
+                None => fresh()?,
+            };
             let be = Backend { base: format!("http://127.0.0.1:{}/v1", srv.port), key: String::new(), model: "local".into(), label: label.clone(),
                 hw: engine_hw(&st.mdir, cfg), mode: "local", kind: "openai", chunk_chars: 11_000, timeout: 1800 };
             let r = f(&be);
-            drop(srv);
+            if srv.alive() {
+                let mut g = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                if g.is_none() {
+                    *g = Some(Cached { key, srv });
+                }
+            }
             r
         };
         let mut res = attempt(cfg);
@@ -801,6 +860,7 @@ pub fn llm_remove_file(st: State<AppState>, path: String) -> R<()> {
     if !p.starts_with(st.mdir.join("llm-models")) || p.extension().map(|x| x != "gguf").unwrap_or(true) {
         return Err("Fichier non géré par Verbatim.".into());
     }
+    release_server();
     unselect_llm(&st, &format!("gguf:{path}"));
     fs::remove_file(p).map_err(|e| e.to_string())
 }
@@ -1320,6 +1380,11 @@ pub fn generate_report(app: AppHandle, st: State<AppState>, id: String, lang: Op
         lang.filter(|l| !l.is_empty()).unwrap_or_else(|| s.settings.report_lang.clone())
     };
     std::thread::spawn(move || {
+        // libère Whisper (mémoire vidéo comprise) pour laisser la place à l'IA du compte-rendu ; il se recharge à la prochaine
+        // ouverture du panneau d'enregistrement. Pas pendant un enregistrement : le direct en a besoin.
+        if app.state::<AppState>().rec.lock().unwrap().is_none() {
+            crate::live::release();
+        }
         let res = produce(&app, &id, &lang);
         let st = app.state::<AppState>();
         let mut s = st.store.lock().unwrap();

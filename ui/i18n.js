@@ -15,13 +15,50 @@
     ["Arrêter", "Stop"], ["Arrêt…", "Stopping…"],
     // Téléchargements
     ["Téléchargement en cours…", "Download in progress…"],
-    ["Vous pouvez changer de page ou fermer l'app : le téléchargement reprendra là où il s'est arrêté.", "You can change page or close the app: the download will resume where it stopped."],
+    ["Vous pouvez changer de page ou fermer l'app : le téléchargement reprendra là où il s'est arrêté. « Arrêter » l'annule et supprime la partie déjà reçue.", "You can change page or close the app: the download will resume where it stopped. “Stop” cancels it and deletes the part already received."],
+    ["Annule le téléchargement et supprime la partie déjà reçue", "Cancels the download and deletes the part already received"],
     ["Téléchargement interrompu", "Download interrupted"], ["Moteur de transcription non installé", "Transcription engine not installed"],
     ["Reprendre le téléchargement", "Resume download"], ["Installer Whisper", "Install Whisper"],
     ["Téléchargement arrêté — vous pourrez le reprendre.", "Download stopped — you can resume it later."], ["Téléchargement annulé.", "Download cancelled."],
     ["Moteur Whisper prêt", "Whisper engine ready"],
     ["Moteur", "Engine"], ["Détection de parole", "Speech detection"], ["Modèle", "Model"], ["Moteur IA", "AI engine"], ["Modèle IA", "AI model"],
-    ["Copie", "Copy"], ["Moteur GPU", "GPU engine"], ["Téléchargement", "Download"],
+    ["Copie", "Copy"], ["Moteur GPU", "GPU engine"], ["Téléchargement", "Download"], ["Séparation des voix", "Voice separation"],
+    // Séparation des intervenants
+    ["Séparation des intervenants", "Speaker separation"], ["Identifier les intervenants", "Identify speakers"], ["Identification des intervenants", "Identifying speakers"],
+    ["Repère qui parle et attribue chaque passage à un intervenant", "Detects who is speaking and assigns each passage to a speaker"],
+    ["Renommer cet intervenant", "Rename this speaker"], ["Identifier", "Identify"],
+    ["Attribue chaque passage à un intervenant (« Intervenant 1 », « Intervenant 2 »…), renommable ensuite. Nombre détecté automatiquement ; calcul local, sur le processeur.",
+      "Assigns each passage to a speaker (“Speaker 1”, “Speaker 2”…), which you can rename afterwards. The number is detected automatically; computed locally, on the processor."],
+    ["Déposez vos fichiers ici pour les importer", "Drop your files here to import them"],
+    ["Astuce :", "Tip:"],
+    ["si chacun dit « Bonjour, je suis Marie » en prenant la parole, sa voix est reconnue et nommée pendant toute la réunion.",
+      "if everyone says “Hello, I'm Marie” when they start speaking, their voice is recognised and named throughout the meeting."],
+    ["Actif", "Active"], ["Emplacement et réunion déjà transcrite", "Location and already transcribed meeting"],
+    ["Pour une réunion déjà transcrite, utilisez « Identifier les intervenants » dans la réunion.", "For an already transcribed meeting, use “Identify speakers” inside the meeting."],
+    ["Dites bonjour", "Say hello"], ["Demandez à chaque personne de dire", "Ask each person to say"], ["« Bonjour, je suis … »", "“Hello, I'm …”"],
+    ["la première fois qu'elle prend la parole : Verbatim reconnaît sa voix et la nomme pendant toute la réunion.", "the first time they speak: Verbatim recognises their voice and names them throughout the meeting."],
+    ["Ne plus afficher ce message", "Don't show this message again"], ["Compris", "Got it"], ["Annuler", "Cancel"],
+    // Fermeture pendant un travail en cours, première utilisation
+    ["Fermer Verbatim ?", "Close Verbatim?"], ["Rester", "Stay"], ["Quitter quand même", "Quit anyway"], ["Un travail est en cours.", "A task is in progress."],
+    ["Un enregistrement est en cours.", "A recording is in progress."], ["Une transcription est en cours.", "A transcription is in progress."],
+    ["Un compte-rendu est en cours de rédaction.", "A report is being written."], ["Une traduction est en cours.", "A translation is in progress."],
+    ["Un téléchargement est en cours.", "A download is in progress."],
+    ["Il sera arrêté ; ce qui est déjà enregistré sera récupéré au prochain lancement.", "It will be stopped; what has already been recorded will be recovered at the next launch."],
+    ["Elle reprendra au prochain lancement.", "It will resume at the next launch."], ["Il reprendra là où il s'est arrêté.", "It will resume where it stopped."],
+    ["Elle sera interrompue : il faudra la relancer.", "It will be interrupted: you will need to start it again."],
+    ["Il sera interrompu : il faudra le relancer.", "It will be interrupted: you will need to start it again."],
+    ["Bienvenue dans Verbatim", "Welcome to Verbatim"],
+    ["Verbatim travaille entièrement sur votre ordinateur : il lui faut d'abord des modèles d'IA.", "Verbatim works entirely on your computer: it first needs AI models."],
+    ["Dans les Réglages, choisissez les modèles de transcription, de compte-rendu et de traduction (facultatif).",
+      "In Settings, choose the transcription, report and translation (optional) models."],
+    ["Chacun n'est téléchargé qu'une seule fois.", "Each is downloaded only once."],
+    ["Ouvrir les Réglages", "Open Settings"],
+    ["Rappel : chaque personne dit", "Reminder: each person says"],
+    ["en prenant la parole pour être reconnue et nommée.", "when they start speaking, to be recognised and named."],
+    ["Supprimer les modèles de séparation des intervenants ? Les transcriptions suivantes n'auront plus d'intervenants distincts.", "Delete the speaker separation models? Next transcriptions will no longer have distinct speakers."],
+    ["Modèles de séparation des intervenants prêts", "Speaker separation models ready"],
+    ["Les intervenants actuels (et les noms que vous leur avez donnés) seront remplacés. Continuer ?", "The current speakers (and the names you gave them) will be replaced. Continue?"],
+    ["Téléchargez d'abord les modèles de séparation des intervenants (Réglages › Transcription).", "Download the speaker separation models first (Settings › Transcription)."],
     // Enregistrement
     ["Nouvel enregistrement", "New recording"], ["Microphone", "Microphone"], ["Sensibilité du micro", "Microphone sensitivity"],
     ["Son du PC (visio, vidéo…)", "PC sound (video calls, videos…)"], ["Sensibilité du son du PC", "PC sound sensitivity"], ["● Démarrer", "● Start"],
@@ -111,8 +148,21 @@
     ["Modèles personnalisés installés", "Installed custom models"],
     ["Ollama", "Ollama"], ["Si Ollama est installé, Verbatim peut l'utiliser pour rédiger avec n'importe lequel de vos modèles.", "If Ollama is installed, Verbatim can use it to write with any of your models."],
     ["Mises à jour", "Updates"],
-    ["Verbatim cherche au démarrage la dernière version publiée sur GitHub. L'installation ne se lance jamais pendant un enregistrement, une transcription ou une rédaction.",
-      "Verbatim checks at startup for the latest version published on GitHub. Installation never starts during a recording, a transcription or report writing."],
+    ["Verbatim cherche au démarrage la dernière version publiée sur GitHub. Avec l'option cochée, elle est téléchargée en arrière-plan ; l'installation ne démarre que lorsque vous cliquez sur « Mettre à jour » (l'application redémarre alors), et jamais pendant un enregistrement, une transcription ou une rédaction.",
+      "Verbatim checks at startup for the latest version published on GitHub. With the option ticked, it is downloaded in the background; installation only starts when you click “Update” (the application then restarts), and never during a recording, a transcription or report writing."],
+    // Fenêtre et bandeau de mise à jour
+    ["Notes de version", "Release notes"], ["Ignorer pour cette session", "Ignore for this session"], ["Fermer", "Close"],
+    ["Continuer en arrière-plan", "Continue in the background"], ["Chargement…", "Loading…"], ["Chargement de Whisper…", "Loading Whisper…"], ["Chargement de la séparation des voix…", "Loading voice separation…"], ["Mise à jour impossible", "Update failed"],
+    ["Redémarrez l'application pour l'installer.", "Restart the application to install it."],
+    ["Verbatim va se fermer puis redémarrer tout seul pour appliquer la mise à jour.", "Verbatim will close and restart by itself to apply the update."],
+    ["Verbatim va se fermer puis redémarrer tout seul. Cela peut prendre plusieurs minutes : ne l'éteignez pas.", "Verbatim will close and restart by itself. This can take several minutes: do not turn it off."],
+    ["Aucune note pour cette version.", "No notes for this version."],
+    ["Un enregistrement est en cours.", "A recording is in progress."], ["Une transcription est en cours.", "A transcription is in progress."],
+    ["Un compte-rendu est en cours de rédaction.", "A report is being written."], ["Une traduction est en cours.", "A translation is in progress."],
+    ["Un téléchargement est en cours.", "A download is in progress."],
+    ["Pas de connexion à internet. Vérifiez-la puis réessayez.", "No internet connection. Check it and try again."],
+    ["La signature de la mise à jour est invalide : elle n'a pas été installée.", "The update signature is invalid: it was not installed."],
+    ["La mise à jour n'est pas disponible dans cette version.", "Updating is not available in this version."],
     ["Installer automatiquement les nouvelles versions", "Install new versions automatically"], ["Rechercher maintenant", "Check now"],
     ["API distante (facultatif)", "Remote API (optional)"], ["Utilisée si aucun modèle local n'est sélectionné.", "Used if no local model is selected."],
     ["URL de l'API", "API URL"], ["Clé d'API", "API key"], ["Réglages enregistrés", "Settings saved"],
@@ -126,7 +176,8 @@
     ["Le modèle n'est chargé en mémoire (4 à 24 Go selon le modèle) que pendant la rédaction.", "The model is only loaded into memory (4 to 24 GB depending on the model) while writing."],
     ["Processeur, compatible partout (beaucoup plus lent)", "Processor, works everywhere (much slower)"],
     ["Aucun moteur GPU installé.", "No GPU engine installed."],
-    ["Moteurs et réglages avancés", "Engines and advanced settings"], ["Forcer Vulkan", "Force Vulkan"], ["(AMD, NVIDIA, Intel)", "(AMD, NVIDIA, Intel)"],
+    ["Moteurs et réglages avancés", "Engines and advanced settings"], ["Forcer Vulkan", "Force Vulkan"], ["Vulkan", "Vulkan"],
+    ["Force Vulkan (AMD, Intel, NVIDIA), même si ROCm ou CUDA sont disponibles", "Forces Vulkan (AMD, Intel, NVIDIA), even if ROCm or CUDA are available"], ["(AMD, NVIDIA, Intel)", "(AMD, NVIDIA, Intel)"],
     ["Forcer CUDA", "Force CUDA"], ["(NVIDIA ; le plus rapide sur carte NVIDIA)", "(NVIDIA; fastest on NVIDIA cards)"],
     ["Forcer ROCm", "Force ROCm"], ["(AMD RDNA3 ; lecture des longs textes plus rapide)", "(AMD RDNA3; faster reading of long texts)"],
     ["Runtime ROCm :", "ROCm runtime:"], ["Runtime ROCm introuvable.", "ROCm runtime not found."],
@@ -164,6 +215,7 @@
     ["Modèle inconnu.", "Unknown model."], ["Un téléchargement est déjà en cours.", "A download is already in progress."],
     ["Fréquence d'échantillonnage inconnue.", "Unknown sample rate."], ["Aucune parole détectée.", "No speech detected."],
     ["Moteur d'IA locale non installé (Réglages).", "Local AI engine not installed (Settings)."], ["Délai dépassé au chargement de l'IA locale.", "Timed out loading the local AI."],
+    ["Réponse du modèle coupée : elle dépasse la longueur maximale autorisée.", "Model response cut off: it exceeds the maximum allowed length."],
     ["Réponse vide du modèle.", "Empty response from the model."], ["Réponse du modèle non exploitable (JSON invalide).", "Unusable model response (invalid JSON)."],
     ["Ollama ne répond pas après son démarrage.", "Ollama is not responding after starting."], ["Réponse vide d'Ollama.", "Empty response from Ollama."],
     ["Réponse d'Ollama non exploitable (JSON invalide).", "Unusable Ollama response (invalid JSON)."], ["Fichier non géré par Verbatim.", "File not supported by Verbatim."],
@@ -214,6 +266,7 @@
   add(/^Whisper s'exécute en local, l'audio ne quitte jamais cet ordinateur\. Modèle « (.*) » : (.+?)(?: — déjà (\d+) % téléchargés)?\. Téléchargé une seule fois, puis conservé\.$/,
     (m) => `Whisper runs locally; audio never leaves this computer. Model “${T(m[1])}”: ${m[2]}${m[3] ? ` — already ${m[3]}% downloaded` : ""}. Downloaded once, then kept.`);
   add(/^Par défaut — (.*)$/, (m) => `Default — ${m[1]}`);
+  add(/^Modèles installés · (.+)$/, (m) => `Models installed · ${m[1]}`);
   add(/^(\d+) fichier\(s\) importé\(s\)$/, (m) => `${m[1]} file(s) imported`);
   add(/^(.*?) · (Audio · transcription Whisper locale|Transcription importée)(?: · (.*))?$/, (m) => `${m[1]} · ${T(m[2])}${m[3] ? " · " + m[3] : ""}`);
   add(/^(.*) · local$/, (m) => `${T(m[1])} · local`);
@@ -223,11 +276,20 @@
   add(/^Version (.+) disponible\.$/, (m) => `Version ${m[1]} available.`);
   add(/^Vous avez la dernière version \(v(.+)\)\.$/, (m) => `You have the latest version (v${m[1]}).`);
   add(/^Installation de la version (.+) : l'application va redémarrer…$/, (m) => `Installing version ${m[1]}: the application will restart…`);
+  add(/^La version (.+) est disponible\.$/, (m) => `Version ${m[1]} is available.`);
+  add(/^La version (.+) est prête\.?$/, (m) => `Version ${m[1]} is ready${/\.$/.test(m[0]) ? "." : ""}`);
+  add(/^Téléchargement de la version (.+?)(?: : (\d+) %)?$/, (m) => `Downloading version ${m[1]}${m[2] ? ": " + m[2] + "%" : ""}`);
+  add(/^Installation de la version (.+)…$/, (m) => `Installing version ${m[1]}…`);
+  add(/^Version (\d[^ ]*)$/, (m) => `Version ${m[1]}`);
+  add(/^(\d+) %(?: · (.+))?$/, (m) => `${m[1]}%${m[2] ? " · " + m[2] : ""}`);
+  add(/^Mise à jour impossible : (.*)$/s, (m) => `Update failed: ${T(m[1])}`);
+  add(/^(.+) Terminez-le avant de mettre à jour\.$/, (m) => `${T(m[1])} Finish it before updating.`);
   add(/^Téléchargement interrompu : (.*) — vous pourrez le reprendre\.$/, (m) => `Download interrupted: ${T(m[1])} — you can resume it later.`);
   add(/^(\d+) points?(?: · (\d+) min)? · (\d+) questions?$/, (m) => `${m[1]} item${m[1] == 1 ? "" : "s"}${m[2] ? " · " + m[2] + " min" : ""} · ${m[3]} question${m[3] == 1 ? "" : "s"}`);
   add(/^Durée prévue : (\d+) min$/, (m) => `Planned duration: ${m[1]} min`);
   add(/^Analyse de la partie (\d+)\/(\d+)…$/, (m) => `Analyzing part ${m[1]}/${m[2]}…`);
-  add(/^Aucun GPU utilisable(?: \((.*)\))? : il faut une carte NVIDIA \(CUDA\) ou AMD RDNA3 \(ROCm\)\.$/, (m) => `No usable GPU${m[1] ? " (" + m[1] + ")" : ""}: an NVIDIA card (CUDA) or AMD RDNA3 (ROCm) is required.`);
+  add(/^Aucun GPU utilisable(?: \((.*)\))? : il faut une carte NVIDIA \(CUDA\), AMD RDNA3 \(ROCm\), ou un pilote Vulkan \(AMD, Intel\) avec le moteur Whisper Vulkan\.$/, (m) => `No usable GPU${m[1] ? " (" + m[1] + ")" : ""}: an NVIDIA card (CUDA), AMD RDNA3 (ROCm), or a Vulkan driver (AMD, Intel) with the Whisper Vulkan engine is required.`);
+  add(/^Vulkan : (.+?)( \(pilote Vulkan introuvable\))?$/, (m) => `Vulkan: ${m[1]}${m[2] ? " (Vulkan driver not found)" : ""}`);
   add(/^GPU actif · (.*)$/, (m) => `GPU active · ${m[1]}`);
   add(/^CPU \(GPU indisponible\)$/, () => "CPU (GPU unavailable)");
   add(/^CPU \(moteur GPU non installé\)$/, () => "CPU (GPU engine not installed)");

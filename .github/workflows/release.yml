@@ -1,17 +1,22 @@
 name: release
 
-# Construit l'installateur sur GitHub, le fait signer par SignPath, puis publie la release.
+# Construit l'installateur, le signe pour la mise à jour intégrée à l'application (minisign) et publie la release
+# avec l'installateur, sa signature (.sig) et latest.json (le fichier que l'application interroge).
 # Déclenchement : pousser un tag « vX.Y.Z » (la version doit déjà être montée dans les fichiers du projet).
+# La release est toujours créée en BROUILLON (privée) : on vérifie les fichiers, on y joint les packs du moteur s'il y en a
+# de nouveaux, puis on la publie à la main (« Publish release »). Tant qu'elle est en brouillon, l'application ne la voit pas.
+# Un tag avec un suffixe (v0.4.1-beta) est en plus marqué préversion : jamais proposée par la mise à jour, même publiée.
+# Secrets GitHub : TAURI_SIGNING_PRIVATE_KEY (obligatoire : contenu du fichier .secrets/verbatim-updater.key),
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (seulement si la clé a un mot de passe).
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-sign-release:
+  build-release:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,31 +29,37 @@ jobs:
 
       - run: npm ci
 
-      - name: Build (Tauri, NSIS)
-        run: npx tauri build
+      # Étiquette de build « v{version}-{horodatage} » : la même dans l'application et dans le nom de la release
+      - name: Étiquette de build
+        id: stamp
+        shell: bash
+        run: |
+          echo "ts=$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          case "${{ github.ref_name }}" in *-*) echo "pre=true" >> "$GITHUB_OUTPUT" ;; *) echo "pre=false" >> "$GITHUB_OUTPUT" ;; esac
 
-      - name: Archive l'installateur non signé
-        id: unsigned
-        uses: actions/upload-artifact@v4
+      - name: Build, signature et brouillon de release
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VERBATIM_BUILD_TS: ${{ steps.stamp.outputs.ts }}
         with:
-          name: installateur-non-signe
-          path: src-tauri/target/release/bundle/nsis/*_x64-setup.exe
+          tagName: ${{ github.ref_name }}
+          releaseName: v${{ steps.stamp.outputs.version }}-${{ steps.stamp.outputs.ts }}
+          releaseBody: "Voir les changements de cette version."
+          releaseDraft: true
+          prerelease: ${{ steps.stamp.outputs.pre == 'true' }}
 
-      - name: Signature (SignPath)
-        uses: signpath/github-action-submit-signing-request@v1
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: verbatim
-          signing-policy-slug: release-signing
-          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: signed
-
-      - name: Publie la release (installateur signé)
-        if: startsWith(github.ref, 'refs/tags/v')
+      # Notes de la release : la section de CHANGELOG.md de cette version (affichées dans « Notes de version »)
+      - name: Notes de version
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" signed/*_x64-setup.exe --title "${{ github.ref_name }}" --generate-notes
+          v="${{ steps.stamp.outputs.version }}"
+          awk -v v="$v" '$0 == "## " v {f=1; next} /^## / && f {exit} f' CHANGELOG.md > notes.md
+          # par identifiant : « gh release edit <tag> » ne trouve pas un brouillon
+          if [ -s notes.md ]; then gh api --method PATCH "repos/${{ github.repository }}/releases/${{ steps.tauri.outputs.releaseId }}" -F "body=@notes.md" > /dev/null; fi

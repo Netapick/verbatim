@@ -81,7 +81,19 @@ npx tauri build                         # NSIS installer
 
 ## Automatic updates
 
-At startup, the app queries `releases/latest` of the GitHub repository, downloads the installer (`*_x64-setup.exe`), verifies its SHA-256 (the API's `digest` field), runs it silently in the same folder, then restarts (`src-tauri/src/update.rs`). Never during a recording, a transcription or report writing. Can be turned off in Settings › Connections.
+Updating uses the official `tauri-plugin-updater` (+ `tauri-plugin-process`), called from the interface (`ui/app.js`, "Mise à jour" section). At startup, the app reads `latest.json` from `releases/latest` of the GitHub repository (`plugins.updater` in `tauri.conf.json`), compares versions, then:
+
+- shows a banner at the top (release notes, "Update" button);
+- on click: a centred window on a blurred background, download with progress, minisign signature verified by the plugin, installation by the NSIS installer in passive mode (`installMode: "passive"`), then the installer restarts the application;
+- with "Install automatically" (Settings › General), the download happens in the background; **nothing is installed without a click** on "Update".
+
+`src-tauri/src/update.rs` provides `update_busy` (refuses the update during a recording, transcription, report writing, translation or download), `update_prepare` (stops the AI engines before installing) and `app_version` (the `v{version}-{timestamp}` label).
+
+**Signing key.** `npx tauri signer generate -w .secrets/verbatim-updater.key` (already done; `.secrets/` and `*.key` are git-ignored). The public key is in `tauri.conf.json` (`plugins.updater.pubkey`), the private key in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY` (and a copy outside the repository). Never commit it. A local installer build (`tauri build`) also signs: first set `$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content .secrets/verbatim-updater.key -Raw` (PowerShell).
+
+**Build label.** `build.rs` sets `VERBATIM_BUILD_TS` (`YYYYMMDD-HHMM`, UTC); the app shows `v{version}-{timestamp}`, and CI passes it so the release carries the same name. Only the version (`0.4.0`) is used for comparisons.
+
+**Compatibility.** Versions ≤ 0.3.1 use the old flow (`*_x64-setup.exe` installer + the API's SHA-256): the release must keep publishing that installer under that name.
 
 ## Antivirus
 
@@ -103,7 +115,7 @@ npx tauri build                  # installer (requires NSIS)
 ## Publishing a version
 
 1. Bump the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`, add an entry to `CHANGELOG.md`, then commit.
-2. Push a `vX.Y.Z` tag: the `.github/workflows/release.yml` workflow builds the installer, has it signed by SignPath and publishes the release (see [SIGNATURE.en.md](SIGNATURE.en.md)). The release must be the most recent one for the automatic update to see it.
+2. Push a `vX.Y.Z` tag: the `.github/workflows/release.yml` workflow builds the installer, signs the update (secret `TAURI_SIGNING_PRIVATE_KEY`, see [SIGNATURE.en.md](SIGNATURE.en.md)) and publishes the release with the installer, the `.sig` and `latest.json`, then sets the notes from `CHANGELOG.md`. The release must be the most recent one for the update to see it. A tag with a suffix (`v0.4.1-beta`) is a pre-release published as a draft: never offered.
 
 ## Visual identity
 

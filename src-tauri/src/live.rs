@@ -18,7 +18,7 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const RATE: usize = 16_000;
 /// Fenêtre maximale envoyée à Whisper (il travaille par blocs de 30 s).
@@ -65,16 +65,34 @@ static LOADING: AtomicBool = AtomicBool::new(false);
 /// Incrémenté à chaque libération : un chargement en cours dont le numéro a changé s'abandonne.
 static GEN: AtomicU64 = AtomicU64::new(0);
 
+/// Whisper reste chargé une fois prêt (au démarrage de l'application ou à l'ouverture du panneau d'enregistrement) :
+/// les enregistrements suivants démarrent tout de suite. Il n'est libéré qu'à la fermeture, si la configuration change
+/// ou s'il s'arrête de lui-même.
+static RESIDENT: AtomicBool = AtomicBool::new(false);
+
 /// Libère Whisper (mémoire vidéo comprise) et abandonne un chargement éventuel.
 pub fn release() {
     GEN.fetch_add(1, Ordering::SeqCst);
+    RESIDENT.store(false, Ordering::SeqCst);
     let r = SRV.lock().unwrap().take();
     drop(r);
 }
 
+/// Libération demandée par l'interface ou à la fin d'un enregistrement : sans effet tant que Whisper est gardé chargé.
+fn soft_release() {
+    if !RESIDENT.load(Ordering::SeqCst) {
+        release();
+    }
+}
+
 #[tauri::command]
 pub fn live_release() {
-    release();
+    soft_release();
+}
+
+/// Le serveur chargé correspond-il à cette configuration (même moteur, modèle, langue et runtime) ?
+fn same_cfg(a: &LiveCfg, b: &LiveCfg) -> bool {
+    a.server == b.server && a.model == b.model && a.lang == b.lang && a.rocm_path == b.rocm_path
 }
 
 /// Modèle utilisé en direct : le modèle choisi s'il est assez léger, sinon le meilleur « petit » modèle installé.
@@ -100,15 +118,19 @@ pub fn prepare(st: &AppState) -> R<LiveCfg> {
     let s = st.store.lock().unwrap();
     let cfg = s.settings.clone();
     // GPU AMD : whisper-server compilé pour ROCm, s'il est livré avec le moteur ROCm
-    let rocm = if cfg.whisper_device != "cpu" { crate::engine::rocm_server_ready(&st.mdir, &cfg.rocm_root) } else { None };
+    // ordre : ROCm, puis Vulkan (AMD plus anciennes, Intel, NVIDIA sans CUDA), puis processeur ; « vulkan » dans les Réglages force Vulkan
+    let force_vulkan = cfg.whisper_device == "vulkan";
+    let rocm = if cfg.whisper_device != "cpu" && !force_vulkan { crate::engine::rocm_server_ready(&st.mdir, &cfg.rocm_root) } else { None };
+    let vulkan = rocm.is_none() && cfg.whisper_device != "cpu" && crate::engine::vulkan_server_ready(&st.mdir);
     let (server, rocm_path, hw) = match rocm {
         Some(dirs) => (engine_paths::engine_rocm_server(&st.mdir), dirs, crate::engine::hw_label("rocm")),
+        None if vulkan => (engine_paths::engine_vulkan_server(&st.mdir), vec![], crate::engine::hw_label("vulkan")),
         None => (engine_paths::engine_bin(&st.mdir).with_file_name("whisper-server.exe"), vec![], crate::engine::hw_label("cpu")),
     };
     if !server.exists() {
         return Err("La transcription en direct nécessite whisper-server, absent de ce moteur Whisper. Réinstallez le moteur de transcription (Réglages › Transcription).".into());
     }
-    let model = live_model(&st.mdir, &cfg.whisper_model, !rocm_path.is_empty())
+    let model = live_model(&st.mdir, &cfg.whisper_model, !rocm_path.is_empty() || vulkan)
         .ok_or("Aucun modèle Whisper installé : installez au moins le modèle « Base » (Réglages › Transcription).")?;
     let terms = s.glossary.iter().map(|t| t.term.clone()).collect::<Vec<_>>().join(", ");
     Ok(LiveCfg { server, rocm_path, hw, model, lang: cfg.whisper_lang.clone(), terms, settings: cfg })
@@ -189,9 +211,23 @@ fn spawn_server(cfg: &LiveCfg, gen: u64) -> R<Running> {
 /// (`loading`, `ready`, `error`) renseignent l'interface ; l'enregistrement en direct n'est possible qu'une fois `ready`.
 #[tauri::command]
 pub fn live_prepare(app: AppHandle, st: State<AppState>) -> R<()> {
-    if let Some(r) = SRV.lock().unwrap().as_ref() {
-        emit_state(&app, "ready", &r.hw, json!({ "model": r.model, "prep": true }));
-        return Ok(());
+    {
+        // un serveur déjà chargé est réutilisé s'il tourne encore avec la configuration actuelle, sinon il est remplacé
+        let want = prepare(&st);
+        let mut g = SRV.lock().unwrap();
+        if let Some(r) = g.as_mut() {
+            let alive = matches!(r.child.try_wait(), Ok(None));
+            let same = match (&want, LAST_CFG.lock().unwrap().as_ref()) {
+                (Ok(w), Some(l)) => same_cfg(w, l),
+                _ => false,
+            };
+            if alive && same {
+                emit_state(&app, "ready", &r.hw, json!({ "model": r.model, "prep": true }));
+                return Ok(());
+            }
+            *g = None;
+            RESIDENT.store(false, Ordering::SeqCst);
+        }
     }
     if LOADING.swap(true, Ordering::SeqCst) {
         return Ok(()); // déjà en cours : les événements suivront
@@ -214,6 +250,7 @@ pub fn live_prepare(app: AppHandle, st: State<AppState>) -> R<()> {
                 } else {
                     let (hw, model) = (r.hw.clone(), r.model.clone());
                     *SRV.lock().unwrap() = Some(r);
+                    RESIDENT.store(true, Ordering::SeqCst);
                     emit_state(&app, "ready", &hw, json!({ "model": model, "prep": true }));
                 }
             }
@@ -285,8 +322,34 @@ impl LiveHandle {
         if let Some(j) = self.join.take() {
             let _ = j.join();
         }
-        release(); // libère Whisper et sa mémoire avant la transcription finale
+        soft_release(); // Whisper reste chargé (voir RESIDENT) ; sinon il est libéré avant la transcription finale
     }
+}
+
+/// Charge whisper-server au démarrage de l'application et le garde jusqu'à la fermeture. Bloque jusqu'à ce qu'il réponde ;
+/// les mêmes événements `live-state` que `live_prepare` renseignent l'interface si le panneau d'enregistrement est déjà ouvert.
+pub fn boot_load(app: &AppHandle) -> R<()> {
+    let st = app.state::<AppState>();
+    if SRV.lock().unwrap().is_some() || LOADING.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let res = (|| -> R<()> {
+        let cfg = prepare(&st)?;
+        let gen = GEN.load(Ordering::SeqCst);
+        let model = cfg.model.file_stem().map(|s| s.to_string_lossy().replace("ggml-", "")).unwrap_or_default();
+        emit_state(app, "loading", "Chargement de Whisper…", json!({ "model": model, "hw": cfg.hw, "prep": true }));
+        let r = spawn_server(&cfg, gen)?;
+        if GEN.load(Ordering::SeqCst) != gen {
+            return Ok(()); // libéré entre-temps
+        }
+        let (hw, model) = (r.hw.clone(), r.model.clone());
+        *SRV.lock().unwrap() = Some(r);
+        RESIDENT.store(true, Ordering::SeqCst);
+        emit_state(app, "ready", &hw, json!({ "model": model, "prep": true }));
+        Ok(())
+    })();
+    LOADING.store(false, Ordering::SeqCst);
+    res
 }
 
 pub fn start(app: AppHandle, taps: Vec<Arc<Mutex<TapBuf>>>, cfg: LiveCfg, port: u16, translate_to: Option<String>) -> LiveHandle {
