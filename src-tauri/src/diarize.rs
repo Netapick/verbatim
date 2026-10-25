@@ -636,7 +636,9 @@ mod tests {
         let wav = PathBuf::from(std::env::var("VERBATIM_TEST_WAV").expect("VERBATIM_TEST_WAV"));
         assert!(ready(&dir), "modèles de séparation absents de {}", dir.display());
         let mut s = load(&wav).unwrap();
-        s.truncate(120 * 16000); // 2 minutes
+        // durée analysée : 2 minutes par défaut, VERBATIM_TEST_SECS pour une autre (ex. 916 pour 15 min, 3600 pour 1 h)
+        let secs: usize = std::env::var("VERBATIM_TEST_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(120);
+        s.truncate(secs * 16000);
         let t = Instant::now();
         preload(&dir).unwrap();
         println!("préchargement : {:.1} s", t.elapsed().as_secs_f64());
