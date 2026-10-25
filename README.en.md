@@ -52,7 +52,7 @@ At startup, Verbatim preloads Whisper and speaker separation (a start screen sho
 
 - Capture the **microphone**, the **PC sound** (video calls, videos, through WASAPI loopback) or both, mixed to mono. Live levels, pause and resume, sensitivity setting.
 - Audio is written to disk as it is recorded: after a crash or a power cut, the recording is recovered at the next launch (about 2 seconds lost at most).
-- **Background recording**: when it starts, the window hides (no taskbar button) and a translucent, blurred, draggable **floating bar** stays on top, with the clock, **pause / resume**, **stop** and a way back to the window. A **notification-area icon** offers the same actions (left click: show).
+- **Background recording**: when it starts, the window hides (no taskbar button) and a translucent, draggable **floating bar** stays on top, with the clock, **pause / resume**, **stop** and a way back to the window. A **notification-area icon** offers the same actions (left click: show).
 - Import **audio** (mp3, m4a/aac, ogg, flac, wav…) or an **existing transcript** (txt, srt, vtt, md), from the menu or by drag and drop.
 - A message reminds you to **say hello** at the start of a recording: that is what lets Verbatim name the voices (can be turned off).
 
@@ -327,6 +327,7 @@ An idea or a need? Open an [issue](https://github.com/Netapick/verbatim/issues).
 
 - [Illustrated tour](docs/PRESENTATION.en.md): a walk through the application, with screenshots.
 - [Technical documentation](docs/DEVELOPMENT.en.md): architecture, build, distribution, updates.
+- [Installation codes and error messages](docs/CODES.en.md): what each code or message means, and what to do.
 - [Changelog](CHANGELOG.md): what is new in each version.
 - [Code signing](docs/SIGNATURE.en.md) · [Privacy policy](docs/PRIVACY.en.md)
 

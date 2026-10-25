@@ -6,12 +6,35 @@ use crate::{AppState, R};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    window::{Color, Effect, EffectsBuilder},
     AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
 };
 
 const LABEL: &str = "overlay";
 const SIZE: (f64, f64) = (340.0, 48.0); // la fenêtre épouse la pastille (découpée en forme de pilule, voir `round_corners`)
+
+/// Début d'un glissement : position du curseur (écran) et de la fenêtre, en pixels logiques.
+static DRAG: std::sync::Mutex<Option<(f64, f64, f64, f64)>> = std::sync::Mutex::new(None);
+
+/// Déplace la pastille à la souris, sans le glissement natif de Windows : celui-ci redessine la barre de titre de la fenêtre
+/// pendant le déplacement. `phase` : "start" (saisie), "move" (déplacement), autre valeur = fin.
+#[tauri::command]
+pub fn overlay_drag(app: AppHandle, phase: String, x: f64, y: f64) {
+    let Some(w) = app.get_webview_window(LABEL) else { return };
+    let mut d = DRAG.lock().unwrap_or_else(|e| e.into_inner());
+    match phase.as_str() {
+        "start" => {
+            if let (Ok(p), Ok(sf)) = (w.outer_position(), w.scale_factor()) {
+                *d = Some((x, y, p.x as f64 / sf, p.y as f64 / sf));
+            }
+        }
+        "move" => {
+            if let Some((sx, sy, wx, wy)) = *d {
+                let _ = w.set_position(tauri::LogicalPosition::new(wx + x - sx, wy + y - sy));
+            }
+        }
+        _ => *d = None,
+    }
+}
 
 /// Éléments de l'icône de notification, conservés pour les activer/désactiver et changer les libellés.
 pub struct TrayState {
@@ -114,10 +137,10 @@ fn open_overlay(app: &AppHandle) -> tauri::Result<()> {
         .decorations(false)
         .transparent(true)
         .shadow(false)
-        // flou de l'écran derrière la pastille (le CSS ne le peut pas : il ne voit pas le bureau) + teinte sombre
-        .effects(EffectsBuilder::new().effect(Effect::Blur).color(Color(22, 26, 33, 150)).build())
         .always_on_top(true)
         .skip_taskbar(true)
+        // un clic sur la pastille ne prend pas le focus à l'application en cours (visio, présentation…)
+        .focusable(false)
         .focused(false);
     // en haut et au centre de l'écran principal
     if let Ok(Some(m)) = app.primary_monitor() {
@@ -132,7 +155,8 @@ fn open_overlay(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Le flou s'applique à tout le rectangle de la fenêtre : on la découpe en pilule pour qu'il suive la pastille.
+/// La fenêtre est un rectangle : on la découpe en pilule pour que seule la pastille soit visible (coins transparents).
+/// Pas de flou de l'écran derrière : ceux de Windows (Blur, Acrylic, fond système) ignorent cette découpe et laissent un rectangle.
 #[cfg(windows)]
 fn round_corners(w: &tauri::WebviewWindow) {
     use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};

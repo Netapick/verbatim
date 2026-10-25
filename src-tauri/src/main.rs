@@ -732,7 +732,7 @@ fn main() {
             get_glossary, set_glossary, get_settings, set_settings,
             engine_status, engine_install, engine_install_gpu, download_cancel, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, models::install_lang, retry_transcription,
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
-            live::live_prepare, live::live_release, overlay::tray_labels, overlay::overlay_action,
+            live::live_prepare, live::live_release, overlay::tray_labels, overlay::overlay_action, overlay::overlay_drag,
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
             update::app_version, update::update_busy, update::update_prepare, update::app_quit, warm::warm_status,
             diarize::diarize_install, diarize::diarize_remove, diarize::diarize_meeting, diarize::rename_speaker

@@ -23,7 +23,7 @@ Français · English below each version.
 - La séparation des intervenants affiche son avancement en pourcentage (estimé d'après la vitesse de la séparation précédente).
 - Réunions : bouton pour renommer directement depuis la liste ; fenêtre au démarrage d'un enregistrement rappelant de dire « Bonjour, je suis… » ; l'application s'ouvre maximisée et le contenu occupe toute la largeur.
 - Glisser-déposer : déposez des fichiers audio (ou une transcription) sur la fenêtre pour les importer.
-- Enregistrement en arrière-plan : pendant un enregistrement, la fenêtre se masque (plus de bouton dans la barre des tâches, seule reste l'icône de la zone de notification) et une pastille translucide et floutée, toujours visible (en haut de l'écran, déplaçable), offre Pause / Reprendre, Terminer et le retour à la fenêtre. L'icône de notification donne les mêmes actions (clic gauche : afficher).
+- Enregistrement en arrière-plan : pendant un enregistrement, la fenêtre se masque (plus de bouton dans la barre des tâches, seule reste l'icône de la zone de notification) et une pastille translucide, toujours visible (en haut de l'écran, déplaçable), offre Pause / Reprendre, Terminer et le retour à la fenêtre. L'icône de notification donne les mêmes actions (clic gauche : afficher).
 - La case « Transcription en direct » est décochée à chaque ouverture du panneau d'enregistrement.
 - Les modèles de séparation des intervenants (34 Mo) sont téléchargés seuls au démarrage quand Whisper est déjà installé (une seule fois : supprimés à la main, ils ne reviennent pas).
 - Sous « Réunions », des cartes proposent d'installer la séparation des intervenants et de choisir un modèle de compte-rendu quand l'un des deux manque (Whisper étant installé).
@@ -51,7 +51,7 @@ Français · English below each version.
 - Speaker separation shows its progress as a percentage (estimated from the speed of the previous separation).
 - Meetings: a button to rename straight from the list; a window when starting a recording reminding to say “Hello, I'm…”; the application opens maximised and the content uses the full width.
 - Drag and drop: drop audio files (or a transcript) on the window to import them.
-- Background recording: while recording, the window is hidden (no taskbar button, only the notification-area icon remains) and a translucent, blurred, always-visible bar (top of the screen, draggable) offers Pause / Resume, Stop and a way back to the window. The notification icon gives the same actions (left click: show).
+- Background recording: while recording, the window is hidden (no taskbar button, only the notification-area icon remains) and a translucent, always-visible bar (top of the screen, draggable) offers Pause / Resume, Stop and a way back to the window. The notification icon gives the same actions (left click: show).
 - The “Live transcription” checkbox is unchecked every time the recording panel opens.
 - The speaker-separation models (34 MB) are downloaded automatically at startup when Whisper is already installed (once only: if you delete them by hand, they do not come back).
 - Under “Meetings”, cards offer to install speaker separation and to choose a report model when either is missing (once Whisper is installed).

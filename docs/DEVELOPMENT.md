@@ -13,7 +13,7 @@ Verbatim est une application de bureau **Tauri 2 + Rust** (interface HTML/JS san
 | `src-tauri/src/engine.rs` | Transcription : whisper.cpp, décodage audio (symphonia), téléchargements reprenables, détection GPU |
 | `src-tauri/src/llm.rs` | Rédaction : llama.cpp (serveur local), Ollama, API distante, résumé simplifié |
 | `src-tauri/src/recorder.rs` | Enregistrement micro et son du PC (cpal, WASAPI loopback) ; copie des échantillons pour le direct |
-| `src-tauri/src/overlay.rs` | Enregistrement en arrière-plan : icône de la zone de notification (`tray-icon`), pastille flottante `overlay.html` (fenêtre transparente, floue — effet Blur de Tauri —, découpée en pilule avec `SetWindowRgn`), fenêtre principale masquée ; l'arrêt passe par l'événement `overlay-stop` (la fenêtre principale garde le titre saisi) |
+| `src-tauri/src/overlay.rs` | Enregistrement en arrière-plan : icône de la zone de notification (`tray-icon`), pastille flottante `overlay.html` (fenêtre transparente découpée en pilule avec `SetWindowRgn` ; pas de flou : ceux de Windows ignorent la découpe et laissent un rectangle), fenêtre principale masquée ; le déplacement passe par la commande `overlay_drag` (le glissement natif de Windows redessine la barre de titre de la fenêtre pendant le déplacement) et la fenêtre ne prend pas le focus ; l'arrêt passe par l'événement `overlay-stop` (la fenêtre principale garde le titre saisi) |
 | `src-tauri/src/live.rs` | Transcription en direct : `whisper-server` persistant, fenêtre glissante, événements `live-*` |
 | `src-tauri/src/translate.rs` | Traduction de la transcription par lots (TranslateGemma ou modèle du compte-rendu) |
 | `src-tauri/src/models.rs` | Détection et copie de modèles existants |

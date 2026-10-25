@@ -8,8 +8,9 @@
   <link rel="stylesheet" href="style.css">
   <style>
     html,body{background:transparent;height:100%}
-    body.ov{display:flex;align-items:center;padding:0;overflow:hidden;user-select:none;-webkit-user-select:none}
-    .ov-bar{display:flex;align-items:center;gap:8px;width:100%;height:100%;padding:0 6px 0 16px;border-radius:24px;background:#161a2133; /* léger : le flou et la teinte sombre viennent de la fenêtre (Rust) */
+    /* marge de 2 px : la découpe de la fenêtre (non lissée) ne doit couper que du transparent, pas le contour de la pastille */
+    body.ov{display:flex;align-items:center;padding:2px;overflow:hidden;user-select:none;-webkit-user-select:none}
+    .ov-bar{display:flex;align-items:center;gap:8px;width:100%;height:100%;padding:0 6px 0 16px;border-radius:22px;background:#161a21b8; /* fond translucide (72 %) : on devine l'écran derrière */
       border:1.5px solid var(--danger);cursor:grab}
     .ov-bar.paused{border-color:var(--mute)}
     .ov-bar .dot{width:11px;height:11px;border-radius:50%;background:var(--danger);animation:ovpulse 1.4s ease-out infinite;flex:none;pointer-events:none}
@@ -27,7 +28,7 @@
   </style>
 </head>
 <body class="ov">
-  <div class="ov-bar" id="bar" data-tauri-drag-region>
+  <div class="ov-bar" id="bar">
     <span class="dot"></span>
     <span class="clock" id="clk">00:00:00</span>
     <button class="ov-btn" id="b-pause" title="Mettre en pause" aria-label="Mettre en pause"></button>

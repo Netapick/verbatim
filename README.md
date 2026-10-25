@@ -50,7 +50,7 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 
 - Capture du **microphone**, du **son du PC** (visio, vidéo, via la boucle WASAPI) ou des deux, mixés en mono. Niveaux en direct, pause et reprise, réglage de la sensibilité.
 - L'audio est écrit sur le disque au fil de l'eau : après un plantage ou une coupure, l'enregistrement est reconstitué au prochain lancement (environ 2 secondes perdues au plus).
-- **Enregistrement en arrière-plan** : au démarrage, la fenêtre se masque (plus de bouton dans la barre des tâches) et une **pastille flottante** translucide, floutée et déplaçable reste au premier plan, avec l'horloge, **pause / reprise**, **terminer** et le retour à la fenêtre. Une **icône dans la zone de notification** offre les mêmes actions (clic gauche : afficher).
+- **Enregistrement en arrière-plan** : au démarrage, la fenêtre se masque (plus de bouton dans la barre des tâches) et une **pastille flottante** translucide et déplaçable reste au premier plan, avec l'horloge, **pause / reprise**, **terminer** et le retour à la fenêtre. Une **icône dans la zone de notification** offre les mêmes actions (clic gauche : afficher).
 - Import d'**audio** (mp3, m4a/aac, ogg, flac, wav…) ou d'une **transcription existante** (txt, srt, vtt, md), par le menu ou par glisser-déposer.
 - Un message rappelle de **dire bonjour** en début d'enregistrement : c'est ce qui permet de nommer les voix (désactivable).
 
@@ -325,6 +325,7 @@ Une idée ou un besoin ? Ouvrez une [issue](https://github.com/Netapick/verbatim
 
 - [Présentation illustrée](docs/PRESENTATION.md) : le tour de l'application, avec captures d'écran.
 - [Documentation technique](docs/DEVELOPMENT.md) : architecture, construction, distribution, mises à jour.
+- [Codes d'installation et messages d'erreur](docs/CODES.md) : que signifie chaque code ou message, et que faire.
 - [Historique des versions](CHANGELOG.md) : nouveautés de chaque version.
 - [Signature du code](docs/SIGNATURE.md) · [Politique de confidentialité](docs/PRIVACY.md)
 

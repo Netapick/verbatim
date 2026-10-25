@@ -35,6 +35,17 @@ $("#b-stop").onclick = async () => {
   setTimeout(() => { busy = false; $("#b-stop").disabled = false; }, 8000); // la pastille se ferme d'elle-même si l'arrêt aboutit
 };
 $("#b-show").onclick = () => invoke("overlay_action", { action: "show" }).catch(() => {});
+// Glissement : géré côté Rust (`overlay_drag`) à partir des coordonnées d'écran du pointeur.
+const bar = $("#bar");
+let dragging = false;
+bar.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || e.target.closest("button")) return;
+  dragging = true; bar.setPointerCapture(e.pointerId);
+  invoke("overlay_drag", { phase: "start", x: e.screenX, y: e.screenY }).catch(() => {});
+});
+bar.addEventListener("pointermove", (e) => { if (dragging) invoke("overlay_drag", { phase: "move", x: e.screenX, y: e.screenY }).catch(() => {}); });
+const endDrag = () => { if (dragging) { dragging = false; invoke("overlay_drag", { phase: "end", x: 0, y: 0 }).catch(() => {}); } };
+bar.addEventListener("pointerup", endDrag); bar.addEventListener("pointercancel", endDrag);
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 refresh();

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "overlay",
-  "description": "Pastille flottante d'enregistrement : déplaçable, appelle les commandes de l'application",
+  "description": "Pastille flottante d'enregistrement : appelle les commandes de l'application (le glissement passe par `overlay_drag`)",
   "windows": ["overlay"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "permissions": ["core:default"]
 }
