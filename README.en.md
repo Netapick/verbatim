@@ -11,7 +11,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 [![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![MIT license](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
 
-**[⬇ Download](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Performance](#performance) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Roadmap](#roadmap)
+**[Download](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Performance](#performance) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Roadmap](#roadmap)
 
 [Français](README.md) · English
 
@@ -29,11 +29,11 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 | Strength | In practice |
 |---|---|
-| 🔒 **100% local** | Audio, transcripts, reports and models stay on your computer. No cloud, no account, no data sent anywhere. |
-| ⚡ **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in **22 s** on an RX 7800 XT, versus 4 min 38 s on the processor. |
-| 🗣️ **Who said what** | Every passage is attributed to a speaker, with one color per person. People who introduce themselves ("Hello, I'm Marie") are named throughout the meeting. |
-| 📝 **From sound to report** | Summary, topics, decisions, actions and next steps from a simple recording: from 15 minutes of audio to the report in 1 min 10 s on a recent AMD card. |
-| 🧰 **Built for meetings** | Live transcription, preparations (agenda, questions), a glossary of business acronyms, translation, an audio player synced with the transcript. |
+| **100% local** | Audio, transcripts, reports and models stay on your computer. No cloud, no account, no data sent anywhere. |
+| **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in **22 s** on an RX 7800 XT, versus 4 min 38 s on the processor. |
+| **Who said what** | Every passage is attributed to a speaker, with one color per person. People who introduce themselves ("Hello, I'm Marie") are named throughout the meeting. |
+| **From sound to report** | Summary, topics, decisions, actions and next steps from a simple recording: from 15 minutes of audio to the report in 1 min 10 s on a recent AMD card. |
+| **Built for meetings** | Live transcription, preparations (agenda, questions), a glossary of business acronyms, translation, an audio player synced with the transcript. |
 
 ## How it works
 
@@ -130,13 +130,13 @@ Measurements of 25 October 2026 on a desktop PC (Ryzen 7 5800X3D, 8 cores / 16 t
 
 | | Result |
 |---|---|
-| 🎙️ **Transcription** | 15 min 16 s transcribed in **22 s** on ROCm (×41 real time), 36 s on Vulkan, 4 min 38 s on the processor: **12× faster** with a graphics card |
-| ⏱️ **Live** | A 10 s excerpt is transcribed in **0.4 s** (ROCm) or 0.7 s (Vulkan): the text keeps up with the voice. On the processor, 13 s: too slow for live |
-| 📈 **Since 0.3** | Transcription **1.5× faster** on ROCm (2.9× for a 1-hour meeting), **9.7× faster** on AMD cards older than the RX 7000 and on Intel, which move from the processor to Vulkan |
-| 🗣️ **Speakers** | 38 s for 15 min, 2 min 30 s for 1 h, on the processor (×24 real time) |
-| 📝 **Report** | 15 min: **9 s** (4B, ROCm), 26 s (Vulkan), 2 min 29 s (processor). 1-hour meeting: 20 s (4B, ROCm). The 27B: 42 s on ROCm, 17 min on the processor |
-| 🧠 **Video memory** | 1.5 GB for Whisper, 3.4 GB for the 4B, 5.7 GB for the 9B (an 8 GB card is enough for the whole chain), 11 GB for the 27B |
-| ⚙️ **Processor** | 2 to 8% of the PC with a graphics card, versus 50% without |
+| **Transcription** | 15 min 16 s transcribed in **22 s** on ROCm (×41 real time), 36 s on Vulkan, 4 min 38 s on the processor: **12× faster** with a graphics card |
+| ⏱**Live** | A 10 s excerpt is transcribed in **0.4 s** (ROCm) or 0.7 s (Vulkan): the text keeps up with the voice. On the processor, 13 s: too slow for live |
+| **Since 0.3** | Transcription **1.5× faster** on ROCm (2.9× for a 1-hour meeting), **9.7× faster** on AMD cards older than the RX 7000 and on Intel, which move from the processor to Vulkan |
+| **Speakers** | 38 s for 15 min, 2 min 30 s for 1 h, on the processor (×24 real time) |
+| **Report** | 15 min: **9 s** (4B, ROCm), 26 s (Vulkan), 2 min 29 s (processor). 1-hour meeting: 20 s (4B, ROCm). The 27B: 42 s on ROCm, 17 min on the processor |
+| **Video memory** | 1.5 GB for Whisper, 3.4 GB for the 4B, 5.7 GB for the 9B (an 8 GB card is enough for the whole chain), 11 GB for the 27B |
+| **Processor** | 2 to 8% of the PC with a graphics card, versus 50% without |
 
 ### From recording to report
 
@@ -295,14 +295,14 @@ The installer and the engines have no Windows code signature. See the section on
 These are working leads, with no commitment on dates or order.
 
 **Done**
-- ✅ **Speaker separation** (diarization) and recognition of people who introduce themselves.
-- ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
-- ✅ **Built-in update**: banner, download and installation inside the application, automatic restart, verified signature.
-- ✅ **Fast startup**: Whisper and speaker separation preloaded, a start screen, safeguards on close.
-- ✅ **English interface** (French by default, chosen in Settings › General).
-- ✅ **Drag and drop** of audio files or transcripts.
-- ✅ **Report language** of your choice, **transcript translation** into 14 languages, **live transcription** with translation.
-- ✅ **Themes and palettes** (including Kawaii and Gamer).
+- **Speaker separation** (diarization) and recognition of people who introduce themselves.
+- **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
+- **Built-in update**: banner, download and installation inside the application, automatic restart, verified signature.
+- **Fast startup**: Whisper and speaker separation preloaded, a start screen, safeguards on close.
+- **English interface** (French by default, chosen in Settings › General).
+- **Drag and drop** of audio files or transcripts.
+- **Report language** of your choice, **transcript translation** into 14 languages, **live transcription** with translation.
+- **Themes and palettes** (including Kawaii and Gamer).
 
 **Priorities**
 - **Backup and restore** of meetings, and a **wider model catalog** (Llama, Mistral, Gemma).
