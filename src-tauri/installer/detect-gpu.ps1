@@ -1,4 +1,5 @@
-﻿# Détecte les cartes graphiques pour l'installateur. Code de sortie : bit 1 = NVIDIA, bit 2 = AMD Radeon RX 7000 / PRO W7000 (RDNA 3).
+﻿# Détecte les cartes graphiques pour l'installateur. Code de sortie : bit 1 = NVIDIA, bit 2 = AMD Radeon RX 7000 / PRO W7000 (RDNA 3),
+# bit 4 = autre carte AMD ou Intel (Whisper Vulkan : ROCm n'existe pas pour elles).
 param([string]$Lang = "fr")
 $ErrorActionPreference = "SilentlyContinue"
 # NSIS lit la sortie avec la page de codes ANSI de Windows (sinon « é » s'affiche « , » : page OEM).
@@ -8,6 +9,7 @@ foreach ($g in (Get-CimInstance Win32_VideoController)) {
     $n = [string]$g.Name
     if ($n -match 'NVIDIA') { $code = $code -bor 1 }
     if ($n -match '(AMD|Radeon)' -and $n -match '(RX\s*7\d{3}|PRO\s*W7\d{3})') { $code = $code -bor 2 }
+    elseif ($n -match '(AMD|Radeon|Intel)' -and $n -notmatch '(Basic|Remote|Virtual)') { $code = $code -bor 4 }
 }
 Write-Output ($(if ($Lang -eq "en") { "GPUs detected: " } else { "GPU détectés : " }) + ((Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }) -join " ; ") + " (code $code)")
 exit $code

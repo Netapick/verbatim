@@ -32,7 +32,9 @@
   !insertmacro VB_LOG "[hook] code retour : $0"
   ${If} $0 != "0"
     !insertmacro VB_SAY "Échec : ${LABEL_FR}." "Failed: ${LABEL_EN}."
+    ; pas de boîte de dialogue en mode silencieux ni passif (mise à jour lancée depuis l'application)
     ${IfNot} ${Silent}
+    ${AndIf} $PassiveMode <> 1
       ${If} $LANGUAGE = 1033
         MessageBox MB_OK|MB_ICONEXCLAMATION "Downloading “${LABEL_EN}” failed.$\r$\n$\r$\nCheck your Internet connection. Verbatim will work, but without these components: you can run the installer again to add them."
       ${Else}
@@ -62,6 +64,7 @@
   ${If} $0 != "0"
     !insertmacro VB_SAY "Échec : ${LABEL_FR}." "Failed: ${LABEL_EN}."
     ${IfNot} ${Silent}
+    ${AndIf} $PassiveMode <> 1
       ${If} $LANGUAGE = 1033
         MessageBox MB_OK|MB_ICONEXCLAMATION "Downloading “${LABEL_EN}” failed.$\r$\n$\r$\nVerbatim will run on the processor: you can try again from the Settings."
       ${Else}
@@ -87,6 +90,7 @@
   ; Information (pas une question) : les moteurs d'IA ne sont pas signés, l'antivirus peut les supprimer.
   !insertmacro VB_SAY "Antivirus : ajoutez une exclusion pour le dossier $INSTDIR\ia" "Antivirus: add an exclusion for the folder $INSTDIR\ia"
   ${IfNot} ${Silent}
+  ${AndIf} $PassiveMode <> 1
     ${If} $LANGUAGE = 1033
       MessageBox MB_OK|MB_ICONEXCLAMATION "Antivirus: add a security exclusion for the “ia” folder.$\r$\n$\r$\nThe AI engines (whisper.cpp, llama.cpp) are not signed: your antivirus may delete or block them while they are installed.$\r$\n$\r$\nFolder to exclude:$\r$\n$INSTDIR\ia$\r$\n$\r$\nWindows Defender: Windows Security > Virus & threat protection > Manage settings > Exclusions > Add an exclusion > Folder.$\r$\n$\r$\nDo it now if possible, then click OK: the engines installation then continues."
     ${Else}
@@ -111,6 +115,14 @@
       !insertmacro VB_FETCH "Transcription en direct (ROCm)" "Live transcription (ROCm)" "${PACK_ROCMFIX_BASE}" "${PACK_ROCMFIX_FILE}" "${PACK_ROCMFIX_SHA}" "${PACK_ROCMFIX_MB}"
     ${EndIf}
   ${EndIf}
+  ; AMD d'avant la série RX 7000, Intel : Whisper Vulkan (pack facultatif : défini dans packs.nsh une fois publié)
+  !ifdef PACK_VULKAN_FILE
+    IntOp $1 $2 & 4
+    ${If} $1 != 0
+    ${AndIfNot} ${FileExists} "$INSTDIR\redist\engine-vulkan\whisper-cli.exe"
+      !insertmacro VB_FETCH "Accélération Vulkan (AMD, Intel)" "Vulkan acceleration (AMD, Intel)" "${PACK_VULKAN_BASE}" "${PACK_VULKAN_FILE}" "${PACK_VULKAN_SHA}" "${PACK_VULKAN_MB}"
+    ${EndIf}
+  !endif
   IntOp $1 $2 & 1
   ${If} $1 != 0
   ${AndIfNot} ${FileExists} "$INSTDIR\ia\engine-gpu\whisper-cli.exe"
@@ -130,6 +142,7 @@
   RMDir /r "$INSTDIR\redist"
   Delete "$INSTDIR\lang.txt"
   ${IfNot} ${Silent}
+  ${AndIf} $PassiveMode <> 1
     ${If} ${FileExists} "$INSTDIR\ia\*.*"
       ${If} $LANGUAGE = 1033
         MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "Also delete the downloaded models (the “ia” folder, several GB)?" IDNO vb_keep_models

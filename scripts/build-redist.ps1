@@ -7,7 +7,8 @@
 param(
     [switch]$WithRocm,
     [string]$WhisperRocmFrom = "",  # dossier "bin" de whisper.cpp compilé en ROCm (voir build-whisper-rocm.ps1)
-    [string]$RocmRuntimeFrom = ""   # dossier déjà prêt (DLL ROCm) au lieu de télécharger les wheels AMD
+    [string]$RocmRuntimeFrom = "",  # dossier déjà prêt (DLL ROCm) au lieu de télécharger les wheels AMD
+    [string]$WhisperVulkanFrom = "" # dossier "bin" de whisper.cpp compilé en Vulkan (voir build-whisper-vulkan.ps1) : engine-vulkan
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -58,6 +59,13 @@ Write-Host "llama.cpp (Vulkan : AMD, NVIDIA, Intel)"
 Get-File "$LL/llama-b11700-bin-win-vulkan-x64.zip" "$tmp\llama-vulkan.zip"
 Expand-Flat "$tmp\llama-vulkan.zip" "$out\llm-vulkan"
 Check "$out\llm-vulkan\llama-server.exe" "llama-server.exe (Vulkan)"
+
+if ($WhisperVulkanFrom) {
+    Write-Host "Whisper (Vulkan : AMD, Intel, NVIDIA)"
+    $wv = "$out\engine-vulkan"; New-Item -ItemType Directory -Force $wv | Out-Null
+    foreach ($f in "whisper-cli.exe", "whisper-server.exe", "whisper.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "ggml-vulkan.dll") { Copy-Item "$WhisperVulkanFrom\$f" $wv -Force }
+    Check "$wv\ggml-vulkan.dll" "ggml-vulkan.dll"
+}
 
 if ($WithRocm) {
     Write-Host "llama.cpp (ROCm)"

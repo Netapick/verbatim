@@ -26,6 +26,8 @@ $packs = [ordered]@{
     ROCM = @{ Tag = "v0.3.0"; File = "verbatim-redist-rocm-0.3.0.zip"; Dirs = @("engine-rocm", "llm-rocm", "rocm-runtime") }  # 0.3.0 : + whisper-server ROCm (direct)
     # correctif pour les mises à jour : seul whisper-server.exe, ajouté à un dossier engine-rocm déjà installé (~0,5 Mo)
     ROCMFIX = @{ Tag = "v0.3.0"; File = "verbatim-redist-rocm-server-0.3.0.zip"; Files = @("engine-rocm\whisper-server.exe") }
+    # Whisper Vulkan (AMD d'avant RX 7000, Intel) : ~17 Mo ; facultatif tant que redist\engine-vulkan n'existe pas (voir build-whisper-vulkan.ps1)
+    VULKAN = @{ Tag = "v0.4.0"; File = "verbatim-redist-vulkan-0.4.0.zip"; Dirs = @("engine-vulkan"); Optional = $true }
 }
 
 Add-Type -AssemblyName System.IO.Compression
@@ -34,6 +36,9 @@ $nsh = @("; Généré par scripts/make-packs.ps1 : ne pas modifier à la main.")
 foreach ($k in $packs.Keys) {
     $pk = $packs[$k]
     $zip = Join-Path $out $pk.File
+    # pack facultatif : ignoré (et absent de packs.nsh : l'installateur ne le télécharge pas) tant que ni son dossier ni son zip n'existent
+    if ($pk.Optional -and -not (Test-Path $zip) -and -not (Test-Path (Join-Path $redist $pk.Dirs[0]))) { Write-Host "Pack $k ignoré (redist\$($pk.Dirs[0]) absent)"; continue }
+    if ($pk.Optional -and -not $SkipZip -and $Rebuild -notcontains $k -and (Test-Path (Join-Path $redist $pk.Dirs[0])) -and -not (Test-Path $zip)) { $Rebuild += $k }
     if (-not $SkipZip -and ($Rebuild -contains $k)) {
         foreach ($d in $pk.Dirs) { if (-not (Test-Path (Join-Path $redist $d))) { throw "Dossier manquant : redist\$d" } }
         Write-Host "Pack $k -> $($pk.File)"
