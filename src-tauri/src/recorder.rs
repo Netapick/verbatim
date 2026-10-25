@@ -273,8 +273,9 @@ pub fn rec_start(app: tauri::AppHandle, st: State<AppState>, mic: bool, system: 
     });
     match ready_rx.recv_timeout(Duration::from_secs(10)) {
         Ok(Ok(())) => {
-            let live_h = live_cfg.map(|(c, port)| crate::live::start(app, taps, c, port, translate_to.filter(|l| !l.is_empty())));
+            let live_h = live_cfg.map(|(c, port)| crate::live::start(app.clone(), taps, c, port, translate_to.filter(|l| !l.is_empty())));
             *slot = Some(Recorder { stop: stop_tx, join, started, clock, mic: m, sys: s, live: live_h });
+            crate::overlay::recording_started(&app);
             Ok(())
         }
         Ok(Err(e)) => Err(e),
@@ -467,9 +468,20 @@ pub fn rec_devices() -> R<Value> {
 
 #[tauri::command]
 pub fn rec_pause(st: State<AppState>, paused: bool) -> R<()> {
+    set_paused(&st, Some(paused))
+}
+
+/// Bascule pause / reprise (icône de la zone de notification).
+pub fn toggle_pause(st: &AppState) -> R<()> {
+    set_paused(st, None)
+}
+
+/// `Some(p)` impose l'état, `None` l'inverse.
+fn set_paused(st: &AppState, paused: Option<bool>) -> R<()> {
     let g = st.rec.lock().unwrap();
     let r = g.as_ref().ok_or("Aucun enregistrement en cours.")?;
     let mut c = r.clock.lock().unwrap();
+    let paused = paused.unwrap_or(c.paused_since.is_none());
     match (paused, c.paused_since) {
         (true, None) => c.paused_since = Some(Instant::now()),
         (false, Some(since)) => {

@@ -13,6 +13,7 @@ mod live;
 mod llm;
 use llm::{generate_report, llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
 mod models;
+mod overlay;
 mod procs;
 mod recorder;
 mod resample;
@@ -379,7 +380,9 @@ fn rec_stop(app: tauri::AppHandle, st: State<AppState>, title: Option<String>) -
     let audio_dir = st.dir.join("audio");
     fs::create_dir_all(&audio_dir).map_err(|e| e.to_string())?;
     let dst = audio_dir.join(format!("{id}.wav"));
-    recorder::finish(&st, &dst)?;
+    let fin = recorder::finish(&st, &dst);
+    overlay::recording_stopped(&app); // pastille fermée et fenêtre principale rétablie, même si l'écriture a échoué
+    fin?;
     let installed = engine_ready(&st.mdir, &st.store.lock().unwrap().settings.whisper_model);
     {
         let mut s = st.store.lock().unwrap();
@@ -648,6 +651,7 @@ fn main() {
         // fermeture pendant un travail en cours : on la retient et l'interface demande confirmation (`app_quit` quitte vraiment)
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() != "main" { return; }
                 if let Some(st) = window.app_handle().try_state::<AppState>() {
                     if let Some(reason) = update::busy_now(&st) {
                         api.prevent_close();
@@ -717,6 +721,7 @@ fn main() {
                 }
                 if ready { for id in new_ids { spawn_transcription(h.clone(), id); } }
             }
+            if let Err(e) = overlay::setup_tray(app.handle()) { eprintln!("icône de notification : {e}"); }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -726,7 +731,7 @@ fn main() {
             get_glossary, set_glossary, get_settings, set_settings,
             engine_status, engine_install, engine_install_gpu, download_cancel, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, models::install_lang, retry_transcription,
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
-            live::live_prepare, live::live_release,
+            live::live_prepare, live::live_release, overlay::tray_labels, overlay::overlay_action,
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
             update::app_version, update::update_busy, update::update_prepare, update::app_quit, warm::warm_status,
             diarize::diarize_install, diarize::diarize_remove, diarize::diarize_meeting, diarize::rename_speaker

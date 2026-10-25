@@ -52,6 +52,7 @@ At startup, Verbatim preloads Whisper and speaker separation (a start screen sho
 
 - Capture the **microphone**, the **PC sound** (video calls, videos, through WASAPI loopback) or both, mixed to mono. Live levels, pause and resume, sensitivity setting.
 - Audio is written to disk as it is recorded: after a crash or a power cut, the recording is recovered at the next launch (about 2 seconds lost at most).
+- **Background recording**: when it starts, the window hides (no taskbar button) and a translucent, blurred, draggable **floating bar** stays on top, with the clock, **pause / resume**, **stop** and a way back to the window. A **notification-area icon** offers the same actions (left click: show).
 - Import **audio** (mp3, m4a/aac, ogg, flac, wav…) or an **existing transcript** (txt, srt, vtt, md), from the menu or by drag and drop.
 - A message reminds you to **say hello** at the start of a recording: that is what lets Verbatim name the voices (can be turned off).
 
@@ -59,7 +60,7 @@ At startup, Verbatim preloads Whisper and speaker separation (a start screen sho
 
 - Local Whisper (whisper.cpp), with speech detection to limit hallucinations on silences.
 - French, English, Spanish, German, Italian, or automatic language detection.
-- **Live transcription** (checkbox in the recording panel): the text appears during the meeting, a few seconds behind; when you stop, the full transcript is redone for maximum quality.
+- **Live transcription** (checkbox in the recording panel, unchecked by default): the text appears during the meeting, a few seconds behind; when you stop, the full transcript is redone for maximum quality.
 - From the lightest model (Tiny, 75 MB) to the most accurate (Large v3), with compressed versions.
 - A glossary of acronyms and business terms is passed to the model to limit errors on proper nouns.
 
@@ -303,6 +304,7 @@ These are working leads, with no commitment on dates or order.
 - ✅ **Drag and drop** of audio files or transcripts.
 - ✅ **Report language** of your choice, **transcript translation** into 14 languages, **live transcription** with translation.
 - ✅ **Themes and palettes** (including Kawaii and Gamer).
+- ✅ **Background recording**: floating bar (pause, stop) and notification-area icon.
 
 **Priorities**
 - **Backup and restore** of meetings, and a **wider model catalog** (Llama, Mistral, Gemma).
@@ -316,7 +318,7 @@ These are working leads, with no commitment on dates or order.
 - **Search across all meetings** and **transcript correction** in the application.
 - **Customizable report templates** (structure and tone).
 - **Video import** and batch processing.
-- **More convenient recording**: global shortcut, notification-area icon, start offered when a video call opens.
+- **More convenient recording**: global shortcut, start offered when a video call opens.
 - **Audio enhancement** before transcription, a **command-line mode**, **macOS and Linux**.
 
 An idea or a need? Open an [issue](https://github.com/Netapick/verbatim/issues).

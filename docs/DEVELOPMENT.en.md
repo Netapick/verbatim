@@ -13,6 +13,7 @@ Verbatim is a **Tauri 2 + Rust** desktop application (HTML/JS interface without 
 | `src-tauri/src/engine.rs` | Transcription: whisper.cpp, audio decoding (symphonia), resumable downloads, GPU detection |
 | `src-tauri/src/llm.rs` | Writing: llama.cpp (local server), Ollama, remote API, simplified summary |
 | `src-tauri/src/recorder.rs` | Microphone and PC sound recording (cpal, WASAPI loopback); sample copy for live mode |
+| `src-tauri/src/overlay.rs` | Background recording: notification-area icon (`tray-icon`), floating bar `overlay.html` (transparent window, blurred with Tauri's Blur effect, cut into a pill with `SetWindowRgn`), main window hidden; stopping goes through the `overlay-stop` event (the main window keeps the typed title) |
 | `src-tauri/src/live.rs` | Live transcription: persistent `whisper-server`, sliding window, `live-*` events |
 | `src-tauri/src/translate.rs` | Batched transcript translation (TranslateGemma or the report model) |
 | `src-tauri/src/models.rs` | Detection and copy of existing models |

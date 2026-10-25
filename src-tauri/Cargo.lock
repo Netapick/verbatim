@@ -4832,6 +4832,7 @@ dependencies = [
  "tauri-plugin-updater",
  "ureq",
  "uuid",
+ "windows",
  "zip 2.6.1",
 ]
 

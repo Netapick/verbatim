@@ -23,6 +23,8 @@ Français · English below each version.
 - La séparation des intervenants affiche son avancement en pourcentage (estimé d'après la vitesse de la séparation précédente).
 - Réunions : bouton pour renommer directement depuis la liste ; fenêtre au démarrage d'un enregistrement rappelant de dire « Bonjour, je suis… » ; l'application s'ouvre maximisée et le contenu occupe toute la largeur.
 - Glisser-déposer : déposez des fichiers audio (ou une transcription) sur la fenêtre pour les importer.
+- Enregistrement en arrière-plan : pendant un enregistrement, la fenêtre se masque (plus de bouton dans la barre des tâches, seule reste l'icône de la zone de notification) et une pastille translucide et floutée, toujours visible (en haut de l'écran, déplaçable), offre Pause / Reprendre, Terminer et le retour à la fenêtre. L'icône de notification donne les mêmes actions (clic gauche : afficher).
+- La case « Transcription en direct » est décochée à chaque ouverture du panneau d'enregistrement.
 - La version affichée est de la forme `v0.4.0-20261025-1130` (version et horodatage du build).
 - Compte-rendu : si le modèle est coupé par la limite de longueur, la rédaction est relancée avec une limite plus large ; l'erreur indique la cause.
 
@@ -47,6 +49,8 @@ Français · English below each version.
 - Speaker separation shows its progress as a percentage (estimated from the speed of the previous separation).
 - Meetings: a button to rename straight from the list; a window when starting a recording reminding to say “Hello, I'm…”; the application opens maximised and the content uses the full width.
 - Drag and drop: drop audio files (or a transcript) on the window to import them.
+- Background recording: while recording, the window is hidden (no taskbar button, only the notification-area icon remains) and a translucent, blurred, always-visible bar (top of the screen, draggable) offers Pause / Resume, Stop and a way back to the window. The notification icon gives the same actions (left click: show).
+- The “Live transcription” checkbox is unchecked every time the recording panel opens.
 - The displayed version looks like `v0.4.0-20261025-1130` (version and build timestamp).
 - Report: if the model is cut off by the length limit, writing is retried with a larger limit; the error states the cause.
 

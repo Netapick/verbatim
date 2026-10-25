@@ -50,6 +50,7 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 
 - Capture du **microphone**, du **son du PC** (visio, vidéo, via la boucle WASAPI) ou des deux, mixés en mono. Niveaux en direct, pause et reprise, réglage de la sensibilité.
 - L'audio est écrit sur le disque au fil de l'eau : après un plantage ou une coupure, l'enregistrement est reconstitué au prochain lancement (environ 2 secondes perdues au plus).
+- **Enregistrement en arrière-plan** : au démarrage, la fenêtre se masque (plus de bouton dans la barre des tâches) et une **pastille flottante** translucide, floutée et déplaçable reste au premier plan, avec l'horloge, **pause / reprise**, **terminer** et le retour à la fenêtre. Une **icône dans la zone de notification** offre les mêmes actions (clic gauche : afficher).
 - Import d'**audio** (mp3, m4a/aac, ogg, flac, wav…) ou d'une **transcription existante** (txt, srt, vtt, md), par le menu ou par glisser-déposer.
 - Un message rappelle de **dire bonjour** en début d'enregistrement : c'est ce qui permet de nommer les voix (désactivable).
 
@@ -57,7 +58,7 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 
 - Whisper local (whisper.cpp), avec détection de parole pour limiter les hallucinations sur les silences.
 - Français, anglais, espagnol, allemand, italien, ou détection automatique de la langue.
-- **Transcription en direct** (case à cocher dans le panneau d'enregistrement) : le texte s'affiche pendant la réunion, avec quelques secondes de retard ; à l'arrêt, la transcription complète est refaite pour une qualité maximale.
+- **Transcription en direct** (case à cocher dans le panneau d'enregistrement, décochée par défaut) : le texte s'affiche pendant la réunion, avec quelques secondes de retard ; à l'arrêt, la transcription complète est refaite pour une qualité maximale.
 - Du modèle le plus léger (Tiny, 75 Mo) au plus précis (Large v3), avec des versions compressées.
 - Un glossaire de sigles et de termes métier est transmis au modèle pour limiter les erreurs sur les noms propres.
 
@@ -301,6 +302,7 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 - ✅ **Glisser-déposer** de fichiers audio ou de transcriptions.
 - ✅ **Langue du compte-rendu** au choix, **traduction** de la transcription en 14 langues, **transcription en direct** avec traduction.
 - ✅ **Thèmes et palettes** (dont Kawaii et Gamer).
+- ✅ **Enregistrement en arrière-plan** : pastille flottante (pause, terminer) et icône dans la zone de notification.
 
 **Priorités**
 - **Sauvegarde et restauration** des réunions, et **catalogue de modèles élargi** (Llama, Mistral, Gemma).
@@ -314,7 +316,7 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 - **Recherche dans toutes les réunions** et **correction de la transcription** dans l'application.
 - **Modèles de comptes-rendus personnalisables** (structure et ton).
 - **Import de vidéos** et traitement par lots.
-- **Enregistrement plus pratique** : raccourci global, icône dans la zone de notification, démarrage proposé à l'ouverture d'une visioconférence.
+- **Enregistrement plus pratique** : raccourci global, démarrage proposé à l'ouverture d'une visioconférence.
 - **Amélioration audio** avant transcription, **mode ligne de commande**, **macOS et Linux**.
 
 Une idée ou un besoin ? Ouvrez une [issue](https://github.com/Netapick/verbatim/issues).

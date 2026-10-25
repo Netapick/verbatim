@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Verbatim</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    html,body{background:transparent;height:100%}
+    body.ov{display:flex;align-items:center;padding:0;overflow:hidden;user-select:none;-webkit-user-select:none}
+    .ov-bar{display:flex;align-items:center;gap:8px;width:100%;height:100%;padding:0 6px 0 16px;border-radius:24px;background:#161a2133; /* léger : le flou et la teinte sombre viennent de la fenêtre (Rust) */
+      border:1.5px solid var(--danger);cursor:grab}
+    .ov-bar.paused{border-color:var(--mute)}
+    .ov-bar .dot{width:11px;height:11px;border-radius:50%;background:var(--danger);animation:ovpulse 1.4s ease-out infinite;flex:none;pointer-events:none}
+    .ov-bar.paused .dot{animation:none;background:var(--mute)}
+    /* halo de l'application, resserré */
+    @keyframes ovpulse{0%{box-shadow:0 0 0 0 #ef6b7599;transform:scale(1)}70%{box-shadow:0 0 0 5px #ef6b7500;transform:scale(1.1)}100%{box-shadow:0 0 0 0 #ef6b7500;transform:scale(1)}}
+    .ov-bar .clock{font-variant-numeric:tabular-nums;font-size:18px;font-weight:700;font-family:var(--mono);pointer-events:none;margin-right:auto}
+    .ov-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:50%;flex:none;
+      border:1.5px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+    .ov-btn:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+    .ov-btn.stop{border-color:var(--danger);color:var(--danger)}
+    .ov-btn.stop:hover{border-color:var(--danger);color:var(--danger);background:#c93a4520}
+    .ov-btn svg{width:16px;height:16px;fill:currentColor;stroke:none;flex:none}
+    .ov-btn.line svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  </style>
+</head>
+<body class="ov">
+  <div class="ov-bar" id="bar" data-tauri-drag-region>
+    <span class="dot"></span>
+    <span class="clock" id="clk">00:00:00</span>
+    <button class="ov-btn" id="b-pause" title="Mettre en pause" aria-label="Mettre en pause"></button>
+    <button class="ov-btn stop" id="b-stop" title="Terminer l'enregistrement" aria-label="Terminer l'enregistrement"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+    <button class="ov-btn line" id="b-show" title="Afficher Verbatim" aria-label="Afficher Verbatim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></button>
+  </div>
+  <script src="i18n.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>

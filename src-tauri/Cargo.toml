@@ -7,7 +7,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }   # icône de la zone de notification
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"   # mise à jour dans l'app (téléchargement, signature minisign, installation)
 tauri-plugin-process = "2"   # redémarrage après la mise à jour
@@ -23,6 +23,9 @@ sha2 = "0.10"
 earshot = "1.2.2"
 regex = "1"             # détection des présentations (« bonjour, je suis X »)
 sherpa-onnx = "2.0.0"   # séparation des intervenants (ONNX Runtime embarqué, sur CPU)
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Graphics_Gdi"] }   # découpe de la pastille d'enregistrement en pilule (flou)
 
 [profile.release]
 opt-level = 3        # décodage audio (symphonia) nettement plus rapide qu'en "s"

@@ -259,13 +259,13 @@ async function recPanel() {
         <label style="margin-top:10px">Sensibilité du son du PC <span class="pill" id="r-sysg-v"></span></label>
         <input type="range" id="r-sysg" min="25" max="800" step="5" value="${Math.round(parseFloat(lsGet("rec.sysgain") || "1") * 100)}"></div>
     </div>
-    <div style="margin-top:12px"><label class="chk" title="Affiche le texte au fil de l'enregistrement ; la transcription complète est refaite à l'arrêt"><input type="checkbox" id="live-chk" ${lsGet("rec.live") === "1" ? "checked" : ""}> Transcription en direct</label>
-      <select id="live-tr" style="margin-top:6px;max-width:260px" title="Traduire en direct" ${lsGet("rec.live") === "1" ? "" : "hidden"}><option value="">Sans traduction</option>${TR_LANGS.map(([k, v]) => `<option value="${k}" ${lsGet("rec.livetr") === k ? "selected" : ""}>Traduire en ${v}</option>`).join("")}</select>
+    <div style="margin-top:12px"><label class="chk" title="Affiche le texte au fil de l'enregistrement ; la transcription complète est refaite à l'arrêt"><input type="checkbox" id="live-chk"> Transcription en direct</label>
+      <select id="live-tr" style="margin-top:6px;max-width:260px" title="Traduire en direct" hidden><option value="">Sans traduction</option>${TR_LANGS.map(([k, v]) => `<option value="${k}" ${lsGet("rec.livetr") === k ? "selected" : ""}>Traduire en ${v}</option>`).join("")}</select>
       <p class="meta" id="r-prep" style="margin-top:8px" hidden></p></div>
     <div class="bar" style="margin:12px 0 0"><button class="btn rec" id="r-go">● Démarrer</button><button class="btn" id="r-x">Annuler</button></div>
     <p class="meta" style="margin-top:8px">Pour une visioconférence, cochez les deux : votre voix et celle de vos interlocuteurs sont enregistrées. Pour « Son du PC », choisissez la sortie sur laquelle vous écoutez (casque, haut-parleurs).</p></div>`;
   $("#live-chk").onchange = (e) => {
-    lsSet("rec.live", e.target.checked ? "1" : "0"); $("#live-tr").hidden = !e.target.checked;
+    $("#live-tr").hidden = !e.target.checked;
     if (e.target.checked) recPrepStart(); else { recPrepStop(); recPrepUI(); }
   };
   if ($("#live-chk").checked) recPrepStart(); else recPrepUI();
@@ -281,6 +281,7 @@ async function recPanel() {
     const micGain = gm.value / 100, sysGain = gs.value / 100;
     const live = !!($("#live-chk") && $("#live-chk").checked) && PREP.state === "ready", translateTo = live && $("#live-tr") ? $("#live-tr").value || null : null;
     LIVE.hw = live ? PREP.hw : ""; LIVE.segs = []; LIVE.tr = {}; LIVE.partial = ""; LIVE.warn = ""; LIVE.state = live ? "ready" : ""; LIVE.msg = ""; LIVE.trMsg = ""; LIVE.wantTr = !!translateTo;
+    trayLabels();
     await invoke("rec_start", { mic, system, micDevice: micDevice || null, sysDevice: sysDevice || null, micGain, sysGain, live, translateTo });
     lsSet("rec.micgain", String(micGain)); lsSet("rec.sysgain", String(sysGain));
     lsSet("rec.mic", mic ? "1" : "0"); lsSet("rec.sys", system ? "1" : "0"); lsSet("rec.micdev", micDevice); lsSet("rec.sysdev", sysDevice);
@@ -311,6 +312,25 @@ function helloModal() {
   });
 }
 
+// Termine l'enregistrement (bouton « Terminer », pastille flottante ou icône de la zone de notification).
+let stoppingRec = false;
+async function stopRecording() {
+  if (stoppingRec) return;
+  stoppingRec = true;
+  try {
+    clearInterval(recTimer);
+    const title = $("#r-title") ? $("#r-title").value : "";
+    const id = await invoke("rec_stop", { title });
+    LIVE.state = ""; PREP.state = ""; PREP.model = ""; PREP.hw = ""; liveRender();
+    toast("Enregistrement ajouté — transcription lancée"); go("meeting", id);
+  } finally { stoppingRec = false; }
+}
+listen("overlay-stop", () => run(stopRecording));
+
+// Libellés de l'icône de la zone de notification (menu natif : traduit ici, dans la langue de l'interface)
+const trayLabels = () => { const t = window.I18N ? I18N.t : (s) => s; invoke("tray_labels", { show: t("Afficher Verbatim"), pause: t("Pause / Reprendre"), stop: t("Terminer l'enregistrement") }).catch(() => {}); };
+trayLabels();
+
 async function recRefresh() {
   clearInterval(recTimer);
   const box = $("#recbox"); if (!box) return;
@@ -331,13 +351,7 @@ async function recRefresh() {
     const lg = $("#r-live-g");
     if (lg) lg.oninput = () => { $("#r-live-gv").textContent = fmtGain(lg.value); invoke("rec_set_gain", { source: "mic", gain: lg.value / 100 }).catch(() => {}); lsSet("rec.micgain", String(lg.value / 100)); };
     $("#r-pause").onclick = () => run(async () => { await invoke("rec_pause", { paused: !s.paused }); draw(); });
-    $("#r-stop").onclick = () => run(async () => {
-      clearInterval(recTimer);
-      const title = $("#r-title").value;
-      const id = await invoke("rec_stop", { title });
-      LIVE.state = ""; PREP.state = ""; PREP.model = ""; PREP.hw = ""; liveRender();
-      toast("Enregistrement ajouté — transcription lancée"); go("meeting", id);
-    });
+    $("#r-stop").onclick = () => run(stopRecording);
   };
   liveRender();
   await draw(); recTimer = setInterval(async () => {
