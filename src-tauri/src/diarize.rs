@@ -51,6 +51,11 @@ pub fn ready(dir: &Path) -> bool {
     files(dir).iter().all(|(p, _, n)| fs::metadata(p).map(|m| m.len() == *n).unwrap_or(false))
 }
 
+/// Témoin « les modèles ont déjà été installés une fois » : sans lui, ceux qu'on a supprimés à la main reviendraient à chaque démarrage.
+fn marker(dir: &Path) -> PathBuf {
+    dir.join("diarization.installed")
+}
+
 /// Télécharge les modèles manquants (reprise possible).
 pub fn install(dir: &Path) -> R<()> {
     for (p, url, n) in files(dir) {
@@ -58,7 +63,24 @@ pub fn install(dir: &Path) -> R<()> {
             engine::download_to(url, &p, n, "diarization", "diarization")?;
         }
     }
+    let _ = fs::write(marker(dir), b"");
     Ok(())
+}
+
+/// Au démarrage : un utilisateur qui avait déjà Whisper (mise à jour depuis une version sans séparation des intervenants)
+/// reçoit les modèles (34 Mo) en arrière-plan, sans rien demander. Une seule fois : si on les supprime ensuite, ils ne reviennent pas.
+pub fn auto_install(app: &AppHandle) {
+    let st = app.state::<AppState>();
+    let dir = st.mdir.clone();
+    let model = st.store.lock().unwrap().settings.whisper_model.clone();
+    if ready(&dir) || marker(&dir).exists() || !crate::engine_paths::engine_ready(&dir, &model) {
+        return;
+    }
+    let _ = engine::run_job(app.clone(), "diarization".into(), "diarization", move || {
+        install(&dir)?;
+        let _ = preload(&dir);
+        Ok(())
+    });
 }
 
 #[tauri::command]

@@ -136,8 +136,9 @@ listen("tauri://drag-drop", (e) => {
   });
 });
 
-// Bandeau « moteur non installé / téléchargement » pour le modèle choisi.
-async function engineBox() {
+// Bandeaux « non installé / téléchargement » : Whisper pour le modèle choisi ; sur la liste des réunions (`all`), aussi la
+// séparation des intervenants et le modèle de compte-rendu, une fois Whisper installé.
+async function engineBox(all = false) {
   const [st, cfg] = await Promise.all([invoke("engine_status"), invoke("get_settings")]);
   const m = st.models.find((x) => x.name === cfg.whisper_model) || st.models[0];
   const d = st.download;
@@ -146,19 +147,49 @@ async function engineBox() {
     return `<div class="card"><b>Téléchargement en cours…</b><div class="prog" style="width:100%;margin:8px 0"><b data-dlbar style="width:${dlPct(d)}%"></b></div>
       <span class="meta" data-dlmsg>${esc(dlLabel(d))}</span><p class="meta" style="margin-top:6px">Vous pouvez changer de page ou fermer l'app : le téléchargement reprendra là où il s'est arrêté. « Arrêter » l'annule et supprime la partie déjà reçue.</p></div>`;
   }
-  if (st.binary && m.installed) return "";
+  if (st.binary && m.installed) return all ? extraBoxes(st, cfg) : "";
   const pct = m.partial ? Math.round((m.partial / m.bytes) * 100) : 0;
   return `<div class="card"><b>${m.partial ? "Téléchargement interrompu" : "Moteur de transcription non installé"}</b>
     <p class="meta" style="margin:4px 0 10px">Whisper s'exécute en local, l'audio ne quitte jamais cet ordinateur. Modèle « ${esc(m.label)} » : ${fmtSize(m.bytes)}${m.partial ? ` — déjà ${pct} % téléchargés` : ""}. Téléchargé une seule fois, puis conservé.</p>
     <button class="btn pri" id="eng-go">${m.partial ? "Reprendre le téléchargement" : "Installer Whisper"}</button>
     ${d.error ? `<span class="meta" style="color:var(--danger)"> ${esc(d.error)}</span>` : ""}</div>`;
 }
+// Le compte-rendu est prêt avec une API configurée, un modèle local importé ou un modèle du catalogue installé et choisi.
+function reportReady(st, cfg) {
+  if ((cfg.llm_base_url || "").trim()) return true;
+  const sel = cfg.llm_local || "";
+  if (!sel) return false;
+  if (sel.startsWith("gguf:") || sel.startsWith("ollama:")) return true;
+  return st.llm.models.some((x) => x.name === sel && x.installed);
+}
+function extraBoxes(st, cfg) {
+  let h = "";
+  if (!st.diarization.installed) {
+    h += `<div class="card"><b>Séparation des intervenants non installée</b>
+      <p class="meta" style="margin:4px 0 10px">Repère qui parle et attribue chaque passage à un intervenant. Calcul local : l'audio ne quitte jamais cet ordinateur. Téléchargé une seule fois, puis conservé : <span>${fmtSize(st.diarization.bytes)}</span></p>
+      <button class="btn pri" id="eng-dia">Installer la séparation des intervenants</button></div>`;
+  }
+  if (!reportReady(st, cfg)) {
+    const min = Math.min(...st.llm.models.map((x) => x.bytes));
+    h += `<div class="card"><b>Modèle de compte-rendu non installé</b>
+      <p class="meta" style="margin:4px 0 10px">Le compte-rendu (résumé, décisions, actions) est rédigé par une IA qui s'exécute sur cet ordinateur. La transcription fonctionne sans. Modèles à partir de <span>${fmtSize(min)}</span></p>
+      <button class="btn pri" id="eng-llm">Choisir un modèle</button></div>`;
+  }
+  return h;
+}
 function bindEngine(model) {
-  const b = document.getElementById("eng-go"); if (!b) return;
-  b.onclick = () => run(async () => {
+  const b = document.getElementById("eng-go");
+  if (b) b.onclick = () => run(async () => {
     b.disabled = true; await invoke("engine_install", { model });
     if (engineHook) engineHook(); watchDownload();
   });
+  const d = document.getElementById("eng-dia");
+  if (d) d.onclick = () => run(async () => {
+    d.disabled = true; await invoke("diarize_install");
+    if (engineHook) engineHook(); watchDownload();
+  });
+  const l = document.getElementById("eng-llm");
+  if (l) l.onclick = () => { setTab = "ia"; go("settings"); };
 }
 async function run(fn) { try { return await fn(); } catch (e) { toast(String(e)); } }
 
@@ -375,7 +406,7 @@ async function meetings() {
   $("#rec").onclick = () => recPanel();
   recRefresh();
   const cfg0 = await invoke("get_settings");
-  const showEng = async () => { const e = $("#eng"); if (!e) return; e.innerHTML = await engineBox(); bindEngine((await invoke("get_settings")).whisper_model); };
+  const showEng = async () => { const e = $("#eng"); if (!e) return; e.innerHTML = await engineBox(true); bindEngine((await invoke("get_settings")).whisper_model); };
   engineHook = () => view === "meetings" && showEng();
   await showEng();
   $("#ia").onclick = () => run(async () => {

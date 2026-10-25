@@ -698,6 +698,7 @@ fn main() {
                 procs::kill_orphans(&dirs);
                 // seulement après : le nettoyage tuerait le whisper-server qu'on vient de lancer
                 warm::start(&h); // charge Whisper et la séparation des intervenants pendant l'écran de démarrage
+                diarize::auto_install(&h); // modèles de séparation absents (mise à jour depuis une version plus ancienne) : téléchargés seuls
                 for id in pending { spawn_transcription(h.clone(), id); }
             });
             // récupère les enregistrements interrompus

@@ -25,6 +25,8 @@ Français · English below each version.
 - Glisser-déposer : déposez des fichiers audio (ou une transcription) sur la fenêtre pour les importer.
 - Enregistrement en arrière-plan : pendant un enregistrement, la fenêtre se masque (plus de bouton dans la barre des tâches, seule reste l'icône de la zone de notification) et une pastille translucide et floutée, toujours visible (en haut de l'écran, déplaçable), offre Pause / Reprendre, Terminer et le retour à la fenêtre. L'icône de notification donne les mêmes actions (clic gauche : afficher).
 - La case « Transcription en direct » est décochée à chaque ouverture du panneau d'enregistrement.
+- Les modèles de séparation des intervenants (34 Mo) sont téléchargés seuls au démarrage quand Whisper est déjà installé (une seule fois : supprimés à la main, ils ne reviennent pas).
+- Sous « Réunions », des cartes proposent d'installer la séparation des intervenants et de choisir un modèle de compte-rendu quand l'un des deux manque (Whisper étant installé).
 - La version affichée est de la forme `v0.4.0-20261025-1130` (version et horodatage du build).
 - Compte-rendu : si le modèle est coupé par la limite de longueur, la rédaction est relancée avec une limite plus large ; l'erreur indique la cause.
 
@@ -51,6 +53,8 @@ Français · English below each version.
 - Drag and drop: drop audio files (or a transcript) on the window to import them.
 - Background recording: while recording, the window is hidden (no taskbar button, only the notification-area icon remains) and a translucent, blurred, always-visible bar (top of the screen, draggable) offers Pause / Resume, Stop and a way back to the window. The notification icon gives the same actions (left click: show).
 - The “Live transcription” checkbox is unchecked every time the recording panel opens.
+- The speaker-separation models (34 MB) are downloaded automatically at startup when Whisper is already installed (once only: if you delete them by hand, they do not come back).
+- Under “Meetings”, cards offer to install speaker separation and to choose a report model when either is missing (once Whisper is installed).
 - The displayed version looks like `v0.4.0-20261025-1130` (version and build timestamp).
 - Report: if the model is cut off by the length limit, writing is retried with a larger limit; the error states the cause.
 
