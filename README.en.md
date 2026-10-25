@@ -6,12 +6,12 @@
 
 ### Your meetings, transcribed and summarized. On your own PC.
 
-Verbatim records or imports your meetings, transcribes them with **Whisper**, then writes the report with a **Qwen** AI that runs on your own computer.<br>
+Verbatim records or imports your meetings, transcribes them with **Whisper**, tells who is speaking, then writes the report with a **Qwen** AI that runs on your own computer.<br>
 No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 [![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![MIT license](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
 
-**[⬇ Download](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Roadmap](#roadmap) &nbsp;·&nbsp; [Documentation](#documentation)
+**[⬇ Download](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Performance](#performance) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Roadmap](#roadmap)
 
 [Français](README.md) · English
 
@@ -29,16 +29,20 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 | Strength | In practice |
 |---|---|
-| 🔒 **100% local** | Audio, transcripts, reports and models stay on your computer. No cloud, no account, no data sent. |
-| ⚡ **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in 41 s on an RX 7800 XT, versus almost 10 minutes on the processor. |
-| 📝 **From sound to report** | Summary, topics, decisions, actions and next steps, from a simple recording. |
-| 🧰 **Built for meetings** | Preparations (agenda, questions), a glossary of business acronyms, an audio player synchronized with the transcript. |
+| 🔒 **100% local** | Audio, transcripts, reports and models stay on your computer. No cloud, no account, no data sent anywhere. |
+| ⚡ **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in **22 s** on an RX 7800 XT, versus 4 min 38 s on the processor. |
+| 🗣️ **Who said what** | Every passage is attributed to a speaker, with one color per person. People who introduce themselves ("Hello, I'm Marie") are named throughout the meeting. |
+| 📝 **From sound to report** | Summary, topics, decisions, actions and next steps from a simple recording: from 15 minutes of audio to the report in 1 min 10 s on a recent AMD card. |
+| 🧰 **Built for meetings** | Live transcription, preparations (agenda, questions), a glossary of business acronyms, translation, an audio player synced with the transcript. |
 
 ## How it works
 
-1. **Record** a meeting (microphone, PC sound or both) or **import** an audio file or an existing transcript.
+1. **Record** a meeting (microphone, PC sound or both) or **import** an audio file or an existing transcript (drag and drop works).
 2. **Transcribe**: Whisper turns speech into timestamped text, locally.
-3. **Write**: a local AI produces the report, which you review, export or regenerate.
+3. **Identify** the speakers: one color and one name per person, renamable in one click.
+4. **Write**: a local AI produces the report, which you review, export or regenerate.
+
+At startup, Verbatim preloads Whisper and speaker separation (a start screen shows the progress), so your first transcription does not wait. Everything is unloaded when the application closes.
 
 ## Features
 
@@ -46,33 +50,42 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 <img src="docs/screenshots/02-enregistrement.png" alt="New recording panel" width="720">
 
-- Capture the **microphone**, the **PC sound** (video calls, videos, via WASAPI loopback) or both, mixed to mono. Live levels, pause and resume, sensitivity adjustment.
-- Audio is written to disk as you go: after a crash or power loss, the recording is rebuilt on the next launch (about 2 seconds lost at most).
-- Import **audio** (mp3, m4a/aac, ogg, flac, wav…) or an **existing transcript** (txt, srt, vtt, md).
+- Capture the **microphone**, the **PC sound** (video calls, videos, through WASAPI loopback) or both, mixed to mono. Live levels, pause and resume, sensitivity setting.
+- Audio is written to disk as it is recorded: after a crash or a power cut, the recording is recovered at the next launch (about 2 seconds lost at most).
+- Import **audio** (mp3, m4a/aac, ogg, flac, wav…) or an **existing transcript** (txt, srt, vtt, md), from the menu or by drag and drop.
+- A message reminds you to **say hello** at the start of a recording: that is what lets Verbatim name the voices (can be turned off).
 
 ### Transcribe with Whisper
 
 - Local Whisper (whisper.cpp), with speech detection to limit hallucinations on silences.
 - French, English, Spanish, German, Italian, or automatic language detection.
-- **Live transcription** (checkbox in the recording panel): Whisper loads when the panel opens (the "Start" button stays greyed out while loading); the text appears during the meeting with a few seconds of delay; when you stop, the full transcription is redone for maximum quality.
+- **Live transcription** (checkbox in the recording panel): the text appears during the meeting, a few seconds behind; when you stop, the full transcript is redone for maximum quality.
 - From the lightest model (Tiny, 75 MB) to the most accurate (Large v3), with compressed versions.
-- A glossary of acronyms and business terms is passed to the model to limit mistakes on proper names.
+- A glossary of acronyms and business terms is passed to the model to limit errors on proper nouns.
 
 <img src="docs/screenshots/07-reglages-transcription.png" alt="Transcription settings" width="720">
+
+### Identify the speakers
+
+- After transcription, each passage is attributed to a speaker ("Speaker 1", "Speaker 2"…), with one color per person. The number of people is found automatically.
+- Click a name to rename it: the name changes everywhere (transcript, translation, report, exports). The "Identify speakers" button handles a meeting that is already transcribed.
+- If each person introduces themselves when they first speak, Verbatim remembers their voice and names it for the whole meeting.
+- The work runs on the processor, with nothing sent online, about **24× faster than the audio** (38 s for 15 min, 2 min 30 s for 1 h). Very similar voices or very short sentences stay approximate.
 
 ### Translate
 
 - **Transcript translation** into 14 languages, by a local AI (Google's **TranslateGemma**, or the report model), with timestamps kept: the player and highlighting also work on the translation. Exports (.txt, .srt, .vtt, .json) follow the displayed language.
-- **Live translation** under each sentence of the live transcription.
-- Compute of your choice (graphics card or processor) in Settings › Translation; the hardware and model used are shown.
+- **Live translation** under each sentence of the live transcript.
+- Compute on your choice of graphics card or processor in Settings › Translation; the hardware and model used are displayed.
 
 ### Write the report
 
-- Summary, topics, decisions, actions and next steps, generated by a local AI: **Qwen 3.5** (4B or 9B), **Qwen 3.8 27B**, or your own GGUF models. Ollama and an OpenAI-compatible API remain optional.
-- Long meetings are split into parts, summarized, then merged. The glossary and the linked preparation are provided to the model.
+- Summary, topics, decisions, actions and next steps, produced by a local AI: **Qwen 3.5** (4B or 9B), **Qwen 3.8 27B**, or your own GGUF models. Ollama and an OpenAI-compatible API remain possible as options.
+- Long meetings are split into parts, summarized, then merged. The glossary and the linked preparation are given to the model.
+- The report is deliberately **concise**: a 5 to 8 sentence summary, about 120 to 250 words whether the meeting lasts 15 min or 1 h.
 - Without a writing model, Verbatim produces a simplified summary built from real sentences of the transcript, inventing nothing.
-- The model is only loaded into memory while writing.
-- **Report language of your choice**, independent of the meeting's (French, English, Spanish, German, Italian, Portuguese, Dutch), as a default or meeting by meeting.
+- **Report language of your choice**, independent of the meeting's language (French, English, Spanish, German, Italian, Portuguese, Dutch), as a default or meeting by meeting.
+- While the report is written, Whisper is released to leave memory to the AI; the writing model stays loaded while the application is open.
 
 <img src="docs/screenshots/08-reglages-redaction.png" alt="Report writing settings" width="720">
 
@@ -81,9 +94,11 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 <img src="docs/screenshots/04-preparations.png" alt="Meeting preparations" width="720">
 
 - **Preparations**: objective, timed agenda and questions to ask, with customizable meeting types.
-- **Synchronized audio player** (0.75× to 2×): clicking a passage of the transcript starts playback at that moment.
-- **Export** to text, subtitles (.srt, .vtt), data (.json), report (.md) and the original audio, in the original or translated language.
-- **Light (default), dark or automatic theme**, nine palettes including **Kawaii** and **Gamer**, French and English interface (Settings › General).
+- **Synced audio player** (0.75× to 2×): a click on a passage of the transcript starts playback at that moment.
+- **Rename** a meeting from the meeting itself or straight from the list.
+- **Export** as text, subtitles (.srt, .vtt), data (.json), report (.md) and the original audio, in the original or the translated language.
+- **Light (default), dark or automatic theme**, nine palettes including **Kawaii** and **Gamer**, interface in French and English (Settings › General).
+- **Safeguards**: if you close the application during a recording, a transcription or a report, it warns you before interrupting it.
 
 ## Supported hardware
 
@@ -94,41 +109,57 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 | Other AMD, Intel | Vulkan | Vulkan |
 | No graphics card | Processor | Processor |
 
-**Automatic** mode picks the fastest available engine and falls back to the processor in case of problems. Models too large for your card's video memory are flagged in Settings.
+**Automatic** mode picks the fastest engine available and falls back to the processor if there is a problem. Models too large for your card's video memory are flagged in Settings.
 
-### Whisper on AMD cards: a ROCm build made for Verbatim
+### Whisper on AMD cards: builds made for Verbatim
 
-whisper.cpp does not provide a binary to use an AMD card on Windows: only the processor and NVIDIA (CUDA) versions are published, and accelerated transcription on AMD is not provided out of the box. Verbatim fills that gap:
+whisper.cpp does not ship a binary to use an AMD card on Windows: only processor and NVIDIA (CUDA) versions are published. Verbatim fills the gap with two in-house builds:
 
-- **whisper.cpp is built with ROCm (HIP)** for Radeon RX 7000 / PRO W7000 cards (RDNA 3), using the `scripts/build-whisper-rocm.ps1` script.
-- **A minimal ROCm runtime** ships with it, so the card works without installing AMD's SDK.
-- **A ROCm `whisper-server`** also handles live transcription on these cards: a 10 s window is processed in 0.16 s, versus 1.2 s on the processor.
-- **The installer sets it up by itself** when it detects a compatible card, and "Automatic" mode picks it, falling back to the processor in case of problems.
+- **ROCm (HIP)** for Radeon RX 7000 / PRO W7000 (RDNA 3), the fastest: script `scripts/build-whisper-rocm.ps1`, shipped with a minimal ROCm runtime (no need for AMD's SDK).
+- **Vulkan** for other AMD cards and Intel: script `scripts/build-whisper-vulkan.ps1`, a 17 MB pack, with no embedded runtime (your driver provides Vulkan).
+- Each exists as `whisper-cli` (files) and `whisper-server` (**live transcription**).
+- **The installer sets up the right pack by itself**, and "Automatic" mode picks it, with fallback to the processor if there is a problem.
 
 Tested on an RX 7800 XT.
 
-## Performance and resource usage
+## Performance
 
-Measurements of October 18, 2026 on a desktop PC (Ryzen 7 5800X3D, 8 cores / 16 threads, 48 GB of RAM, Radeon RX 7800 XT 16 GB), with a **real 15 min 16 s recording in French**, using the application's own settings (Whisper Large v3 Turbo compressed; Qwen 3.5 Q4_K_M; 3,788 tokens read and 300 written for the report). Raw data: [`docs/benchmarks/results.json`](docs/benchmarks/results.json).
+Measurements of 25 October 2026 on a desktop PC (Ryzen 7 5800X3D, 8 cores / 16 threads, 48 GB RAM, Radeon RX 7800 XT 16 GB), with a **real 15 min 16 s recording in French** and a real **1-hour** meeting, with the application's settings (version 0.4.0: Whisper Large v3 Turbo compressed, Qwen 3.5 Q4_K_M). Raw data: [`docs/benchmarks/results.json`](docs/benchmarks/results.json).
 
 ### At a glance
 
 | | Result |
 |---|---|
-| 🎙️ **Transcription** | 15 min 16 s transcribed in **41 s** on an AMD card (×22.5 real time), versus 9 min 48 s on the processor: **14× faster** |
-| 📝 **Report** | **6 to 8 s** with Qwen 3.5 4B or 9B on ROCm, versus 94 s for the 4B on the processor |
-| 🧠 **Video memory** | 1.2 GB for Whisper, 3.4 GB for the 4B, 5.7 GB for the 9B: an 8 GB card is enough for the whole pipeline |
-| ⚙️ **Processor** | 2 to 11% of the PC with a graphics card, versus 45% without |
-| 💤 **At rest** | 106 MB actually reserved, 0% processor |
+| 🎙️ **Transcription** | 15 min 16 s transcribed in **22 s** on ROCm (×41 real time), 36 s on Vulkan, 4 min 38 s on the processor: **12× faster** with a graphics card |
+| ⏱️ **Live** | A 10 s excerpt is transcribed in **0.4 s** (ROCm) or 0.7 s (Vulkan): the text keeps up with the voice. On the processor, 13 s: too slow for live |
+| 🗣️ **Speakers** | 38 s for 15 min, 2 min 30 s for 1 h, on the processor (×24 real time) |
+| 📝 **Report** | 15 min: **9 s** (4B, ROCm), 26 s (Vulkan), 2 min 29 s (processor). 1-hour meeting: 20 s (4B, ROCm) |
+| 🧠 **Video memory** | 1.5 GB for Whisper, 3.4 GB for the 4B, 5.7 GB for the 9B: an 8 GB card is enough for the whole chain |
+| ⚙️ **Processor** | 2 to 8% of the PC with a graphics card, versus 50% without |
+
+### From recording to report
+
+<p align="center"><img src="docs/benchmarks/pipeline.en.svg" alt="Total time from recording to report: ROCm 1 min 9 s, Vulkan 1 min 40 s, processor 7 min 46 s" width="780"></p>
+
+Total for the 15 min 16 s recording: transcription + speaker separation + report (Qwen 3.5 4B), the sum of the steps measured one by one.
 
 ### Transcription
 
-<p align="center"><img src="docs/benchmarks/transcription.en.svg" alt="Transcription time: ROCm 41 s, processor 9 min 48 s" width="780"></p>
+<p align="center"><img src="docs/benchmarks/transcription.en.svg" alt="Transcription time: ROCm 22 s, Vulkan 36 s, processor 4 min 38 s" width="780"></p>
 
 | Engine | Time | Speed | RAM (peak) | VRAM (peak) | Processor |
 |---|---:|---:|---:|---:|---|
-| **ROCm** (RX 7800 XT) | **41 s** | ×22.5 real time | 405 MB | 1.2 GB | ≈ 1.8 core (11% of the PC) |
-| Processor (8 threads) | 9 min 48 s | ×1.6 real time | 1.1 GB | – | ≈ 7.4 cores (46% of the PC) |
+| **ROCm** (RX 7800 XT) | **22 s** | ×41 real time | 367 MB | 1.5 GB | ≈ 1.3 core (8% of the PC) |
+| Vulkan | 36 s | ×26 real time | 699 MB | 1.0 GB | ≈ 1 core (6% of the PC) |
+| Processor (8 threads) | 4 min 38 s | ×3.3 real time | 1.3 GB | – | ≈ 8 cores (50% of the PC) |
+
+Proportionally, a one-hour meeting would be transcribed in about 1 min 30 s on ROCm, 2 min 20 s on Vulkan and 18 min on the processor (linear estimate).
+
+### Live transcription
+
+<p align="center"><img src="docs/benchmarks/direct.en.svg" alt="Time to transcribe a 10-second live excerpt: ROCm 0.4 s, Vulkan 0.7 s, processor 13 s" width="780"></p>
+
+The Whisper server loads in 1 to 1.6 s (it is preloaded at startup) and stays in memory: 94 MB of RAM and 1.4 GB of VRAM on ROCm, 335 MB and 1.0 GB on Vulkan, 920 MB on the processor.
 
 ### Report writing
 
@@ -136,15 +167,17 @@ Measurements of October 18, 2026 on a desktop PC (Ryzen 7 5800X3D, 8 cores / 16 
 
 <p align="center"><img src="docs/benchmarks/redaction-vitesse.en.svg" alt="Reading and writing speed in tokens per second" width="780"></p>
 
-| Model · engine | Time | Reading | Writing | RAM (peak)¹ | VRAM (peak) | Processor |
-|---|---:|---:|---:|---:|---:|---:|
-| 4B · **ROCm** | **6.4 s** | 1,909 tok/s | 74 tok/s | 3.1 GB (0.5 GB private) | 3.4 GB | 4% of the PC |
-| 4B · Vulkan | 14.9 s | 696 tok/s | 34 tok/s | 3.8 GB (1.2 GB private) | 2.8 GB | 2% of the PC |
-| 4B · Processor | 94 s | 63 tok/s | 9 tok/s | 4.6 GB (1.9 GB private) | – | 45% of the PC |
-| 9B · **ROCm** | **8.4 s** | 1,330 tok/s | 56 tok/s | 5.4 GB (0.5 GB private) | 5.7 GB | 4% of the PC |
-| 9B · Vulkan | 19 s | 490 tok/s | 29 tok/s | 6.4 GB (1.5 GB private) | 5.0 GB | 2% of the PC |
+| Model · engine | 15 min | 1 h | Reading | Writing | RAM (peak)¹ | VRAM (peak) | Processor |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 4B · **ROCm** | **8.6 s** | 20 s | 3,400 tok/s | 105 tok/s | 3.8 GB | 3.4 GB | 6% of the PC |
+| 4B · Vulkan | 26 s | 54 s | 1,040 tok/s | 46 tok/s | 4.6 GB | 2.8 GB | 3% of the PC |
+| 4B · Processor | 2 min 29 s | – | 97 tok/s | 10 tok/s | 5.3 GB | – | 50% of the PC |
+| 9B · **ROCm** | **15 s** | 37 s | 2,050 tok/s | 74 tok/s | 6.1 GB | 5.7 GB | 5% of the PC |
+| 9B · Vulkan | 35 s | 83 s | 767 tok/s | 39 tok/s | 7.1 GB | 5.0 GB | 2% of the PC |
 
-¹ RAM includes the model file, memory-mapped by Windows: that part can be reclaimed at any time. The memory actually reserved by Verbatim (the "Memory" column of Task Manager) is the value in parentheses. For Whisper, only the total working memory was recorded.
+The application is measured as it really runs: the 15 min recording is split into 2 parts summarized one by one (≈ 9,900 tokens read, 550 to 930 written), then merged; the 1-hour meeting is split into 6 parts (≈ 25,000 tokens read). Times are those of the **first report after the model has loaded**: a second report is up to twice as fast (the engine is already "warm").
+
+¹ RAM includes the model file, memory-mapped by Windows: that part can be reclaimed at any time.
 
 ### Memory and processor
 
@@ -152,51 +185,47 @@ Measurements of October 18, 2026 on a desktop PC (Ryzen 7 5800X3D, 8 cores / 16 
 
 <p align="center"><img src="docs/benchmarks/processeur.en.svg" alt="Processor load during processing, by configuration" width="780"></p>
 
-### The application at rest
+### Key takeaways
 
-Window open, no processing: about **360 MB** of working memory in total, of which **106 MB** is actually reserved. Most of it is Windows' display engine (WebView2); the Verbatim process itself uses only about 30 MB, and the processor stays at 0%. The engines only run during a transcription or a report, and the writing model is unloaded from memory afterwards.
+**1. The graphics card changes how you use it.** On the processor, transcribing a recording uses 8 of 16 cores for nearly a third of its duration, and the whole path (transcription, speakers, report) takes 7 min 46 s for 15 min of audio. On ROCm it takes 1 min 9 s while using only a few percent of the processor: the PC stays usable.
 
-### Summary
+**2. ROCm or Vulkan?** On a Radeon RX 7000, ROCm transcribes 1.6× faster than Vulkan and writes 2 to 3× faster. Vulkan uses a little less video memory (0.5 to 0.7 GB less) and remains the universal choice: it works on AMD, NVIDIA and Intel, and is still 6× faster than the processor for writing with the 4B.
 
-**1. The graphics card changes how you use it.** On the processor, transcribing a recording takes about 64% of its duration (588 s for 916 s) and uses 7 cores out of 16: the PC remains usable, but loaded for nearly ten minutes. On ROCm, the same transcription takes 41 s and occupies only 11% of the processor. Proportionally, a one-hour meeting would be transcribed in about 2 min 40 s on ROCm, versus about 38 min on the processor (linear estimate from this measurement).
+**3. Qwen 3.5 4B or 9B?** On ROCm, the 9B costs about 6 s more than the 4B for 15 min, 17 s more for 1 h. It writes slightly more detail (more actions and next steps picked up in our tests). The 4B stays useful on cards with 4 to 6 GB of VRAM and with no graphics card.
 
-**2. ROCm or Vulkan?** On a Radeon RX 7000, ROCm completes the report 2.3× faster than Vulkan (6.4 s versus 14.9 s for the 4B; 8.4 s versus 19 s for the 9B). The gap comes mostly from reading the text (2.7×), and a little less from writing (2×). The price is about 0.6 to 0.7 GB more VRAM (3.4 GB versus 2.8 GB; 5.7 GB versus 5.0 GB). Vulkan remains the universal choice: it works on AMD, NVIDIA and Intel, with performance already 6× better than the processor for the 4B.
+**4. Sizing memory.** Whisper is released while the report is written: the VRAM you need is that of the larger of the two jobs, i.e. 5.7 GB for the 9B on ROCm. An 8 GB card is therefore enough for the whole chain, and a 6 GB card works with the 4B (3.4 GB).
 
-**3. Qwen 3.5 4B or 9B?** On a graphics card, the 9B (more than twice as large) costs only 2 s more than the 4B on ROCm (8.4 s versus 6.4 s, +31%): it offers better writing quality for a barely longer wait. The 4B remains useful on cards with 4 to 6 GB of VRAM and without a graphics card.
+**5. With no graphics card.** The result is still usable: 4 min 38 s of transcription, 38 s of speaker separation and 2 min 29 s of report (4B) for 15 min of audio. However the processor is heavily used (50% of the PC) and live transcription is too slow: lighter transcription models (Small, Base) are preferable.
 
-**4. Sizing the memory.** Transcription and then writing run one after the other: the VRAM needed is that of the larger of the two, i.e. 5.7 GB for the 9B on ROCm. An 8 GB card is therefore enough for the whole pipeline, and a 6 GB card works with the 4B (3.4 GB). As for RAM, once the model is loaded into video memory, Verbatim reserves only about 0.5 GB; without a graphics card, count about 1.5 GB more for the 4B (1.9 GB reserved versus 0.5 GB).
-
-**5. Without a graphics card.** The result remains usable: 94 s for a report with the 4B, and a transcription lasting about two thirds of the recording. However, the processor is heavily loaded (45% of the PC), and the lighter transcription models (Small, Base) are preferable to reduce the wait.
-
-**6. Which setup to choose?**
+**6. Which configuration should you pick?**
 
 | Your hardware | Transcription | Recommended writing |
 |---|---|---|
 | Radeon RX 7000, 8 GB or more | ROCm | Qwen 3.5 9B · ROCm |
-| Other AMD or Intel card, 6 GB or more | Processor | Qwen 3.5 9B · Vulkan |
+| Other AMD or Intel card, 6 GB or more | Vulkan | Qwen 3.5 9B · Vulkan |
 | Card with 4 to 6 GB | depends on the card | Qwen 3.5 4B · Vulkan or ROCm |
 | NVIDIA | CUDA | CUDA or Vulkan (not measured) |
 | No graphics card | Processor | Qwen 3.5 4B · Processor |
 
-**Limits of the measurement.** A single machine, a single recording and one run per configuration; whisper.cpp v1.9.2 and llama.cpp b11700. NVIDIA (CUDA) results were not measured, for lack of a card on the test machine. Differences vary with the machine, the text length and the audio content.
+**Limits of the measurement.** One machine and one recording (transcription: average of 2 runs, a single one for the processor); whisper.cpp v1.9.2, llama.cpp b11700. NVIDIA (CUDA) results were not measured, as the test machine has no such card. Speaker separation was timed on a single-voice recording: its speed does not depend on the number of people, but the quality of the result is not evaluated here. Gaps vary with the machine, the length of the text and the audio content.
 
 ## Installation
 
-1. **Download** `Verbatim_X.Y.Z_x64-setup.exe` from the [latest release](https://github.com/Netapick/verbatim/releases/latest). The installer is lightweight (about 3 MB) and offers French or English.
-2. **Run it.** It downloads the engines by itself: the base pack (≈ 61 MB), then the acceleration that matches your card (ROCm ≈ 430 MB, or CUDA ≈ 1.3 GB). It asks no questions and needs no administrator rights.
-3. **Choose your models** in **Settings**: a transcription model and, if you wish, a writing model. No model is shipped with the application.
+1. **Download** `Verbatim_X.Y.Z_x64-setup.exe` from the [latest release](https://github.com/Netapick/verbatim/releases/latest). The installer is light (about 9 MB) and offers French or English.
+2. **Run it.** It downloads the engines by itself: the base pack (≈ 61 MB), then the acceleration suited to your card (ROCm ≈ 430 MB, Vulkan ≈ 17 MB, or CUDA ≈ 1.3 GB). It asks no questions and needs no administrator rights.
+3. **Choose your models** in **Settings**: a transcription model, a writing model and, if you wish, a translation model. No model ships with the application; each is downloaded only once, and a download can be stopped (the partial file is then deleted). On first launch, a message takes you there.
 
-Engines and models are stored in an `ia` folder next to the application. If you already have models (Ollama, `.gguf` or `ggml-*.bin` files), **Settings › Models** detects them and **copies** them into `ia`, leaving the originals untouched.
+Engines and models are stored in an `ia` folder next to the application. If you already have models (Ollama, `.gguf` or `ggml-*.bin` files), **Settings › Models** detects them and **copies** them into `ia`, without touching the originals.
 
 ### Automatic updates
 
-At startup, Verbatim looks for the latest version published on GitHub. A **banner** at the top announces it, with its notes. Clicking **Update** opens a window in the centre that shows the download and then the installation, and the application restarts by itself. The update's signature (minisign) is verified before installation.
+At startup, Verbatim looks for the latest version published on GitHub. A **banner** at the top announces it, with its notes. Clicking **Update** opens a window in the center showing the download and then the installation, and the application restarts by itself. The update's signature (minisign) is verified before installation.
 
-With **Install automatically** (Settings › General), the version is downloaded in the background, but **nothing is installed until you click** "Update". The button stays greyed out, with the reason shown, during a recording, a transcription, report writing, a translation or a download.
+With **Install automatically** (Settings › General), the version is downloaded in the background, but **nothing is installed without your click** on "Update". The button stays greyed out, with the reason shown, during a recording, a transcription, a report, a translation or a download.
 
 ### If your antivirus blocks an engine
 
-The third-party engines (whisper.cpp, llama.cpp) are unsigned: some antivirus products, including Windows Defender, may delete or block them ("access denied" or "connection closed" errors).
+The third-party engines (whisper.cpp, llama.cpp) are not signed: some antivirus programs, including Windows Defender, may delete or block them ("access denied" or "connection closed" error).
 
 1. Open *Windows Security › Virus & threat protection › Manage settings › Exclusions*.
 2. Add Verbatim's installation folder (the one containing `ia`) as an exclusion.
@@ -206,14 +235,13 @@ Running the application as administrator does not help.
 
 ## Privacy
 
-| What stays on your computer | What leaves it, and only if you ask |
+| What stays on your computer | What leaves, and only if you ask |
 |---|---|
 | Audio, transcripts, reports, preparations, glossary, models | Downloading engines and models (GitHub, Hugging Face) |
-| All of the transcription and writing | The update check against the GitHub API (can be turned off) |
-| | A remote writing API, only if you configure one yourself |
-| Speakers' voices (computed on the fly, not kept) | |
+| All transcription, speaker separation and writing | Update check against the GitHub API (can be turned off) |
+| Speakers' voices (computed on the fly, not stored) | A remote writing API, only if you configure one yourself |
 
-No personal data is collected and there is no telemetry. Full text: [privacy policy](docs/PRIVACY.en.md).
+No personal data is collected, and there is no telemetry. Full text: [privacy policy](docs/PRIVACY.en.md).
 
 ## FAQ
 
@@ -221,66 +249,70 @@ No personal data is collected and there is no telemetry. Full text: [privacy pol
 Only to download engines and models, and to check for updates. Transcription and writing work offline.
 
 **Do I need a graphics card?**
-No. Verbatim runs on the processor, but an NVIDIA or AMD card speeds up transcription and writing considerably.
+No. Verbatim runs on the processor, but an NVIDIA or AMD card speeds up transcription and writing a lot (see [performance](#performance)).
 
-**How much space and memory do I need?**
-The base pack is about 61 MB. Each transcription model is 75 MB to 1.1 GB, each writing model about 2.7 to 16 GB, and each translation model (TranslateGemma) 2.5 to 7.3 GB. Qwen 3.5 4B needs about 4 GB of memory, the 9B about 8 GB.
+**How much disk space and memory do I need?**
+The base pack weighs about 61 MB. Each transcription model is 75 MB to 1.1 GB, each writing model about 2.7 to 16 GB, and each translation model (TranslateGemma) 2.5 to 7.3 GB. Qwen 3.5 4B needs about 4 GB of memory, the 9B about 8 GB.
 
 **What language are the reports in?**
-Your choice: the meeting's language (default) or another one, adjustable per meeting. Verbatim's interface is available in French and English, chosen at installation or in Settings.
+Your choice: the meeting's language (default) or another, settable per meeting. Verbatim's interface is available in French and English, chosen at installation or in Settings.
 
 **Does translation send my text online?**
 No: it uses a local model, like the report. The only exception: if you configured a remote API yourself and no local model is installed, that API is used.
 
 **Does Verbatim tell speakers apart?**
-Yes. After transcription, each passage is assigned to a speaker ("Speaker 1", "Speaker 2"…), with one colour per person. The computation runs on the processor, sends nothing online, and the number of speakers is determined automatically. Click a name to rename it, or "Identify speakers" for an already transcribed meeting. If each person introduces themselves when they start speaking ("Hello, I'm Marie"), Verbatim remembers their voice and names them throughout the meeting. The result remains approximate when voices are similar or sentences are very short.
+Yes. After transcription, each passage is attributed to a speaker, with one color per person. The work runs on the processor, with nothing sent online, and the number of speakers is determined automatically. Click a name to rename it, or "Identify speakers" for a meeting already transcribed. If each person introduces themselves when they first speak ("Hello, I'm Marie"), Verbatim remembers their voice and names it throughout the meeting. The result stays approximate when voices are alike or sentences are very short.
+
+**Why is my report short?**
+It is designed to be concise: a 5 to 8 sentence summary and lists of topics, decisions and actions, about 120 to 250 words whatever the length of the meeting. Decisions and actions are only listed when they are stated explicitly; the full transcript is always available alongside.
 
 **Why does Windows or my antivirus show a warning?**
-The installer and the engines have no Windows code signature. See the section on [antivirus](#if-your-antivirus-blocks-an-engine) and on [signing](#signing).
+The installer and the engines have no Windows code signature. See the section on [antivirus](#if-your-antivirus-blocks-an-engine) and [signing](#signing).
 
 ## Roadmap
 
-These are working ideas, with no commitment on dates or order.
+These are working leads, with no commitment on dates or order.
 
 **Done**
-- ✅ **English interface** (French by default, selectable in Settings › General).
-- ✅ **Built-in updates**: banner, download and installation inside the application, automatic restart, verified signature.
-- ✅ **Speaker separation** (diarization) and recognition of those who introduce themselves.
-- ✅ **Drag and drop** of audio files or transcripts.
+- ✅ **Speaker separation** (diarization) and recognition of people who introduce themselves.
 - ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
-- ✅ **Report language** of your choice.
-- ✅ **Transcript translation** into 14 languages (TranslateGemma).
-- ✅ **Live transcription** during the meeting, with live translation.
+- ✅ **Built-in update**: banner, download and installation inside the application, automatic restart, verified signature.
+- ✅ **Fast startup**: Whisper and speaker separation preloaded, a start screen, safeguards on close.
+- ✅ **English interface** (French by default, chosen in Settings › General).
+- ✅ **Drag and drop** of audio files or transcripts.
+- ✅ **Report language** of your choice, **transcript translation** into 14 languages, **live transcription** with translation.
 - ✅ **Themes and palettes** (including Kawaii and Gamer).
 
 **Priorities**
+- **Backup and restore** of meetings, and a **wider model catalog** (Llama, Mistral, Gemma).
+- **More detailed reports** for long meetings (a summary proportional to the duration).
 - **More interface languages** (Spanish, German, Italian).
-- **Code signing** of the installer, to remove Windows warnings (the SignPath application was declined; another solution has yet to be chosen).
+- **Code signing** of the installer, to remove Windows warnings (the request to SignPath was refused; another solution is to be chosen).
 
 **Under consideration**
-- **Android port**: record and browse on a phone, depending on the feasibility of running Whisper and a small writing model locally.
-- **Ask questions to a meeting**, with a link back to the relevant passage.
+- **Android port**: recording and viewing on a phone, depending on the feasibility of running Whisper and a small writing model locally.
+- **Asking questions to a meeting**, with a link to the passage concerned.
 - **Search across all meetings** and **transcript correction** in the application.
 - **Customizable report templates** (structure and tone).
 - **Video import** and batch processing.
-- **More convenient recording**: global shortcut, notification-area icon, recording offered when a video call opens.
-- **Audio enhancement** before transcription, **backup and restore** of meetings, a **wider model catalog** (Llama, Mistral, Gemma), a **command-line mode**, **macOS and Linux**.
+- **More convenient recording**: global shortcut, notification-area icon, start offered when a video call opens.
+- **Audio enhancement** before transcription, a **command-line mode**, **macOS and Linux**.
 
-Have an idea or a need? Open an [issue](https://github.com/Netapick/verbatim/issues).
+An idea or a need? Open an [issue](https://github.com/Netapick/verbatim/issues).
 
 ## Documentation
 
-- [Illustrated presentation](docs/PRESENTATION.en.md): a tour of the application, with screenshots.
-- [Technical documentation](docs/DEVELOPMENT.en.md): architecture, building, distribution, updates.
-- [Changelog](CHANGELOG.md): what changed in each version.
+- [Illustrated tour](docs/PRESENTATION.en.md): a walk through the application, with screenshots.
+- [Technical documentation](docs/DEVELOPMENT.en.md): architecture, build, distribution, updates.
+- [Changelog](CHANGELOG.md): what is new in each version.
 - [Code signing](docs/SIGNATURE.en.md) · [Privacy policy](docs/PRIVACY.en.md)
 
 ## License
 
-Code under the [MIT](LICENSE) license. Third-party components (whisper.cpp, llama.cpp, ROCm) remain under their respective licenses, detailed in each release's `THIRD-PARTY-LICENSES.md`.
+Code under the [MIT license](LICENSE). Third-party components (whisper.cpp, llama.cpp, ROCm) remain under their own licenses, detailed in each release's `THIRD-PARTY-LICENSES.md`.
 
 ### Signing
 
 - The installer has no Windows code signature (certificate): Windows may show a warning at installation.
-- The application's **updates** are signed with the project's own minisign key, built by GitHub Actions (`.github/workflows/release.yml`); the public key is in `src-tauri/tauri.conf.json`. The application refuses an update whose signature is invalid.
-- Third-party engines (whisper.cpp, llama.cpp) are downloaded as published by their authors and are not signed by this project.
+- The application's **updates** are signed by a minisign key specific to the project and built by GitHub Actions (`.github/workflows/release.yml`); the public key is in `src-tauri/tauri.conf.json`. The application refuses an update whose signature is invalid.
+- The third-party engines (whisper.cpp, llama.cpp) are downloaded as published by their authors and are not signed by this project.

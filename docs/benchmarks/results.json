@@ -1,78 +1,115 @@
 {
-  "date": "2026-10-18",
+  "date": "2026-10-25 (transcription, direct) / 2026-10-18 (compte-rendu)",
   "audio_s": 916.0,
   "machine": "Ryzen 7 5800X3D (8 cores / 16 threads), 48 GB RAM, Radeon RX 7800 XT 16 GB",
   "transcription": [
     {
       "engine": "rocm",
-      "duration_s": 40.7,
-      "ram_peak_mb": 405,
-      "vram_peak_mb": 1240,
-      "cpu_pct_of_pc": 11
+      "duration_s": 22.4,
+      "ram_peak_mb": 367,
+      "ram_private_mb": 325,
+      "vram_peak_mb": 1460,
+      "cpu_pct_of_pc": 8
+    },
+    {
+      "engine": "vulkan",
+      "duration_s": 35.6,
+      "ram_peak_mb": 699,
+      "ram_private_mb": 657,
+      "vram_peak_mb": 982,
+      "cpu_pct_of_pc": 6
     },
     {
       "engine": "cpu",
-      "duration_s": 588.1,
-      "ram_peak_mb": 1093,
+      "duration_s": 278.5,
+      "ram_peak_mb": 1275,
+      "ram_private_mb": 1270,
       "vram_peak_mb": 0,
-      "cpu_pct_of_pc": 46
+      "cpu_pct_of_pc": 50
     }
   ],
+  "live": [
+    {
+      "engine": "rocm",
+      "start_s": 1.64,
+      "ram_mb": 94,
+      "vram_mb": 1362,
+      "first_10s_excerpt_s": 0.58,
+      "next_10s_excerpt_s": 0.4
+    },
+    {
+      "engine": "vulkan",
+      "start_s": 1.54,
+      "ram_mb": 335,
+      "vram_mb": 978,
+      "first_10s_excerpt_s": 0.74,
+      "next_10s_excerpt_s": 0.68
+    },
+    {
+      "engine": "cpu",
+      "start_s": 1.02,
+      "ram_mb": 920,
+      "vram_mb": 0,
+      "first_10s_excerpt_s": 13.41,
+      "next_10s_excerpt_s": 13.36
+    }
+  ],
+  "speaker_separation_s": 38.0,
   "writing": [
     {
       "model": "4B",
       "engine": "rocm",
-      "duration_s": 6.4,
-      "read_tok_s": 1909,
-      "write_tok_s": 74.3,
-      "ram_peak_mb": 3117,
-      "ram_private_mb": 462,
-      "vram_peak_mb": 3369,
-      "cpu_pct_of_pc": 4
+      "duration_15min_s": 8.6,
+      "read_tok_s": 3400,
+      "write_tok_s": 105,
+      "ram_peak_mb": 3819,
+      "vram_peak_mb": 3368,
+      "cpu_pct_of_pc": 6,
+      "duration_1h_s": 20.1
     },
     {
       "model": "4B",
       "engine": "vulkan",
-      "duration_s": 14.9,
-      "read_tok_s": 696,
-      "write_tok_s": 34.1,
-      "ram_peak_mb": 3798,
-      "ram_private_mb": 1164,
-      "vram_peak_mb": 2765,
-      "cpu_pct_of_pc": 2
+      "duration_15min_s": 26.2,
+      "read_tok_s": 1040,
+      "write_tok_s": 46,
+      "ram_peak_mb": 4595,
+      "vram_peak_mb": 2773,
+      "cpu_pct_of_pc": 3,
+      "duration_1h_s": 54.1
     },
     {
       "model": "4B",
       "engine": "cpu",
-      "duration_s": 94.2,
-      "read_tok_s": 63,
-      "write_tok_s": 8.9,
-      "ram_peak_mb": 4565,
-      "ram_private_mb": 1948,
+      "duration_15min_s": 149.3,
+      "read_tok_s": 97,
+      "write_tok_s": 10.3,
+      "ram_peak_mb": 5269,
       "vram_peak_mb": 0,
-      "cpu_pct_of_pc": 45
+      "cpu_pct_of_pc": 50,
+      "duration_1h_s": null
     },
     {
       "model": "9B",
       "engine": "rocm",
-      "duration_s": 8.4,
-      "read_tok_s": 1330,
-      "write_tok_s": 56.3,
-      "ram_peak_mb": 5392,
-      "ram_private_mb": 473,
-      "vram_peak_mb": 5723,
-      "cpu_pct_of_pc": 4
+      "duration_15min_s": 14.7,
+      "read_tok_s": 2050,
+      "write_tok_s": 74,
+      "ram_peak_mb": 6099,
+      "vram_peak_mb": 5719,
+      "cpu_pct_of_pc": 5,
+      "duration_1h_s": 37.0
     },
     {
       "model": "9B",
       "engine": "vulkan",
-      "duration_s": 19.0,
-      "read_tok_s": 490,
-      "write_tok_s": 28.6,
-      "ram_peak_mb": 6403,
-      "ram_private_mb": 1504,
-      "vram_peak_mb": 5029,
-      "cpu_pct_of_pc": 2
+      "duration_15min_s": 35.4,
+      "read_tok_s": 767,
+      "write_tok_s": 39,
+      "ram_peak_mb": 7137,
+      "vram_peak_mb": 5038,
+      "cpu_pct_of_pc": 2,
+      "duration_1h_s": 83.1
     }
   ],
   "app_idle": {
