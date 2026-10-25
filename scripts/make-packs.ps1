@@ -27,7 +27,7 @@ $packs = [ordered]@{
     # correctif pour les mises à jour : seul whisper-server.exe, ajouté à un dossier engine-rocm déjà installé (~0,5 Mo)
     ROCMFIX = @{ Tag = "v0.3.0"; File = "verbatim-redist-rocm-server-0.3.0.zip"; Files = @("engine-rocm\whisper-server.exe") }
     # Whisper Vulkan (AMD d'avant RX 7000, Intel) : ~17 Mo ; facultatif tant que redist\engine-vulkan n'existe pas (voir build-whisper-vulkan.ps1)
-    VULKAN = @{ Tag = "v0.4.0"; File = "verbatim-redist-vulkan-0.4.0.zip"; Dirs = @("engine-vulkan"); Optional = $true }
+    VULKAN = @{ Tag = "v0.4.1"; File = "verbatim-redist-vulkan-0.4.0.zip"; Dirs = @("engine-vulkan"); Optional = $true }
 }
 
 Add-Type -AssemblyName System.IO.Compression

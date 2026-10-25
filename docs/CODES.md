@@ -2,7 +2,7 @@
 
 Français · [English](CODES.en.md)
 
-Mis à jour pour la version 0.4.0. L'application écrit le problème en toutes lettres. Quand c'est Windows qui refuse ou échoue, elle ajoute le code du système entre parenthèses (« os error 5 »). L'installateur a ses propres codes, visibles dans son journal. Cette note regroupe les trois.
+Mis à jour pour la version 0.4.1. L'application écrit le problème en toutes lettres. Quand c'est Windows qui refuse ou échoue, elle ajoute le code du système entre parenthèses (« os error 5 »). L'installateur a ses propres codes, visibles dans son journal. Cette note regroupe les trois.
 
 ## 1. L'installateur
 

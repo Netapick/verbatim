@@ -11,7 +11,7 @@
 !define PACK_ROCMFIX_FILE "verbatim-redist-rocm-server-0.3.0.zip"
 !define PACK_ROCMFIX_SHA "E82F4B7933A1FEE5AAC7D7CD6ABBC7769EE2811882BA22F689B77C51FE02C27E"
 !define PACK_ROCMFIX_MB "1"
-!define PACK_VULKAN_BASE "https://github.com/Netapick/verbatim/releases/download/v0.4.0"
+!define PACK_VULKAN_BASE "https://github.com/Netapick/verbatim/releases/download/v0.4.1"
 !define PACK_VULKAN_FILE "verbatim-redist-vulkan-0.4.0.zip"
 !define PACK_VULKAN_SHA "71F60B63AB44C1444AC8819008E4D5178F3BB1E089C2571F294DC3A444586613"
 !define PACK_VULKAN_MB "17"

@@ -2,6 +2,26 @@
 
 Français · English below each version.
 
+## 0.4.1
+
+**Pastille d'enregistrement**
+- Elle se déplace à la souris sans que Windows fasse apparaître une barre de titre par-dessus, et elle ne prend plus le focus : votre visio ou votre présentation reste active quand vous cliquez dessus.
+- Elle est détourée en pilule, avec un fond translucide et un contour continu. Il n'y a plus de flou : ceux de Windows laissaient un rectangle autour de la pastille.
+
+**Autres**
+- Cette version reprend tout le contenu de la 0.4.0, qui n'a pas été diffusée à cause du défaut de la pastille (voir plus bas).
+- Le pack Whisper Vulkan de l'installateur est hébergé par la release de cette version.
+
+### English
+
+**Recording bar**
+- It moves with the mouse without Windows drawing a title bar over it, and it no longer takes focus: your video call or presentation stays active when you click it.
+- It is cut out as a pill, with a translucent background and a continuous outline. There is no blur any more: Windows' blur effects left a rectangle around the bar.
+
+**Other**
+- This version includes everything in 0.4.0, which was not distributed because of the bar's defect (see below).
+- The installer's Whisper Vulkan pack is hosted by this version's release.
+
 ## 0.4.0
 
 **Séparation des intervenants**

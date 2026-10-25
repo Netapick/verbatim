@@ -2,7 +2,7 @@
 
 [Français](CODES.md) · English
 
-Updated for version 0.4.0. The application spells the problem out. When Windows is the one refusing or failing, it adds the system code in parentheses (“os error 5”). The installer has its own codes, visible in its log. This note covers all three. The message texts below are translated; the application shows them in the language of its interface.
+Updated for version 0.4.1. The application spells the problem out. When Windows is the one refusing or failing, it adds the system code in parentheses (“os error 5”). The installer has its own codes, visible in its log. This note covers all three. The message texts below are translated; the application shows them in the language of its interface.
 
 ## 1. The installer
 
