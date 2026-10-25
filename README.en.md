@@ -295,14 +295,14 @@ The installer and the engines have no Windows code signature. See the section on
 These are working leads, with no commitment on dates or order.
 
 **Done**
-- **Speaker separation** (diarization) and recognition of people who introduce themselves.
-- **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
-- **Built-in update**: banner, download and installation inside the application, automatic restart, verified signature.
-- **Fast startup**: Whisper and speaker separation preloaded, a start screen, safeguards on close.
-- **English interface** (French by default, chosen in Settings › General).
-- **Drag and drop** of audio files or transcripts.
-- **Report language** of your choice, **transcript translation** into 14 languages, **live transcription** with translation.
-- **Themes and palettes** (including Kawaii and Gamer).
+- ✅ **Speaker separation** (diarization) and recognition of people who introduce themselves.
+- ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
+- ✅ **Built-in update**: banner, download and installation inside the application, automatic restart, verified signature.
+- ✅ **Fast startup**: Whisper and speaker separation preloaded, a start screen, safeguards on close.
+- ✅ **English interface** (French by default, chosen in Settings › General).
+- ✅ **Drag and drop** of audio files or transcripts.
+- ✅ **Report language** of your choice, **transcript translation** into 14 languages, **live transcription** with translation.
+- ✅ **Themes and palettes** (including Kawaii and Gamer).
 
 **Priorities**
 - **Backup and restore** of meetings, and a **wider model catalog** (Llama, Mistral, Gemma).

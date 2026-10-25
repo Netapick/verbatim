@@ -293,14 +293,14 @@ L'installateur et les moteurs n'ont pas de signature de code Windows. Voir la se
 Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 
 **Réalisé**
-- **Séparation des intervenants** (diarisation) et reconnaissance de ceux qui se présentent.
-- **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA), y compris Whisper en Vulkan pour les AMD d'avant la série RX 7000 et Intel.
-- **Mise à jour intégrée** : bandeau, téléchargement et installation dans l'application, redémarrage automatique, signature vérifiée.
-- **Démarrage rapide** : Whisper et la séparation préchargés, écran de démarrage, garde-fous à la fermeture.
-- **Interface en anglais** (français par défaut, choix dans Réglages › Général).
-- **Glisser-déposer** de fichiers audio ou de transcriptions.
-- **Langue du compte-rendu** au choix, **traduction** de la transcription en 14 langues, **transcription en direct** avec traduction.
-- **Thèmes et palettes** (dont Kawaii et Gamer).
+- ✅ **Séparation des intervenants** (diarisation) et reconnaissance de ceux qui se présentent.
+- ✅ **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA), y compris Whisper en Vulkan pour les AMD d'avant la série RX 7000 et Intel.
+- ✅ **Mise à jour intégrée** : bandeau, téléchargement et installation dans l'application, redémarrage automatique, signature vérifiée.
+- ✅ **Démarrage rapide** : Whisper et la séparation préchargés, écran de démarrage, garde-fous à la fermeture.
+- ✅ **Interface en anglais** (français par défaut, choix dans Réglages › Général).
+- ✅ **Glisser-déposer** de fichiers audio ou de transcriptions.
+- ✅ **Langue du compte-rendu** au choix, **traduction** de la transcription en 14 langues, **transcription en direct** avec traduction.
+- ✅ **Thèmes et palettes** (dont Kawaii et Gamer).
 
 **Priorités**
 - **Sauvegarde et restauration** des réunions, et **catalogue de modèles élargi** (Llama, Mistral, Gemma).
