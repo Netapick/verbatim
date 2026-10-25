@@ -30,6 +30,14 @@ LLM = [  # modèle, moteur, durée 15 min (s, 1re rédaction après chargement),
     ("4B", "cpu", 149.3, 97, 10.3, 5269, None, 0, 50, None),
     ("9B", "rocm", 14.7, 2050, 74, 6099, None, 5719, 5, 37.0),
     ("9B", "vulkan", 35.4, 767, 39, 7137, None, 5038, 2, 83.1),
+    ("27B", "rocm", 42.2, 655, 34, 12372, None, 11132, 4, 109.3),
+    ("27B", "vulkan", 101.6, 250, 15, 13550, None, 10352, 2, 241.0),
+    ("27B", "cpu", 1008.3, 16, 2.4, 13793, None, 0, 50, None),
+]
+# Versions précédentes (0.3.x : whisper.cpp 1.9.2 identique, mais -bs 5 et une seule instance), mesurées le 25/10/2026 :
+# cas, durée avant (s), durée 0.4.0 (s), explication
+PREV = [
+    ("rocm15", 34.5, 22.4), ("rocm1h", 129.7, 45.0), ("cpu15", 346.5, 278.5), ("vk15", 346.5, 35.6),
 ]
 # Rédaction : vrai parcours de l'application (parties de 11 000 caractères, notes par partie puis fusion), mesuré le 25/10/2026.
 # 15 min : 2 parties + fusion (≈ 9 900 tokens lus, ≈ 570 à 930 écrits). 1 h : 6 parties + fusion (≈ 25 000 lus, ≈ 1 300 à 2 100 écrits).
@@ -41,9 +49,12 @@ FONT = "Segoe UI, -apple-system, Helvetica, Arial, sans-serif"
 T = {
     "fr": {
         "rocm": "ROCm (RX 7800 XT)", "vulkan": "Vulkan", "cpu": "Processeur", "cpu8": "Processeur (8 threads)", "rocm_s": "ROCm", "vulkan_s": "Vulkan", "cpu_s": "Processeur",
-        "m4": "Qwen 3.5 4B", "m9": "Qwen 3.5 9B",
+        "m4": "Qwen 3.5 4B", "m9": "Qwen 3.5 9B", "m27": "Qwen 3.8 27B",
         "tr_title": "Transcription d'un enregistrement de 15 min 16 s", "tr_sub": "Whisper Large v3 Turbo compressé · plus c'est court, mieux c'est",
         "tr_fast": "{n}× plus rapide", "rt": "temps réel",
+        "ev_title": "Transcription : gain par rapport aux versions 0.3.x", "ev_sub": "mêmes moteurs, réglages améliorés · plus c'est court, mieux c'est",
+        "ev_rocm15": "ROCm · 15 min", "ev_rocm1h": "ROCm · 1 h", "ev_cpu15": "Processeur · 15 min", "ev_vk15": "AMD avant RX 7000, Intel · 15 min",
+        "ev_old": "avant", "ev_new": "0.4.0", "ev_old_vk": "processeur",
         "pl_title": "De l'enregistrement au compte-rendu", "pl_sub": "enregistrement de 15 min 16 s, séparation des intervenants comprise · plus c'est court, mieux c'est",
         "st_tr": "Transcription", "st_sep": "Séparation des intervenants", "st_wr": "Compte-rendu (Qwen 3.5 4B)",
         "lv_title": "Transcription en direct : temps pour un extrait de 10 s", "lv_sub": "serveur Whisper gardé en mémoire · en dessous de la ligne, le texte suit la voix",
@@ -59,9 +70,12 @@ T = {
     },
     "en": {
         "rocm": "ROCm (RX 7800 XT)", "vulkan": "Vulkan", "cpu": "Processor", "cpu8": "Processor (8 threads)", "rocm_s": "ROCm", "vulkan_s": "Vulkan", "cpu_s": "Processor",
-        "m4": "Qwen 3.5 4B", "m9": "Qwen 3.5 9B",
+        "m4": "Qwen 3.5 4B", "m9": "Qwen 3.5 9B", "m27": "Qwen 3.8 27B",
         "tr_title": "Transcribing a 15 min 16 s recording", "tr_sub": "Whisper Large v3 Turbo compressed · shorter is better",
         "tr_fast": "{n}× faster", "rt": "real time",
+        "ev_title": "Transcription: gain over versions 0.3.x", "ev_sub": "same engines, improved settings · shorter is better",
+        "ev_rocm15": "ROCm · 15 min", "ev_rocm1h": "ROCm · 1 h", "ev_cpu15": "Processor · 15 min", "ev_vk15": "AMD before RX 7000, Intel · 15 min",
+        "ev_old": "before", "ev_new": "0.4.0", "ev_old_vk": "processor",
         "pl_title": "From recording to meeting report", "pl_sub": "15 min 16 s recording, speaker separation included · shorter is better",
         "st_tr": "Transcription", "st_sep": "Speaker separation", "st_wr": "Report (Qwen 3.5 4B)",
         "lv_title": "Live transcription: time for a 10 s excerpt", "lv_sub": "Whisper server kept in memory · below the line, the text keeps up with the voice",
@@ -136,6 +150,23 @@ def chart_transcription(lang):
     return svg(780, 100 + 3 * 58 + 8, t["tr_title"], t["tr_sub"], body)
 
 
+def chart_evolution(lang):
+    t = T[lang]
+    x0, wmax, vmax = 250, 330, 350.0
+    body, y = "", 96
+    for k, old, new in PREV:
+        body += f'<text x="28" y="{y + 4}" font-size="14" font-weight="700" fill="#111827">{escape(t["ev_" + k])}</text>'
+        y += 12
+        olabel = t["ev_old_vk"] if k == "vk15" else t["ev_old"]
+        body += bar(x0, y, wmax * old / vmax, 24, "#CBD5E1", olabel, dur(old, lang))
+        y += 32
+        col = {"rocm15": COL["rocm"], "rocm1h": COL["rocm"], "cpu15": COL["cpu"], "vk15": COL["vulkan"]}[k]
+        body += bar(x0, y, wmax * new / vmax, 24, col, "Vulkan 0.4.0" if k == "vk15" else t["ev_new"], f"{dur(new, lang)}", bold=True)
+        body += f'<rect x="{x0 + wmax + 90}" y="{y - 14}" width="62" height="24" rx="12" fill="#DCFCE7"/><text x="{x0 + wmax + 121}" y="{y + 3}" font-size="13" font-weight="700" fill="#166534" text-anchor="middle">×{num(old / new, lang, 1)}</text>'
+        y += 40
+    return svg(780, y + 6, t["ev_title"], t["ev_sub"], body)
+
+
 def chart_pipeline(lang):
     t = T[lang]
     x0, wmax = 150, 440
@@ -181,10 +212,16 @@ def chart_redaction_duree(lang):
     t = T[lang]
     x0, wmax = 230, 440
     body, y = "", 96
-    for model, mk in (("4B", "m4"), ("9B", "m9")):
+    for model, mk in (("4B", "m4"), ("9B", "m9"), ("27B", "m27")):
         body += f'<text x="28" y="{y + 4}" font-size="14" font-weight="700" fill="#111827">{escape(t[mk])}</text>'
         y += 14
         for r in [r for r in LLM if r[0] == model]:
+            if r[2] > 160:  # barre tronquée (coupure en biais)
+                body += f'<rect x="{x0}" y="{y}" width="{wmax}" height="28" rx="6" fill="{COL[r[1]]}"/><path d="M{x0 + wmax - 30} {y + 30} L{x0 + wmax - 16} {y - 2}" stroke="#FFFFFF" stroke-width="5"/>'
+                body += f'<text x="{x0 + wmax + 10}" y="{y + 19}" font-size="13" font-weight="600" fill="#111827">{dur(r[2], lang)}</text>'
+                body += f'<text x="{x0 - 12}" y="{y + 19}" font-size="13" fill="#374151" text-anchor="end">{escape(t[r[1]])}</text>'
+                y += 40
+                continue
             body += bar(x0, y, wmax * r[2] / 160.0, 28, COL[r[1]], t[r[1]], dur(r[2], lang) + (f"  ({dur(r[9], lang)})" if r[9] else ""), bold=(r[1] == "rocm"))
             y += 40
         y += 14
@@ -199,7 +236,7 @@ def chart_redaction_vitesse(lang):
         px = 28 + pi * 372
         body += f'<text x="{px}" y="100" font-size="14" font-weight="700" fill="#111827">{escape(ptitle)}</text>'
         y = 116
-        for model, mk in (("4B", "m4"), ("9B", "m9")):
+        for model, mk in (("4B", "m4"), ("9B", "m9"), ("27B", "m27")):
             body += f'<text x="{px}" y="{y + 12}" font-size="12" fill="#6B7280">{escape(t[mk])}</text>'
             y += 20
             for r in [r for r in LLM if r[0] == model]:
@@ -216,11 +253,11 @@ def chart_redaction_vitesse(lang):
 def chart_memoire(lang):
     t = T[lang]
     x0, wmax = 200, 470
-    scale = 7000.0
+    scale = 14000.0
     rows = [(t["wh_" + r[0]], r[2], None, r[4]) for r in TR]
-    for model, mk in (("4B", "m4"), ("9B", "m9")):
+    for model, mk in (("4B", "m4"), ("9B", "m9"), ("27B", "m27")):
         for r in [r for r in LLM if r[0] == model]:
-            rows.append((f"{t[mk].replace('Qwen 3.5 ', '')} · {t[r[1] + '_s']}", r[5], r[6], r[7]))
+            rows.append((f"{t[mk].replace('Qwen 3.5 ', '').replace('Qwen 3.8 ', '')} · {t[r[1] + '_s']}", r[5], r[6], r[7]))
     body, y = "", 100
     for label, ram, priv, vram in rows:
         body += f'<text x="{x0 - 12}" y="{y + 28}" font-size="13" fill="#374151" text-anchor="end">{escape(label)}</text>'
@@ -243,9 +280,9 @@ def chart_cpu(lang):
     t = T[lang]
     x0, wmax = 200, 470
     rows = [(t["wh_" + r[0]], r[5], r[0]) for r in TR]
-    for model, mk in (("4B", "m4"), ("9B", "m9")):
+    for model, mk in (("4B", "m4"), ("9B", "m9"), ("27B", "m27")):
         for r in [r for r in LLM if r[0] == model]:
-            rows.append((f"{t[mk].replace('Qwen 3.5 ', '')} · {t[r[1] + '_s']}", r[8], r[1]))
+            rows.append((f"{t[mk].replace('Qwen 3.5 ', '').replace('Qwen 3.8 ', '')} · {t[r[1] + '_s']}", r[8], r[1]))
     body, y = "", 96
     for label, pct, k in rows:
         body += bar(x0, y, wmax * pct / 55.0, 24, COL[k], label, f"{pct} %")
@@ -254,7 +291,7 @@ def chart_cpu(lang):
 
 
 FILES = {
-    "transcription": chart_transcription, "pipeline": chart_pipeline, "direct": chart_direct, "redaction-duree": chart_redaction_duree, "redaction-vitesse": chart_redaction_vitesse,
+    "transcription": chart_transcription, "evolution": chart_evolution, "pipeline": chart_pipeline, "direct": chart_direct, "redaction-duree": chart_redaction_duree, "redaction-vitesse": chart_redaction_vitesse,
     "memoire": chart_memoire, "processeur": chart_cpu,
 }
 for lang in ("fr", "en"):
@@ -269,6 +306,7 @@ data = {
     "transcription": [dict(zip(("engine", "duration_s", "ram_peak_mb", "ram_private_mb", "vram_peak_mb", "cpu_pct_of_pc"), r)) for r in TR],
     "live": [dict(zip(("engine", "start_s", "ram_mb", "vram_mb", "first_10s_excerpt_s", "next_10s_excerpt_s"), r)) for r in SRV],
     "speaker_separation_s": SEP_S,
+    "previous_versions_transcription_s": [dict(zip(("case", "before_0_3_x_s", "v0_4_0_s"), r)) for r in PREV],
     "writing": [{k: v for k, v in zip(("model", "engine", "duration_15min_s", "read_tok_s", "write_tok_s", "ram_peak_mb", "_", "vram_peak_mb", "cpu_pct_of_pc", "duration_1h_s"), r) if k != "_"} for r in LLM],
     "app_idle": {"working_set_mb": 360, "private_mb": 106, "process_mb": 30, "cpu_pct": 0},
 }

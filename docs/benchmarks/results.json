@@ -55,6 +55,28 @@
     }
   ],
   "speaker_separation_s": 38.0,
+  "previous_versions_transcription_s": [
+    {
+      "case": "rocm15",
+      "before_0_3_x_s": 34.5,
+      "v0_4_0_s": 22.4
+    },
+    {
+      "case": "rocm1h",
+      "before_0_3_x_s": 129.7,
+      "v0_4_0_s": 45.0
+    },
+    {
+      "case": "cpu15",
+      "before_0_3_x_s": 346.5,
+      "v0_4_0_s": 278.5
+    },
+    {
+      "case": "vk15",
+      "before_0_3_x_s": 346.5,
+      "v0_4_0_s": 35.6
+    }
+  ],
   "writing": [
     {
       "model": "4B",
@@ -110,6 +132,39 @@
       "vram_peak_mb": 5038,
       "cpu_pct_of_pc": 2,
       "duration_1h_s": 83.1
+    },
+    {
+      "model": "27B",
+      "engine": "rocm",
+      "duration_15min_s": 42.2,
+      "read_tok_s": 655,
+      "write_tok_s": 34,
+      "ram_peak_mb": 12372,
+      "vram_peak_mb": 11132,
+      "cpu_pct_of_pc": 4,
+      "duration_1h_s": 109.3
+    },
+    {
+      "model": "27B",
+      "engine": "vulkan",
+      "duration_15min_s": 101.6,
+      "read_tok_s": 250,
+      "write_tok_s": 15,
+      "ram_peak_mb": 13550,
+      "vram_peak_mb": 10352,
+      "cpu_pct_of_pc": 2,
+      "duration_1h_s": 241.0
+    },
+    {
+      "model": "27B",
+      "engine": "cpu",
+      "duration_15min_s": 1008.3,
+      "read_tok_s": 16,
+      "write_tok_s": 2.4,
+      "ram_peak_mb": 13793,
+      "vram_peak_mb": 0,
+      "cpu_pct_of_pc": 50,
+      "duration_1h_s": null
     }
   ],
   "app_idle": {
