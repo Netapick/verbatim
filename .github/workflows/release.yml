@@ -29,12 +29,11 @@ jobs:
 
       - run: npm ci
 
-      # Étiquette de build « v{version}-{horodatage} » : la même dans l'application et dans le nom de la release
-      - name: Étiquette de build
+      # Version et type de release (un tag avec suffixe est une préversion). Pas d'horodatage : il est réservé aux versions de développement
+      - name: Version
         id: stamp
         shell: bash
         run: |
-          echo "ts=$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
           echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           case "${{ github.ref_name }}" in *-*) echo "pre=true" >> "$GITHUB_OUTPUT" ;; *) echo "pre=false" >> "$GITHUB_OUTPUT" ;; esac
 
@@ -45,10 +44,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          VERBATIM_BUILD_TS: ${{ steps.stamp.outputs.ts }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: v${{ steps.stamp.outputs.version }}-${{ steps.stamp.outputs.ts }}
+          releaseName: v${{ steps.stamp.outputs.version }}
           releaseBody: "Voir les changements de cette version."
           releaseDraft: true
           prerelease: ${{ steps.stamp.outputs.pre == 'true' }}

@@ -17,9 +17,17 @@ fn build_stamp() -> String {
 }
 
 fn main() {
-    // étiquette de build « v{version}-{horodatage} » : la CI fixe VERBATIM_BUILD_TS pour que l'app et la release portent la même valeur
+    // Horodatage affiché après la version (« v0.4.0-20261025-1130 ») : réservé aux versions de développement.
+    // Une build en profil release (celle qu'on publie) n'en a pas : « v0.4.0 ». Pour en avoir un quand même (builds de test),
+    // définir VERBATIM_BUILD_TS (valeur libre, par exemple « 20261025-1130 »).
     println!("cargo:rerun-if-env-changed=VERBATIM_BUILD_TS");
-    let stamp = std::env::var("VERBATIM_BUILD_TS").ok().filter(|s| !s.trim().is_empty()).unwrap_or_else(build_stamp);
-    println!("cargo:rustc-env=VERBATIM_BUILD_TS={}", stamp.trim());
+    let explicit = std::env::var("VERBATIM_BUILD_TS").ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let release = std::env::var("PROFILE").map(|p| p == "release").unwrap_or(false);
+    let stamp = match explicit {
+        Some(s) => s,
+        None if release => String::new(),
+        None => build_stamp(),
+    };
+    println!("cargo:rustc-env=VERBATIM_BUILD_TS={stamp}");
     tauri_build::build()
 }

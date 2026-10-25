@@ -27,7 +27,7 @@ Français · English below each version.
 - La case « Transcription en direct » est décochée à chaque ouverture du panneau d'enregistrement.
 - Les modèles de séparation des intervenants (34 Mo) sont téléchargés seuls au démarrage quand Whisper est déjà installé (une seule fois : supprimés à la main, ils ne reviennent pas).
 - Sous « Réunions », des cartes proposent d'installer la séparation des intervenants et de choisir un modèle de compte-rendu quand l'un des deux manque (Whisper étant installé).
-- La version affichée est de la forme `v0.4.0-20261025-1130` (version et horodatage du build).
+- La version affichée est `v0.4.0` ; les versions de développement ajoutent l'horodatage du build (`v0.4.0-20261025-1130`).
 - Compte-rendu : si le modèle est coupé par la limite de longueur, la rédaction est relancée avec une limite plus large ; l'erreur indique la cause.
 
 ### English
@@ -55,7 +55,7 @@ Français · English below each version.
 - The “Live transcription” checkbox is unchecked every time the recording panel opens.
 - The speaker-separation models (34 MB) are downloaded automatically at startup when Whisper is already installed (once only: if you delete them by hand, they do not come back).
 - Under “Meetings”, cards offer to install speaker separation and to choose a report model when either is missing (once Whisper is installed).
-- The displayed version looks like `v0.4.0-20261025-1130` (version and build timestamp).
+- The displayed version is `v0.4.0`; development versions add the build timestamp (`v0.4.0-20261025-1130`).
 - Report: if the model is cut off by the length limit, writing is retried with a larger limit; the error states the cause.
 
 ## 0.3.1

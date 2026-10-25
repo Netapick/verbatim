@@ -92,7 +92,7 @@ Updating uses the official `tauri-plugin-updater` (+ `tauri-plugin-process`), ca
 
 **Signing key.** `npx tauri signer generate -w .secrets/verbatim-updater.key` (already done; `.secrets/` and `*.key` are git-ignored). The public key is in `tauri.conf.json` (`plugins.updater.pubkey`), the private key in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY` (and a copy outside the repository). Never commit it. A local installer build (`tauri build`) also signs: first set `$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content .secrets/verbatim-updater.key -Raw` (PowerShell).
 
-**Build label.** `build.rs` sets `VERBATIM_BUILD_TS` (`YYYYMMDD-HHMM`, UTC); the app shows `v{version}-{timestamp}`, and CI passes it so the release carries the same name. Only the version (`0.4.0`) is used for comparisons.
+**Build label.** Published versions (release profile) show `v0.4.0`, with no timestamp. Development versions (`tauri dev`) show `v0.4.0-YYYYMMDD-HHMM` (UTC), set by `build.rs`; to get the timestamp on a release-profile test build, set `VERBATIM_BUILD_TS`. Only the version (`0.4.0`) is used for comparisons.
 
 **Compatibility.** Versions ≤ 0.3.1 use the old flow (`*_x64-setup.exe` installer + the API's SHA-256): the release must keep publishing that installer under that name.
 

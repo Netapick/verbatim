@@ -6,12 +6,14 @@ use crate::{AppState, R};
 use serde_json::{json, Value};
 use tauri::State;
 
-/// Version du projet et étiquette de build `v{version}-{horodatage}` (l'horodatage est fixé à la compilation).
-/// L'étiquette est informative : la comparaison des versions se fait toujours sur le numéro seul.
+/// Version du projet et étiquette `v{version}` (versions publiées) ou `v{version}-{horodatage}` (versions de développement ;
+/// l'horodatage est fixé à la compilation, voir `build.rs`). La comparaison des versions se fait toujours sur le numéro seul.
 #[tauri::command]
 pub fn app_version() -> Value {
     let version = env!("CARGO_PKG_VERSION");
-    json!({ "version": version, "label": format!("v{version}-{}", env!("VERBATIM_BUILD_TS")) })
+    let stamp = env!("VERBATIM_BUILD_TS");
+    let label = if stamp.is_empty() { format!("v{version}") } else { format!("v{version}-{stamp}") };
+    json!({ "version": version, "label": label })
 }
 
 /// Arrête les moteurs d'IA avant l'installation : le plugin quitte l'application sans passer par la fermeture normale
@@ -97,9 +99,15 @@ mod tests {
     fn etiquette_de_build() {
         let v = app_version();
         let label = v["label"].as_str().unwrap();
-        assert!(label.starts_with(&format!("v{}-", env!("CARGO_PKG_VERSION"))), "{label}");
-        let stamp = label.rsplit('-').take(2).collect::<Vec<_>>();
-        assert_eq!(stamp[0].len(), 4, "{label}");
-        assert_eq!(stamp[1].len(), 8, "{label}");
+        let v = env!("CARGO_PKG_VERSION");
+        if env!("VERBATIM_BUILD_TS").is_empty() {
+            // build publiée : la version seule
+            assert_eq!(label, format!("v{v}"));
+        } else {
+            assert!(label.starts_with(&format!("v{v}-")), "{label}");
+            let stamp = label.rsplit('-').take(2).collect::<Vec<_>>();
+            assert_eq!(stamp[0].len(), 4, "{label}");
+            assert_eq!(stamp[1].len(), 8, "{label}");
+        }
     }
 }
