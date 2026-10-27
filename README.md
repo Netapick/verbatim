@@ -9,7 +9,7 @@
 Verbatim enregistre ou importe vos réunions, les transcrit avec **Whisper**, identifie qui parle, puis rédige le compte-rendu avec une IA **Qwen** qui tourne sur votre propre ordinateur.<br>
 Aucun compte, aucun abonnement, aucune télémétrie : **rien ne quitte votre machine.**
 
-[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
+[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA%20%2B%20Vulkan-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
 
 **[Télécharger](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Fonctionnalités](#fonctionnalités) &nbsp;·&nbsp; [Performances](#performances) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Feuille de route](#feuille-de-route)
 
@@ -28,7 +28,7 @@ Français · [English](README.en.md)
 | Atout | En pratique |
 |---|---|
 | **100 % local** | L'audio, les transcriptions, les comptes-rendus et les modèles restent sur votre ordinateur. Pas de cloud, pas de compte, pas d'envoi de données. |
-| **Rapide grâce à votre carte graphique** | NVIDIA (CUDA) ou AMD (ROCm, Vulkan), avec repli automatique sur le processeur. Un enregistrement de 15 min est transcrit en **22 s** sur une RX 7800 XT, contre 4 min 38 s sur processeur. |
+| **Rapide grâce à votre carte graphique** | NVIDIA (CUDA, Vulkan) ou AMD (ROCm, Vulkan), avec repli automatique sur le processeur. Un enregistrement de 15 min est transcrit en **22 s** sur une RX 7800 XT, contre 4 min 38 s sur processeur. |
 | **Qui a dit quoi** | Chaque passage est attribué à un intervenant, avec une couleur par personne. Ceux qui se présentent (« Bonjour, je suis Marie ») sont nommés tout au long de la réunion. |
 | **Du son au compte-rendu** | Résumé, points abordés, décisions, actions et suites, à partir d'un simple enregistrement : de l'audio de 15 min au compte-rendu en 1 min 10 s sur une carte AMD récente. |
 | **Pensé pour les réunions** | Transcription en direct, préparations (ordre du jour, questions), glossaire de sigles métier, traduction, lecteur audio synchronisé. |
@@ -103,7 +103,7 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 
 | Carte graphique | Transcription (Whisper) | Rédaction (Qwen) |
 |---|---|---|
-| **NVIDIA** | CUDA | CUDA, sinon Vulkan |
+| **NVIDIA** | CUDA, sinon Vulkan | CUDA, sinon Vulkan |
 | **AMD Radeon RX 7000 / PRO W7000** (RDNA 3) | ROCm | ROCm, sinon Vulkan |
 | Autres AMD, Intel | Vulkan | Vulkan |
 | Sans carte graphique | Processeur | Processeur |
@@ -295,7 +295,7 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 
 **Réalisé**
 - ✅ **Séparation des intervenants** (diarisation) et reconnaissance de ceux qui se présentent.
-- ✅ **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA), y compris Whisper en Vulkan pour les AMD d'avant la série RX 7000 et Intel.
+- ✅ **Moteurs GPU** : AMD (ROCm, Vulkan) et NVIDIA (CUDA, Vulkan), y compris Whisper en Vulkan pour les AMD d'avant la série RX 7000 et Intel.
 - ✅ **Mise à jour intégrée** : bandeau, téléchargement et installation dans l'application, redémarrage automatique, signature vérifiée.
 - ✅ **Démarrage rapide** : Whisper et la séparation préchargés, écran de démarrage, garde-fous à la fermeture.
 - ✅ **Interface en anglais** (français par défaut, choix dans Réglages › Général).

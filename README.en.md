@@ -9,7 +9,7 @@
 Verbatim records or imports your meetings, transcribes them with **Whisper**, tells who is speaking, then writes the report with a **Qwen** AI that runs on your own computer.<br>
 No account, no subscription, no telemetry: **nothing leaves your machine.**
 
-[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![MIT license](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
+[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![MIT license](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA%20%2B%20Vulkan-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white)
 
 **[Download](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Performance](#performance) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Roadmap](#roadmap)
 
@@ -30,7 +30,7 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 | Strength | In practice |
 |---|---|
 | **100% local** | Audio, transcripts, reports and models stay on your computer. No cloud, no account, no data sent anywhere. |
-| **Fast thanks to your graphics card** | NVIDIA (CUDA) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in **22 s** on an RX 7800 XT, versus 4 min 38 s on the processor. |
+| **Fast thanks to your graphics card** | NVIDIA (CUDA, Vulkan) or AMD (ROCm, Vulkan), with automatic fallback to the processor. A 15-minute recording is transcribed in **22 s** on an RX 7800 XT, versus 4 min 38 s on the processor. |
 | **Who said what** | Every passage is attributed to a speaker, with one color per person. People who introduce themselves ("Hello, I'm Marie") are named throughout the meeting. |
 | **From sound to report** | Summary, topics, decisions, actions and next steps from a simple recording: from 15 minutes of audio to the report in 1 min 10 s on a recent AMD card. |
 | **Built for meetings** | Live transcription, preparations (agenda, questions), a glossary of business acronyms, translation, an audio player synced with the transcript. |
@@ -105,7 +105,7 @@ At startup, Verbatim preloads Whisper and speaker separation (a start screen sho
 
 | Graphics card | Transcription (Whisper) | Writing (Qwen) |
 |---|---|---|
-| **NVIDIA** | CUDA | CUDA, otherwise Vulkan |
+| **NVIDIA** | CUDA, otherwise Vulkan | CUDA, otherwise Vulkan |
 | **AMD Radeon RX 7000 / PRO W7000** (RDNA 3) | ROCm | ROCm, otherwise Vulkan |
 | Other AMD, Intel | Vulkan | Vulkan |
 | No graphics card | Processor | Processor |
@@ -297,7 +297,7 @@ These are working leads, with no commitment on dates or order.
 
 **Done**
 - ✅ **Speaker separation** (diarization) and recognition of people who introduce themselves.
-- ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
+- ✅ **GPU engines**: AMD (ROCm, Vulkan) and NVIDIA (CUDA, Vulkan), including Whisper on Vulkan for AMD cards older than the RX 7000 series and Intel.
 - ✅ **Built-in update**: banner, download and installation inside the application, automatic restart, verified signature.
 - ✅ **Fast startup**: Whisper and speaker separation preloaded, a start screen, safeguards on close.
 - ✅ **English interface** (French by default, chosen in Settings › General).
