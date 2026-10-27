@@ -20,6 +20,8 @@ Français · [English](README.en.md)
 
 <img src="docs/screenshots/demo.webp" alt="Démonstration : enregistrement avec transcription en direct, puis compte-rendu et transcription par intervenant" width="860">
 
+[Voir la vidéo de présentation](docs/video/verbatim-presentation.mp4) (40 s, avec le son)
+
 </div>
 
 <br>

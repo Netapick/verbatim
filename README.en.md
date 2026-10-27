@@ -20,6 +20,8 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 <img src="docs/screenshots/en/demo.webp" alt="Demo: recording with live transcription, then report and per-speaker transcript" width="860">
 
+[Watch the presentation video](docs/video/verbatim-presentation.mp4) (40 s, with sound, in French)
+
 </div>
 
 <br>
