@@ -31,6 +31,10 @@ Un clic sur **● Enregistrer** capture le **microphone**, le **son du PC** (vis
 
 ![Nouvel enregistrement](screenshots/02-enregistrement.png)
 
+![Transcription en direct pendant l'enregistrement, avec traduction](screenshots/14-direct.png)
+
+![Pastille flottante d'enregistrement](screenshots/15-pastille.png)
+
 - L'audio est écrit sur disque au fil de l'eau : après un plantage ou une coupure, l'enregistrement est reconstitué au prochain lancement (perte d'environ 2 secondes au plus).
 - Vous pouvez aussi **importer un audio** (mp3, m4a/aac, ogg, flac, wav…) ou **une transcription existante** (txt, srt, vtt, md).
 - La transcription démarre automatiquement, avec la progression en pourcentage et le matériel utilisé (CPU ou GPU).
