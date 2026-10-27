@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src-tauri/icons/icon.png" alt="Logo Verbatim" width="110">
+<img src="docs/screenshots/logo-anim.webp" alt="Logo Verbatim" width="160">
 
 # Verbatim
 
@@ -17,7 +17,9 @@ Français · [English](README.en.md)
 
 <br>
 
-<img src="docs/screenshots/03-compte-rendu.png" alt="Un compte-rendu généré par Verbatim, avec la transcription minutée" width="860">
+<video src="https://github.com/Netapick/verbatim/raw/main/docs/screenshots/demo.mp4" poster="docs/screenshots/demo-poster.jpg" width="860" controls muted loop playsinline>
+  <a href="docs/screenshots/demo.mp4"><img src="docs/screenshots/demo.gif" alt="Démonstration : enregistrement avec transcription en direct, puis compte-rendu et transcription par intervenant" width="860"></a>
+</video>
 
 </div>
 
@@ -47,6 +49,10 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 ### Enregistrer ou importer
 
 <img src="docs/screenshots/02-enregistrement.png" alt="Panneau de nouvel enregistrement" width="720">
+
+<img src="docs/screenshots/14-direct.png" alt="Transcription en direct pendant l'enregistrement, avec traduction" width="720">
+
+<img src="docs/screenshots/15-pastille.png" alt="Pastille flottante d'enregistrement" width="720">
 
 - Capture du **microphone**, du **son du PC** (visio, vidéo, via la boucle WASAPI) ou des deux, mixés en mono. Niveaux en direct, pause et reprise, réglage de la sensibilité.
 - L'audio est écrit sur le disque au fil de l'eau : après un plantage ou une coupure, l'enregistrement est reconstitué au prochain lancement (environ 2 secondes perdues au plus).
@@ -78,6 +84,8 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 - Calcul au choix (carte graphique ou processeur) dans Réglages › Traduction ; le matériel et le modèle utilisés sont affichés.
 
 ### Rédiger le compte-rendu
+
+<img src="docs/screenshots/03-compte-rendu.png" alt="Un compte-rendu généré par Verbatim, avec la transcription minutée" width="720">
 
 - Résumé, points abordés, décisions, actions et prochaines étapes, générés par une IA locale : **Qwen 3.5** (4B ou 9B), **Qwen 3.8 27B**, ou vos propres modèles GGUF. Ollama et une API compatible OpenAI restent possibles en option.
 - Les réunions longues sont découpées en parties, résumées, puis fusionnées. Le glossaire et la préparation liée sont fournis au modèle.
