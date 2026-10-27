@@ -18,9 +18,12 @@ Français · [English](README.en.md)
 
 <br>
 
-<img src="docs/screenshots/demo.webp" alt="Démonstration : enregistrement avec transcription en direct, puis compte-rendu et transcription par intervenant" width="860">
+<a href="docs/video/verbatim-presentation.mp4"><img src="docs/video/presentation.webp" alt="Vidéo de présentation de Verbatim : enregistrement, transcription en direct, compte-rendu, traduction" width="860"></a>
+<br><sub>Cliquez sur l'animation pour voir la vidéo avec le son (40 s)</sub>
 
-[Voir la vidéo de présentation](docs/video/verbatim-presentation.mp4) (40 s, avec le son)
+<br>
+
+<img src="docs/screenshots/demo.webp" alt="Démonstration : enregistrement avec transcription en direct, puis compte-rendu et transcription par intervenant" width="860">
 
 </div>
 
