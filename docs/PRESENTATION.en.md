@@ -100,6 +100,8 @@ The installation **never** starts during a recording, a transcription or report 
 
 ![Update banner](screenshots/11-mise-a-jour-banniere.png)
 
+![“Update ready” window](screenshots/13-mise-a-jour-prete.png)
+
 Updates are configured in **Settings › Connections**: you can turn off automatic installation or run a check on demand.
 
 ![Update settings](screenshots/12-mise-a-jour-reglages.png)

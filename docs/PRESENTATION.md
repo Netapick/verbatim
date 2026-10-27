@@ -100,6 +100,8 @@ L'installation ne se lance **jamais** pendant un enregistrement, une transcripti
 
 ![Bannière de mise à jour](screenshots/11-mise-a-jour-banniere.png)
 
+![Fenêtre « La version est prête »](screenshots/13-mise-a-jour-prete.png)
+
 La mise à jour se règle dans **Réglages › Connexions** : vous pouvez désactiver l'installation automatique ou lancer une recherche à la demande.
 
 ![Réglages des mises à jour](screenshots/12-mise-a-jour-reglages.png)
