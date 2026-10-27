@@ -51,13 +51,16 @@ jobs:
           releaseDraft: true
           prerelease: ${{ steps.stamp.outputs.pre == 'true' }}
 
-      # Notes de la release : la section de CHANGELOG.md de cette version (affichées dans « Notes de version »)
-      - name: Notes de version
+      # Notes de la release : la section de CHANGELOG.md de cette version (affichées dans « Notes de version »),
+      # suivie de la somme SHA-256 de l'installateur pour vérifier un téléchargement (voir docs/SIGNATURE.md)
+      - name: Notes de version et somme SHA-256
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACTS: ${{ steps.tauri.outputs.artifactPaths }}
         run: |
           v="${{ steps.stamp.outputs.version }}"
           awk -v v="$v" '$0 == "## " v {f=1; next} /^## / && f {exit} f' CHANGELOG.md > notes.md
+          node scripts/checksums.mjs notes.md
           # par identifiant : « gh release edit <tag> » ne trouve pas un brouillon
           if [ -s notes.md ]; then gh api --method PATCH "repos/${{ github.repository }}/releases/${{ steps.tauri.outputs.releaseId }}" -F "body=@notes.md" > /dev/null; fi

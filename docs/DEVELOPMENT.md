@@ -115,8 +115,10 @@ npx tauri build                  # installateur (nécessite NSIS)
 
 ## Publier une version
 
+À chaque envoi de code, `.github/workflows/ci.yml` vérifie que le projet compile (`cargo check --locked`, syntaxe du JavaScript de `ui/`) ; rustfmt et clippy y tournent à titre indicatif. Il ne signe ni ne publie rien.
+
 1. Monter le numéro dans `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` et `src-tauri/Cargo.lock`, ajouter une entrée à `CHANGELOG.md`, puis commiter.
-2. Pousser un tag `vX.Y.Z` : le workflow `.github/workflows/release.yml` construit l'installateur, le signe pour la mise à jour intégrée (secret `TAURI_SIGNING_PRIVATE_KEY`) et publie la release avec l'installateur, le `.sig` et `latest.json`, puis y met les notes du `CHANGELOG.md`. La release doit être la plus récente pour que la mise à jour la voie. Un tag avec suffixe (`v0.4.1-beta`) est une préversion publiée en brouillon : jamais proposée.
+2. Pousser un tag `vX.Y.Z` : le workflow `.github/workflows/release.yml` construit l'installateur, le signe pour la mise à jour intégrée (secret `TAURI_SIGNING_PRIVATE_KEY`) et publie la release avec l'installateur, le `.sig` et `latest.json`, puis y met les notes du `CHANGELOG.md` suivies de la somme SHA-256 de l'installateur (`scripts/checksums.mjs`). La release doit être la plus récente pour que la mise à jour la voie. Un tag avec suffixe (`v0.4.1-beta`) est une préversion publiée en brouillon : jamais proposée.
 
 ## Identité visuelle
 

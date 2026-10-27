@@ -1,0 +1,55 @@
+name: ci
+
+# Vérifie que le projet compile à chaque envoi de code et à chaque pull request. Ne signe rien et ne publie rien
+# (la release est le travail de release.yml, déclenché par un tag).
+# Bloquant : « cargo check » et la syntaxe du JavaScript de l'interface.
+# À titre indicatif (n'échoue pas) : rustfmt et clippy, dont le code actuel n'est pas encore exempt d'écarts.
+on:
+  push:
+    branches: [main]
+    paths: ["src-tauri/**", "ui/**", ".github/workflows/ci.yml"]
+  pull_request:
+    paths: ["src-tauri/**", "ui/**", ".github/workflows/ci.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Syntaxe du JavaScript de l'interface
+        shell: bash
+        run: for f in ui/*.js; do node --check "$f"; done
+
+      - name: Compilation (cargo check)
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      - name: Format (indicatif)
+        working-directory: src-tauri
+        continue-on-error: true
+        run: cargo fmt --check
+
+      - name: Clippy (indicatif)
+        working-directory: src-tauri
+        continue-on-error: true
+        run: cargo clippy --locked

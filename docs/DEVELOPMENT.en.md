@@ -115,8 +115,10 @@ npx tauri build                  # installer (requires NSIS)
 
 ## Publishing a version
 
+On every push, `.github/workflows/ci.yml` checks that the project compiles (`cargo check --locked`, syntax of the JavaScript in `ui/`); rustfmt and clippy run there for information only. It signs and publishes nothing.
+
 1. Bump the version in `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock`, add an entry to `CHANGELOG.md`, then commit.
-2. Push a `vX.Y.Z` tag: the `.github/workflows/release.yml` workflow builds the installer, signs the update (secret `TAURI_SIGNING_PRIVATE_KEY`, see [SIGNATURE.en.md](SIGNATURE.en.md)) and publishes the release with the installer, the `.sig` and `latest.json`, then sets the notes from `CHANGELOG.md`. The release must be the most recent one for the update to see it. A tag with a suffix (`v0.4.1-beta`) is a pre-release published as a draft: never offered.
+2. Push a `vX.Y.Z` tag: the `.github/workflows/release.yml` workflow builds the installer, signs the update (secret `TAURI_SIGNING_PRIVATE_KEY`, see [SIGNATURE.en.md](SIGNATURE.en.md)) and publishes the release with the installer, the `.sig` and `latest.json`, then sets the notes from `CHANGELOG.md`, followed by the installer's SHA-256 checksum (`scripts/checksums.mjs`). The release must be the most recent one for the update to see it. A tag with a suffix (`v0.4.1-beta`) is a pre-release published as a draft: never offered.
 
 ## Visual identity
 
