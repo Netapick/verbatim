@@ -18,7 +18,8 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 <br>
 
-<video src="https://github.com/Netapick/verbatim/raw/main/docs/video/verbatim-presentation.mp4" controls muted width="860"><a href="docs/video/verbatim-presentation.mp4">Watch the presentation video (40 s, in French)</a></video>
+<a href="docs/video/verbatim-presentation.mp4"><img src="docs/video/presentation.webp" alt="Verbatim presentation video: recording, live transcription, report, translation" width="860"></a>
+<br><sub>Click the video to watch it with sound (40 s, in French)</sub>
 
 <br>
 

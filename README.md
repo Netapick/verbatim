@@ -18,7 +18,8 @@ Français · [English](README.en.md)
 
 <br>
 
-<video src="https://github.com/Netapick/verbatim/raw/main/docs/video/verbatim-presentation.mp4" controls muted width="860"><a href="docs/video/verbatim-presentation.mp4">Voir la vidéo de présentation (40 s)</a></video>
+<a href="docs/video/verbatim-presentation.mp4"><img src="docs/video/presentation.webp" alt="Vidéo de présentation de Verbatim : enregistrement, transcription en direct, compte-rendu, traduction" width="860"></a>
+<br><sub>Cliquez sur la vidéo pour la voir avec le son (40 s)</sub>
 
 <br>
 
