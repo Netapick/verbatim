@@ -1,0 +1,67 @@
+name: Signaler un bug / Report a bug
+description: Quelque chose ne marche pas comme prévu. / Something does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Avant de commencer, regardez [les codes et messages d'erreur](https://github.com/Netapick/verbatim/blob/main/docs/CODES.md) : la réponse y est peut-être. Ne joignez **aucun enregistrement réel** ni contenu de réunion privé.
+
+        Before you start, see [the error codes and messages](https://github.com/Netapick/verbatim/blob/main/docs/CODES.en.md): the answer may be there. Do **not** attach any real recording or private meeting content.
+  - type: input
+    id: version
+    attributes:
+      label: Version de Verbatim / Verbatim version
+      description: Affichée en bas à gauche de l'application. / Shown at the bottom left of the application.
+      placeholder: v0.4.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Version de Windows / Windows version
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: Carte graphique et moteur choisi / Graphics card and chosen engine
+      description: Moteur choisi dans Réglages › Modèles (Auto, ROCm, CUDA, Vulkan, Processeur). / Engine chosen in Settings › Models.
+      placeholder: NVIDIA RTX 3060, Auto
+  - type: dropdown
+    id: where
+    attributes:
+      label: Où est le problème ? / Where is the problem?
+      options:
+        - Installation ou mise à jour / Installation or update
+        - Enregistrement / Recording
+        - Transcription (fichier ou direct) / Transcription (file or live)
+        - Séparation des intervenants / Speaker separation
+        - Compte-rendu / Report
+        - Traduction / Translation
+        - Interface / Interface
+        - Autre / Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Ce qui se passe / What happens
+      description: Les étapes pour reproduire, ce que vous attendiez, ce que vous avez obtenu. / Steps to reproduce, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: message
+    attributes:
+      label: Message d'erreur affiché / Error message shown
+      description: Copié tel quel, ou capture d'écran. / Copied as is, or a screenshot.
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Journal / Log
+      description: |
+        Échec d'installation : contenu de `redist-install.log` (racine du dossier d'installation). Problème de direct : `verbatim-whisper-server.log` (dossier temporaire). Retirez ce qui est privé.
+        Failed installation: contents of `redist-install.log` (root of the installation folder). Live problem: `verbatim-whisper-server.log` (temporary folder). Remove anything private.
+      render: text

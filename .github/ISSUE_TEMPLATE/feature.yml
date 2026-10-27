@@ -1,0 +1,30 @@
+name: Proposer une idée / Suggest an idea
+description: Une fonction qui manque, une amélioration. / A missing feature, an improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Regardez d'abord la [feuille de route](https://github.com/Netapick/verbatim#feuille-de-route) : l'idée y est peut-être déjà. Verbatim reste 100 % local et sans télémétrie.
+
+        Look at the [roadmap](https://github.com/Netapick/verbatim/blob/main/README.en.md#roadmap) first: the idea may already be there. Verbatim stays 100% local with no telemetry.
+  - type: textarea
+    id: need
+    attributes:
+      label: Le besoin / The need
+      description: Ce que vous voulez faire et ce qui vous en empêche aujourd'hui. / What you want to do and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Votre idée / Your idea
+      description: Comment cela pourrait marcher, si vous y avez pensé. / How it could work, if you have thought about it.
+  - type: dropdown
+    id: usage
+    attributes:
+      label: Fréquence d'usage / How often you would use it
+      options:
+        - À chaque réunion / Every meeting
+        - Souvent / Often
+        - De temps en temps / Occasionally

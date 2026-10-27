@@ -333,6 +333,7 @@ An idea or a need? Open an [issue](https://github.com/Netapick/verbatim/issues).
 - [Technical documentation](docs/DEVELOPMENT.en.md): architecture, build, distribution, updates.
 - [Installation codes and error messages](docs/CODES.en.md): what each code or message means, and what to do.
 - [Changelog](CHANGELOG.md): what is new in each version.
+- [Contributing](CONTRIBUTING.md): report a bug, suggest an idea or code · [Security](SECURITY.md#security-policy): report a vulnerability.
 - [Code signing](docs/SIGNATURE.en.md) · [Privacy policy](docs/PRIVACY.en.md)
 
 ## License

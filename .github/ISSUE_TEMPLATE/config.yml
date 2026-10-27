@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Faille de sécurité / Security vulnerability"
+    url: https://github.com/Netapick/verbatim/security/policy
+    about: "Ne la publiez pas ici, suivez la politique de sécurité. / Do not post it here, follow the security policy."
+  - name: "Codes et messages d'erreur / Error codes and messages"
+    url: https://github.com/Netapick/verbatim/blob/main/docs/CODES.md
+    about: "Que signifie un code ou un message, et que faire. / What a code or message means, and what to do."
