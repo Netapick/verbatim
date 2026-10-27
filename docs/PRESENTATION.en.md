@@ -98,15 +98,15 @@ A button at the bottom left switches between the two themes; by default, the sys
 
 ## Automatic updates
 
-At startup, Verbatim looks for the latest version published on GitHub. If it finds one, it verifies the installer's SHA-256 checksum, installs it silently, then restarts, within a few seconds. Your meetings, settings and models are kept.
+At startup, Verbatim looks for the latest version published on GitHub. A **banner** at the top announces it, with its notes. Clicking **Update** opens a window in the centre that shows the download then the installation, and the application restarts by itself; the update's signature is verified before installing. Your meetings, settings and models are kept.
 
-The installation **never** starts during a recording, a transcription or report writing: a banner then offers the update, to do whenever you want.
+The button stays greyed out, with the reason shown, during a recording, a transcription, report writing, a translation or a download: the update happens when you want.
 
 ![Update banner](screenshots/en/11-mise-a-jour-banniere.png)
 
 ![“Update ready” window](screenshots/en/13-mise-a-jour-prete.png)
 
-Updates are configured in **Settings › Connections**: you can turn off automatic installation or run a check on demand.
+Updates are configured in **Settings › General**. With **Install automatically**, the version is downloaded in the background, but **nothing is installed without your click** on “Update”. You can also run a check on demand.
 
 ![Update settings](screenshots/en/12-mise-a-jour-reglages.png)
 
@@ -114,11 +114,11 @@ Updates are configured in **Settings › Connections**: you can turn off automat
 
 ## Installation
 
-1. Download `Verbatim_X.Y.Z_x64-setup.exe` from the [releases page](https://github.com/Netapick/verbatim/releases/latest) (lightweight installer, about 3 MB, in French or English).
-2. The installer downloads the base engines by itself, without asking anything (≈ 61 MB: Whisper and llama.cpp, with Vulkan). It also detects your graphics card and adds the matching acceleration: ROCm (≈ 430 MB) for a Radeon RX 7000, CUDA (≈ 685 MB) for an NVIDIA card. Without a compatible card, Verbatim uses the processor.
+1. Download `Verbatim_X.Y.Z_x64-setup.exe` from the [releases page](https://github.com/Netapick/verbatim/releases/latest) (lightweight installer, about 9 MB, in French or English).
+2. The installer downloads the base engines by itself, without asking anything (≈ 61 MB: Whisper and llama.cpp, with Vulkan). It also detects your graphics card and adds the matching acceleration: ROCm (≈ 430 MB) for a Radeon RX 7000, CUDA (≈ 1.3 GB) for an NVIDIA card. Without a compatible card, Verbatim uses the processor.
 3. Launch Verbatim, then download a transcription model and, if you wish, a writing model from the **Settings**. No model is shipped with the application.
 
-**Automatic updates**: at startup, Verbatim looks for the latest version published on GitHub, verifies its SHA-256 checksum, installs it, then restarts. Never during a recording, a transcription or report writing (a banner then offers the update). Can be turned off in Settings › Connections.
+**Automatic updates**: at startup, Verbatim looks for the latest version published on GitHub and announces it in a banner. After a click on “Update”, it downloads, verifies the signature, installs, then restarts. Never during a recording, a transcription or report writing (the button is then greyed out). Configurable in Settings › General.
 
 Installation is per user, without administrator rights. Engines and models are stored in an `ia` folder next to the application.
 

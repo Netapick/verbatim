@@ -102,7 +102,7 @@ The third-party engines are unsigned and may be deleted by an antivirus. After e
 
 ## Interface translation
 
-The interface texts are written in French in the code. `ui/i18n.js` holds a French → English dictionary and patterns for messages with variable values, applied at display time (text nodes and attributes). To translate a new text, add its pair to `EN` (key = exact French text) or a pattern to `P`. The language choice is in Settings › Connections; by default, the installer's language (`lang.txt`), then the system's.
+The interface texts are written in French in the code. `ui/i18n.js` holds a French → English dictionary and patterns for messages with variable values, applied at display time (text nodes and attributes). To translate a new text, add its pair to `EN` (key = exact French text) or a pattern to `P`. The language choice is in Settings › General; by default, the installer's language (`lang.txt`), then the system's.
 
 ## Building
 

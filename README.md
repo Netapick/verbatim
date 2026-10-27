@@ -9,9 +9,10 @@
 Verbatim enregistre ou importe vos réunions, les transcrit avec **Whisper**, identifie qui parle, puis rédige le compte-rendu avec une IA **Qwen** qui tourne sur votre propre ordinateur.<br>
 Aucun compte, aucun abonnement, aucune télémétrie : **rien ne quitte votre machine.**
 
-[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![CI](https://github.com/Netapick/verbatim/actions/workflows/ci.yml/badge.svg)](https://github.com/Netapick/verbatim/actions/workflows/ci.yml) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) ![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA%20%2B%20Vulkan-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white) ![Intel Vulkan](https://img.shields.io/badge/Intel-Vulkan-0071C5?logo=intel&logoColor=white)
+[![Release](https://img.shields.io/github/v/release/Netapick/verbatim)](https://github.com/Netapick/verbatim/releases/latest) [![CI](https://github.com/Netapick/verbatim/actions/workflows/ci.yml/badge.svg)](https://github.com/Netapick/verbatim/actions/workflows/ci.yml) [![Licence MIT](https://img.shields.io/github/license/Netapick/verbatim)](LICENSE) [![Téléchargements](https://img.shields.io/github/downloads/Netapick/verbatim/total)](https://github.com/Netapick/verbatim/releases) [![Étoiles](https://img.shields.io/github/stars/Netapick/verbatim?style=flat)](https://github.com/Netapick/verbatim/stargazers)<br>
+![Windows x64](https://img.shields.io/badge/Windows-x64-0078d4) ![NVIDIA CUDA](https://img.shields.io/badge/NVIDIA-CUDA%20%2B%20Vulkan-76B900?logo=nvidia&logoColor=white) ![AMD ROCm](https://img.shields.io/badge/AMD-ROCm%20%2B%20Vulkan-ED1C24?logo=amd&logoColor=white) ![Intel Vulkan](https://img.shields.io/badge/Intel-Vulkan-0071C5?logo=intel&logoColor=white) ![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8D8?logo=tauri&logoColor=white) ![Rust](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)
 
-**[Télécharger](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Fonctionnalités](#fonctionnalités) &nbsp;·&nbsp; [Performances](#performances) &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Feuille de route](#feuille-de-route)
+**[Télécharger](https://github.com/Netapick/verbatim/releases/latest)** &nbsp;·&nbsp; [Installation](#installation) &nbsp;·&nbsp; [FAQ](#faq) &nbsp;·&nbsp; [Fonctionnalités](#fonctionnalités) &nbsp;·&nbsp; [Performances](#performances) &nbsp;·&nbsp; [Feuille de route](#feuille-de-route) &nbsp;·&nbsp; [Nouveautés](CHANGELOG.md)
 
 Français · [English](README.en.md)
 
@@ -143,6 +144,9 @@ Mesures du 25 octobre 2026 sur un PC de bureau (Ryzen 7 5800X3D, 8 cœurs / 16 t
 | **Mémoire vidéo** | 1,5 Go pour Whisper, 3,4 Go pour le 4B, 5,7 Go pour le 9B (une carte de 8 Go suffit pour toute la chaîne), 11 Go pour le 27B |
 | **Processeur** | 2 à 8 % du PC avec une carte graphique, contre 50 % sans |
 
+<details>
+<summary><b>Détail des mesures : graphiques et tableaux (transcription, direct, rédaction, mémoire)</b></summary>
+
 ### De l'enregistrement au compte-rendu
 
 <p align="center"><img src="docs/benchmarks/pipeline.fr.svg" alt="Durée totale de l'enregistrement au compte-rendu : ROCm 1 min 9 s, Vulkan 1 min 40 s, processeur 7 min 46 s" width="780"></p>
@@ -209,6 +213,8 @@ L'application procède comme dans l'usage réel : l'enregistrement de 15 min est
 <p align="center"><img src="docs/benchmarks/memoire.fr.svg" alt="Mémoire vidéo et RAM utilisées au pic, par configuration" width="780"></p>
 
 <p align="center"><img src="docs/benchmarks/processeur.fr.svg" alt="Charge du processeur pendant le traitement, par configuration" width="780"></p>
+
+</details>
 
 ### Ce qu'il faut retenir
 

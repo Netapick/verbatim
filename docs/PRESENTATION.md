@@ -98,15 +98,15 @@ Un bouton en bas à gauche bascule entre les deux thèmes ; par défaut, celui d
 
 ## Mises à jour automatiques
 
-Au démarrage, Verbatim cherche la dernière version publiée sur GitHub. S'il en trouve une, il vérifie l'empreinte SHA-256 de l'installateur, l'installe en silence puis se relance, en quelques secondes. Vos réunions, réglages et modèles sont conservés.
+Au démarrage, Verbatim cherche la dernière version publiée sur GitHub. Un **bandeau** en haut l'annonce, avec ses notes. En cliquant sur **Mettre à jour**, une fenêtre au centre montre le téléchargement puis l'installation, et l'application redémarre toute seule ; la signature de la mise à jour est vérifiée avant l'installation. Vos réunions, réglages et modèles sont conservés.
 
-L'installation ne se lance **jamais** pendant un enregistrement, une transcription ou une rédaction : une bannière propose alors la mise à jour, à faire quand vous voulez.
+Le bouton reste grisé, avec la raison affichée, pendant un enregistrement, une transcription, une rédaction, une traduction ou un téléchargement : la mise à jour se fait quand vous voulez.
 
 ![Bannière de mise à jour](screenshots/11-mise-a-jour-banniere.png)
 
 ![Fenêtre « La version est prête »](screenshots/13-mise-a-jour-prete.png)
 
-La mise à jour se règle dans **Réglages › Connexions** : vous pouvez désactiver l'installation automatique ou lancer une recherche à la demande.
+La mise à jour se règle dans **Réglages › Général**. Avec **Installer automatiquement**, la version est téléchargée en arrière-plan, mais **rien n'est installé sans votre clic** sur « Mettre à jour ». Vous pouvez aussi lancer une recherche à la demande.
 
 ![Réglages des mises à jour](screenshots/12-mise-a-jour-reglages.png)
 
@@ -114,11 +114,11 @@ La mise à jour se règle dans **Réglages › Connexions** : vous pouvez désac
 
 ## Installation
 
-1. Téléchargez `Verbatim_X.Y.Z_x64-setup.exe` depuis la [page des releases](https://github.com/Netapick/verbatim/releases/latest) (installateur léger, environ 3 Mo, en français ou en anglais).
-2. L'installateur télécharge seul, sans rien demander, les moteurs de base (≈ 61 Mo : Whisper et llama.cpp, avec Vulkan). Il détecte aussi votre carte graphique et y ajoute l'accélération adaptée : ROCm (≈ 430 Mo) pour une Radeon RX 7000, CUDA (≈ 685 Mo) pour une carte NVIDIA. Sans carte compatible, Verbatim utilise le processeur.
+1. Téléchargez `Verbatim_X.Y.Z_x64-setup.exe` depuis la [page des releases](https://github.com/Netapick/verbatim/releases/latest) (installateur léger, environ 9 Mo, en français ou en anglais).
+2. L'installateur télécharge seul, sans rien demander, les moteurs de base (≈ 61 Mo : Whisper et llama.cpp, avec Vulkan). Il détecte aussi votre carte graphique et y ajoute l'accélération adaptée : ROCm (≈ 430 Mo) pour une Radeon RX 7000, CUDA (≈ 1,3 Go) pour une carte NVIDIA. Sans carte compatible, Verbatim utilise le processeur.
 3. Lancez Verbatim, puis téléchargez un modèle de transcription et, si vous le souhaitez, un modèle de rédaction depuis les **Réglages**. Aucun modèle n'est livré avec l'application.
 
-**Mises à jour automatiques** : au démarrage, Verbatim cherche la dernière version publiée sur GitHub, vérifie son empreinte SHA-256, l'installe puis se relance. Jamais pendant un enregistrement, une transcription ou une rédaction (une bannière propose alors la mise à jour). Désactivable dans Réglages › Connexions.
+**Mises à jour automatiques** : au démarrage, Verbatim cherche la dernière version publiée sur GitHub et l'annonce dans un bandeau. Après un clic sur « Mettre à jour », il télécharge, vérifie la signature, installe puis se relance. Jamais pendant un enregistrement, une transcription ou une rédaction (le bouton est alors grisé). Réglable dans Réglages › Général.
 
 L'installation se fait par utilisateur, sans droits administrateur. Les moteurs et modèles sont rangés dans un dossier `ia` à côté de l'application.
 

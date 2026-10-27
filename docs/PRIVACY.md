@@ -24,4 +24,4 @@ Pour toute question : ouvrez une [issue](https://github.com/Netapick/verbatim/is
 ---
 
 ## English summary
-Verbatim records, transcribes and summarizes meetings entirely on your computer. It collects no personal data and includes no telemetry. Its only network activity is: downloading engines and models from GitHub and Hugging Face when you ask for it, checking GitHub for updates at startup (can be turned off in Settings › Connections), and — only if you configure one yourself — sending transcripts to a remote API of your choice for report writing.
+Verbatim records, transcribes and summarizes meetings entirely on your computer. It collects no personal data and includes no telemetry. Its only network activity is: downloading engines and models from GitHub and Hugging Face when you ask for it, checking GitHub for updates at startup (can be turned off in Settings › General), and — only if you configure one yourself — sending transcripts to a remote API of your choice for report writing.

@@ -102,7 +102,7 @@ Les moteurs tiers ne sont pas signés et peuvent être supprimés par un antivir
 
 ## Traduction de l'interface
 
-Les textes de l'interface sont écrits en français dans le code. `ui/i18n.js` contient un dictionnaire français → anglais et des motifs pour les messages à valeurs variables, appliqués à l'affichage (nœuds texte et attributs). Pour traduire un nouveau texte, ajoutez sa paire dans `EN` (clé = texte français exact) ou un motif dans `P`. Le choix de langue est dans Réglages › Connexions ; à défaut, la langue de l'installateur (`lang.txt`), puis celle du système.
+Les textes de l'interface sont écrits en français dans le code. `ui/i18n.js` contient un dictionnaire français → anglais et des motifs pour les messages à valeurs variables, appliqués à l'affichage (nœuds texte et attributs). Pour traduire un nouveau texte, ajoutez sa paire dans `EN` (clé = texte français exact) ou un motif dans `P`. Le choix de langue est dans Réglages › Général ; à défaut, la langue de l'installateur (`lang.txt`), puis celle du système.
 
 ## Construire
 
