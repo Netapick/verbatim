@@ -6,3 +6,6 @@ contact_links:
   - name: "Codes et messages d'erreur / Error codes and messages"
     url: https://github.com/Netapick/verbatim/blob/main/docs/CODES.md
     about: "Que signifie un code ou un message, et que faire. / What a code or message means, and what to do."
+  - name: "Question ou discussion / Question or discussion"
+    url: https://github.com/Netapick/verbatim/discussions
+    about: "Une question d'usage, un retour, une idée à discuter. / A usage question, feedback, an idea to discuss."
