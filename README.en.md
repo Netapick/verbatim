@@ -17,9 +17,9 @@ No account, no subscription, no telemetry: **nothing leaves your machine.**
 
 <br>
 
-<video src="https://github.com/Netapick/verbatim/raw/main/docs/screenshots/en/demo.mp4" poster="docs/screenshots/en/demo-poster.jpg" width="860" controls muted loop playsinline>
-  <a href="docs/screenshots/en/demo.mp4"><img src="docs/screenshots/en/demo.gif" alt="Demo: recording with live transcription, then report and per-speaker transcript" width="860"></a>
-</video>
+<a href="https://github.com/Netapick/verbatim/raw/main/docs/screenshots/en/demo.mp4"><img src="docs/screenshots/en/demo.webp" alt="Demo: recording with live transcription, then report and per-speaker transcript" width="860"></a>
+
+<sub><a href="https://github.com/Netapick/verbatim/raw/main/docs/screenshots/en/demo.mp4">▶ Watch the video (MP4, 53 s)</a></sub>
 
 </div>
 
