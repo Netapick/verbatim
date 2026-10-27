@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/logo-anim.webp" alt="Logo Verbatim" width="160">
+<img src="docs/screenshots/logo-anim.webp" alt="Logo Verbatim" width="270">
 
 # Verbatim
 
