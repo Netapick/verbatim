@@ -17,9 +17,7 @@ Français · [English](README.en.md)
 
 <br>
 
-<a href="https://github.com/Netapick/verbatim/raw/main/docs/screenshots/demo.mp4"><img src="docs/screenshots/demo.webp" alt="Démonstration : enregistrement avec transcription en direct, puis compte-rendu et transcription par intervenant" width="860"></a>
-
-<sub><a href="https://github.com/Netapick/verbatim/raw/main/docs/screenshots/demo.mp4">▶ Voir la vidéo (MP4, 53 s)</a></sub>
+<img src="docs/screenshots/demo.webp" alt="Démonstration : enregistrement avec transcription en direct, puis compte-rendu et transcription par intervenant" width="860">
 
 </div>
 
