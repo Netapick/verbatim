@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use std::{fs, path::PathBuf, sync::Mutex};
 use tauri::{Manager, State};
 
+mod backup;
 mod diarize;
 mod warm;
 mod engine;
@@ -734,8 +735,9 @@ fn main() {
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
             live::live_prepare, live::live_release, overlay::tray_labels, overlay::overlay_action, overlay::overlay_drag,
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
+            backup::backup_export, backup::backup_inspect, backup::backup_restore,
             update::app_version, update::update_busy, update::update_prepare, update::app_quit, warm::warm_status,
-            diarize::diarize_install, diarize::diarize_remove, diarize::diarize_meeting, diarize::rename_speaker
+            diarize::diarize_install, diarize::diarize_remove, diarize::diarize_meeting, diarize::rename_speaker, diarize::set_segments_speaker
         ])
         .build(tauri::generate_context!())
         .expect("erreur au lancement de Verbatim")

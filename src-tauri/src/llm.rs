@@ -33,7 +33,7 @@ const CUDA_RT_ZIP: &str =
 const CUDA_BYTES: u64 = 266_814_439 + 391_443_627;
 
 /// (id, libellé, description, taille exacte en octets, URL)
-pub const LLMS: [(&str, &str, &str, u64, &str); 6] = [
+pub const LLMS: [(&str, &str, &str, u64, &str); 12] = [
     (
         "qwen3.5-4b",
         "Qwen 3.5 — 4B (léger)",
@@ -61,6 +61,48 @@ pub const LLMS: [(&str, &str, &str, u64, &str); 6] = [
         "Meilleure qualité ; ~24 Go de RAM conseillés, lent sans carte graphique",
         18_973_870_528,
         "https://huggingface.co/ggml-org/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q4_K_M.gguf",
+    ),
+    (
+        "gemma4-e4b",
+        "Gemma 4 — E4B (léger)",
+        "Google : ~6 Go de mémoire, rapide même sans carte graphique",
+        4_977_171_584,
+        "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+    ),
+    (
+        "gemma4-12b",
+        "Gemma 4 — 12B",
+        "Google : ~9 Go de mémoire, pour une carte de 10 à 12 Go",
+        7_121_861_440,
+        "https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/main/gemma-4-12b-it-Q4_K_M.gguf",
+    ),
+    (
+        "gemma4-26b-a4b-q3",
+        "Gemma 4 — 26B-A4B allégé (IQ3)",
+        "Google, mélange d'experts (4 milliards de paramètres actifs) : ~13 Go de mémoire, pour une carte de 16 Go",
+        11_416_548_832,
+        "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-IQ3_XXS.gguf",
+    ),
+    (
+        "ministral3-3b",
+        "Ministral 3 — 3B (très léger)",
+        "Mistral AI : ~4 Go de mémoire, le plus petit du catalogue",
+        2_146_497_824,
+        "https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+    ),
+    (
+        "ministral3-8b",
+        "Ministral 3 — 8B",
+        "Mistral AI : ~7 Go de mémoire, pour une carte de 8 Go",
+        5_198_386_720,
+        "https://huggingface.co/unsloth/Ministral-3-8B-Instruct-2512-GGUF/resolve/main/Ministral-3-8B-Instruct-2512-Q4_K_M.gguf",
+    ),
+    (
+        "ministral3-14b",
+        "Ministral 3 — 14B",
+        "Mistral AI : ~10 Go de mémoire, pour une carte de 12 Go",
+        8_239_067_840,
+        "https://huggingface.co/unsloth/Ministral-3-14B-Instruct-2512-GGUF/resolve/main/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
     ),
     (
         "translategemma-4b",
@@ -884,8 +926,8 @@ pub fn lang_name(code: &str) -> &'static str {
 
 fn rules(lang: &str) -> String {
     let write = match lang_name(lang) {
-        "" => "Écris dans la langue de la transcription, de façon claire et concise.".to_string(),
-        n => format!("Écris le compte-rendu en {n} (traduis les propos si besoin), de façon claire et concise."),
+        "" => "Écris dans la langue de la transcription, de façon claire, précise et complète (sans remplissage).".to_string(),
+        n => format!("Écris le compte-rendu en {n} (traduis les propos si besoin), de façon claire, précise et complète (sans remplissage)."),
     };
     format!("{RULES}- {write}\n")
 }
@@ -899,30 +941,60 @@ const RULES: &str = "Règles :\n\
 - \"next_steps\" : points reportés, prochaine réunion, suites prévues.\n\
 - Reprends tels quels les chiffres, dates et noms propres cités.\n";
 
-fn system_full(lang: &str) -> String {
+/// Longueur visée du compte-rendu selon la durée de la réunion (minutes) : (phrases min, phrases max, sujets max).
+/// Une réunion de 10 minutes reste à 5-8 phrases ; une heure en demande 15-18, deux heures 24-27.
+fn targets(mins: f32) -> (usize, usize, usize) {
+    let lo = ((mins / 5.0).round() as usize + 3).clamp(5, 24);
+    (lo, lo + 3, ((mins / 5.0).round() as usize + 4).clamp(6, 24))
+}
+
+/// Description du champ « summary » demandée au modèle ; les longues réunions sont découpées en paragraphes.
+fn summary_spec(mins: f32, whole: bool) -> String {
+    let (lo, hi, _) = targets(mins);
+    let what = if whole { "toute la réunion" } else { "la réunion" };
+    if mins >= 25.0 {
+        format!("{lo} à {hi} phrases qui racontent {what}, en paragraphes courts séparés par une ligne vide (un par grande partie de la réunion)")
+    } else {
+        format!("{lo} à {hi} phrases qui racontent {what}")
+    }
+}
+
+fn system_full(lang: &str, mins: f32) -> String {
     let rules = rules(lang);
+    let (summary, topics) = (summary_spec(mins, false), targets(mins).2);
     format!(
         "Tu es un assistant qui rédige des comptes-rendus de réunion professionnels, fidèles à la transcription fournie.\n{rules}\
-         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"5 à 8 phrases qui racontent la réunion\", \
+         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"{summary}\", \
          \"topics\": [\"Sujet : ce qui a été dit (chiffres, positions)\"], \"decisions\": [\"…\"], \
-         \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}. Liste vide s'il n'y a rien pour une section."
+         \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}. \"topics\" : un élément par sujet abordé (jusqu'à {topics}). Liste vide s'il n'y a rien pour une section."
     )
 }
 fn system_map(lang: &str) -> String {
     let rules = rules(lang);
     format!(
-        "Tu prends des notes sur un extrait d'une réunion (une seule partie de la réunion).\n{rules}\
-         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"2 à 4 phrases sur cette partie\", \
+        "Tu prends des notes détaillées sur un extrait d'une réunion (une seule partie de la réunion). Relève chaque sujet, chaque décision et chaque action, même brève : ces notes serviront à rédiger le compte-rendu complet.\n{rules}\
+         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"3 à 6 phrases sur cette partie\", \
          \"topics\": [\"…\"], \"decisions\": [\"…\"], \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}."
     )
 }
-fn system_reduce(lang: &str) -> String {
+/// Fusion intermédiaire de quelques notes (réunions très longues) : le résultat a la même forme que des notes.
+fn system_partial(lang: &str) -> String {
     let rules = rules(lang);
     format!(
-        "On te donne les notes prises sur les parties successives d'une même réunion. Fusionne-les en un seul compte-rendu : \
-         ordre chronologique, sans doublons, sans rien ajouter.\n{rules}\
-         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"5 à 8 phrases qui racontent toute la réunion\", \
+        "On te donne les notes prises sur des parties consécutives d'une même réunion. Fusionne-les en un seul jeu de notes détaillé : \
+         ordre chronologique, sans doublons, en conservant tous les sujets, décisions et actions.\n{rules}\
+         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"4 à 8 phrases\", \
          \"topics\": [\"…\"], \"decisions\": [\"…\"], \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}."
+    )
+}
+fn system_reduce(lang: &str, mins: f32) -> String {
+    let rules = rules(lang);
+    let (summary, topics) = (summary_spec(mins, true), targets(mins).2);
+    format!(
+        "On te donne les notes prises sur les parties successives d'une même réunion. Fusionne-les en un seul compte-rendu : \
+         ordre chronologique, sans doublons, sans rien ajouter, sans perdre de décision ni d'action.\n{rules}\
+         Réponds UNIQUEMENT avec un objet JSON : {{\"summary\": \"{summary}\", \
+         \"topics\": [\"…\"], \"decisions\": [\"…\"], \"actions\": [\"…\"], \"next_steps\": [\"…\"]}}. \"topics\" : un élément par sujet abordé (jusqu'à {topics})."
     )
 }
 
@@ -1163,34 +1235,60 @@ fn build_context(title: &str, brief: Option<&Value>, glossary: &[String]) -> Str
     c
 }
 
+/// Au-delà, les notes des parties ne tiennent plus ensemble dans le contexte du modèle (8 192 jetons) avec la réponse :
+/// on les fusionne d'abord par petits groupes.
+const MAX_NOTES: usize = 4;
+const GROUP: usize = 3;
+
+fn notes_block(notes: &[Value]) -> String {
+    let n = notes.len();
+    notes
+        .iter()
+        .enumerate()
+        .map(|(i, v)| format!("--- Notes partie {}/{} ---\n{}", i + 1, n, serde_json::to_string(v).unwrap_or_default()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Le chargement du modèle occupe 0-10 %, la rédaction 10-99 % répartis entre les étapes.
-fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &[String], lang: &str) -> R<Value> {
+/// `mins` : durée de la réunion, qui fixe la longueur visée du compte-rendu.
+fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &[String], lang: &str, mins: f32) -> R<Value> {
     let parts = chunk(lines, be.chunk_chars);
     let n = parts.len();
     let steps = if n <= 1 { 1 } else { n + 1 } as f32;
     let at = |step: usize, f: f32| 10.0 + 89.0 * (step as f32 + f) / steps;
+    let hi = targets(mins).1 as u32;
     set_pct(app, id, 10.0);
     set_report_hw(app, id, &be.hw);
     if n <= 1 {
         set_progress(app, id, "Rédaction du compte-rendu…");
         let body = format!("{ctx}\nTranscription :\n{}", parts.first().cloned().unwrap_or_default());
-        return Ok(normalize(&chat_json(be, &system_full(lang), &body, 1400, &|f| set_pct(app, id, at(0, f)))?));
+        let max = (hi * 45 + 1000).clamp(1400, 3500);
+        return Ok(normalize(&chat_json(be, &system_full(lang, mins), &body, max, &|f| set_pct(app, id, at(0, f)))?));
     }
     let mut notes = Vec::new();
     for (i, p) in parts.iter().enumerate() {
         set_progress(app, id, &format!("Analyse de la partie {}/{}…", i + 1, n));
         let body = format!("{ctx}\nPartie {}/{} de la réunion. Transcription :\n{p}", i + 1, n);
-        notes.push(normalize(&chat_json(be, &system_map(lang), &body, 900, &|f| set_pct(app, id, at(i, f)))?));
+        notes.push(normalize(&chat_json(be, &system_map(lang), &body, 1200, &|f| set_pct(app, id, at(i, f)))?));
+    }
+    while notes.len() > MAX_NOTES {
+        set_progress(app, id, "Fusion intermédiaire des parties…");
+        let mut next = Vec::new();
+        for g in notes.chunks(GROUP) {
+            if g.len() == 1 {
+                next.push(g[0].clone());
+                continue;
+            }
+            let body = format!("{ctx}\n{}", notes_block(g));
+            next.push(normalize(&chat_json(be, &system_partial(lang), &body, 1500, &|_| {})?));
+        }
+        notes = next;
     }
     set_progress(app, id, "Fusion des parties…");
-    let merged = notes
-        .iter()
-        .enumerate()
-        .map(|(i, v)| format!("--- Notes partie {}/{} ---\n{}", i + 1, n, serde_json::to_string(v).unwrap_or_default()))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let body = format!("{ctx}\n{merged}");
-    Ok(normalize(&chat_json(be, &system_reduce(lang), &body, 1600, &|f| set_pct(app, id, at(n, f)))?))
+    let body = format!("{ctx}\n{}", notes_block(&notes));
+    let max = (hi * 45 + 1400).clamp(1600, 4000);
+    Ok(normalize(&chat_json(be, &system_reduce(lang, mins), &body, max, &|f| set_pct(app, id, at(n, f)))?))
 }
 
 fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
@@ -1218,6 +1316,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
         return Err("La transcription est vide.".into());
     }
     let lines = transcript_lines(&segs);
+    let mins = ((segs.last().map_or(0.0, |s| s.end) - segs.first().map_or(0.0, |s| s.start)).max(0.0) / 60.0) as f32;
     let ctx = build_context(&title, brief.as_ref(), &glossary);
     let stamp = |mut v: Value, mode: &str, model: &str, hw: &str| {
         v["mode"] = json!(mode);
@@ -1244,7 +1343,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
         };
         let res = ensure_ollama().and_then(|_| {
             set_progress(app, id, "Chargement du modèle (la première fois peut être long)…");
-            run_with_backend(app, id, &be, &ctx, &lines, lang)
+            run_with_backend(app, id, &be, &ctx, &lines, lang, mins)
         });
         return match res {
             Ok(v) => Ok(stamp(v, be.mode, &be.label, &be.hw)),
@@ -1276,7 +1375,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
                     chunk_chars: 11_000,
                     timeout: 7200,
                 };
-                let r = run_with_backend(app, id, &be, &ctx, &lines, lang);
+                let r = run_with_backend(app, id, &be, &ctx, &lines, lang, mins);
                 drop(srv);
                 r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
             })
@@ -1312,7 +1411,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
                     chunk_chars: 11_000,
                     timeout: 1800,
                 };
-                let r = run_with_backend(app, id, &be, &ctx, &lines, lang);
+                let r = run_with_backend(app, id, &be, &ctx, &lines, lang, mins);
                 drop(srv);
                 r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
             })
@@ -1345,7 +1444,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
             chunk_chars: 40_000,
             timeout: 240,
         };
-        return match run_with_backend(app, id, &be, &ctx, &lines, lang) {
+        return match run_with_backend(app, id, &be, &ctx, &lines, lang, mins) {
             Ok(v) => Ok(stamp(v, be.mode, &be.label, &be.hw)),
             Err(e) => Ok(extractive(&title, &segs, &format!("L'API a échoué ({e}). Résumé simplifié affiché."))),
         };
@@ -1406,4 +1505,18 @@ pub fn generate_report(app: AppHandle, st: State<AppState>, id: String, lang: Op
         let _ = st.save(&s);
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn longueur_du_compte_rendu_suit_la_duree() {
+        assert_eq!(targets(10.0), (5, 8, 6));
+        assert_eq!(targets(60.0), (15, 18, 16));
+        assert_eq!(targets(600.0), (24, 27, 24)); // plafonné
+        assert!(summary_spec(10.0, true).contains("5 à 8 phrases") && !summary_spec(10.0, true).contains("paragraphes"));
+        assert!(summary_spec(60.0, true).contains("15 à 18 phrases") && summary_spec(60.0, true).contains("paragraphes"));
+    }
 }

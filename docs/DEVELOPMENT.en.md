@@ -18,6 +18,7 @@ Verbatim is a **Tauri 2 + Rust** desktop application (HTML/JS interface without 
 | `src-tauri/src/translate.rs` | Batched transcript translation (TranslateGemma or the report model) |
 | `src-tauri/src/models.rs` | Detection and copy of existing models |
 | `src-tauri/src/update.rs` | Automatic update |
+| `src-tauri/src/backup.rs` | Backup and restore of meetings (.zip) |
 | `src-tauri/installer/` | NSIS hooks and PowerShell scripts of the installer |
 | `scripts/` | Building the engines and packs, logo |
 
@@ -28,6 +29,8 @@ Verbatim is a **Tauri 2 + Rust** desktop application (HTML/JS interface without 
 - **Live mode**: `recorder::Sink` publishes samples into one `TapBuf` per source; `live.rs` mixes them, sends the not-yet-committed audio tail to `whisper-server` (`/inference`) every ~0.6 s, commits sentences that ended 1.2 s before the end of the audio (`live-segment` event), leaves the last one provisional (`live-partial`) and translates each committed sentence (`live-translation`). Server: ROCm (`engine-rocm/whisper-server.exe`) if a Radeon card and the runtime are present, otherwise CPU; models up to small on CPU. The server is restarted if it stops (up to 3 times, log `verbatim-whisper-server.log`); live speech detection is done in Rust (`earshot` crate, 16 ms frames) rather than by the server's VAD. The cpal capture callback only copies samples to a processing thread (resampling, disk, live). On stop, `recorder::finish` shuts live mode down, then the normal transcription of the file starts.
 
 Data lives in a `store.json` file plus the copied audio files, in the application's data folder.
+
+**Backup** (`backup.rs`, Settings › General): a `.zip` with `manifest.json` (version, date), `data.json` (meetings, preparations, glossary, meeting types) and, optionally, `audio/`. Settings (API key included) are not in it. Restoring (`backup_inspect` then `backup_restore`) is a merge: a meeting, preparation or type already present (same id) is never modified; audio is written back to the machine's `audio/` folder with sanitized names. Jobs running at backup time do not resume on their own (an interrupted transcription leaves the meeting in error, to be run again).
 
 ## Recording
 

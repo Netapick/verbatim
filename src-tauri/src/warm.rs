@@ -61,7 +61,7 @@ fn run(app: &AppHandle, mdir: &PathBuf, model: &str) {
     // lecture des fichiers : 0 → 55 % ; séparation des intervenants : → 60 % ; démarrage de whisper-server : → 99 %
     let span = 55.0;
     let mut done = 0u64;
-    for (files, label) in [(&whisper, "Chargement de Whisper…"), (&diar, "Chargement de la séparation des voix…")] {
+    for (files, label) in [(&whisper, "Lecture du modèle Whisper…"), (&diar, "Chargement de la séparation des voix…")] {
         for p in files {
             set(label, (done as f64 / total as f64 * span) as u8, false);
             read_through(p, &mut |n| {
@@ -77,14 +77,14 @@ fn run(app: &AppHandle, mdir: &PathBuf, model: &str) {
         }
     }
     // whisper-server : le modèle est chargé (mémoire vidéo comprise) et reste prêt jusqu'à la fermeture, pour le direct
-    set("Chargement de Whisper…", 60, false);
+    set("Démarrage de Whisper…", 60, false);
     let t0 = Instant::now();
     std::thread::scope(|sc| {
         let job = sc.spawn(|| crate::live::boot_load(app));
         while !job.is_finished() {
             // durée inconnue : on s'approche de 99 % sans l'atteindre
             let x = t0.elapsed().as_secs_f64();
-            set("Chargement de Whisper…", (60.0 + 39.0 * (1.0 - (-x / 8.0).exp())) as u8, false);
+            set("Démarrage de Whisper…", (60.0 + 39.0 * (1.0 - (-x / 8.0).exp())) as u8, false);
             std::thread::sleep(Duration::from_millis(150));
         }
         if let Ok(Err(e)) = job.join() {

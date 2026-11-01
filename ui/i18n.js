@@ -164,6 +164,29 @@
     ["La signature de la mise à jour est invalide : elle n'a pas été installée.", "The update signature is invalid: it was not installed."],
     ["La mise à jour n'est pas disponible dans cette version.", "Updating is not available in this version."],
     ["Installer automatiquement les nouvelles versions", "Install new versions automatically"], ["Rechercher maintenant", "Check now"],
+    ["Lecture du modèle Whisper…", "Reading the Whisper model…"], ["Démarrage de Whisper…", "Starting Whisper…"],
+    ["Renommer cet intervenant partout dans la réunion, ou n'attribuer que ce passage à un autre intervenant (si la voix n'est pas la sienne) ?",
+      "Rename this speaker everywhere in the meeting, or assign only this passage to another speaker (if the voice is not theirs)?"],
+    ["Réattribuer des passages", "Reassign passages"], ["Sélectionner plusieurs passages pour les attribuer à un intervenant", "Select several passages to assign them to a speaker"],
+    ["Attribuer à…", "Assign to…"], ["Tout désélectionner", "Deselect all"], ["Terminer", "Done"], ["Passages réattribués", "Passages reassigned"],
+    ["Ce passage seulement", "This passage only"], ["Renommer partout", "Rename everywhere"], ["Passage introuvable.", "Passage not found."],
+    ["Vider la corbeille", "Empty the trash"], ["Corbeille vidée", "Trash emptied"],
+    ["Supprimer définitivement tout le contenu de la corbeille ? Cette action est irréversible.", "Permanently delete everything in the trash? This cannot be undone."],
+    // Sauvegarde et restauration
+    ["Sauvegarde et restauration", "Backup and restore"],
+    ["Enregistre vos réunions (transcriptions, comptes-rendus, traductions), vos préparations et votre glossaire dans un seul fichier .zip, pour les mettre à l'abri ou les retrouver sur un autre ordinateur. Les réglages et la clé d'API n'en font pas partie.",
+      "Saves your meetings (transcripts, reports, translations), preparations and glossary in a single .zip file, to keep them safe or move them to another computer. Settings and the API key are not included."],
+    ["Inclure les fichiers audio (sauvegarde plus volumineuse)", "Include audio files (larger backup)"],
+    ["Créer une sauvegarde…", "Create a backup…"], ["Restaurer une sauvegarde…", "Restore a backup…"],
+    ["La restauration ajoute ce qui manque : les réunions déjà présentes ne sont jamais modifiées ni remplacées.", "Restoring adds what is missing: meetings already present are never modified or replaced."],
+    ["Sauvegarde en cours…", "Backup in progress…"], ["Lecture de la sauvegarde…", "Reading the backup…"], ["Restauration en cours…", "Restoring…"],
+    ["Sauvegarde créée", "Backup created"], ["Restauration terminée", "Restore complete"],
+    ["Rien à restaurer : tout ce que contient cette sauvegarde est déjà présent.", "Nothing to restore: everything in this backup is already present."],
+    ["Ce fichier n'est pas une sauvegarde Verbatim.", "This file is not a Verbatim backup."],
+    ["La sauvegarde est illisible ou endommagée.", "The backup is unreadable or damaged."],
+    ["Cette sauvegarde vient d'une version plus récente de Verbatim : mettez l'application à jour.", "This backup comes from a newer version of Verbatim: update the application."],
+    ["Transcription interrompue avant la sauvegarde. Relancez-la.", "Transcription interrupted before the backup. Run it again."],
+    ["Fichier audio absent de la sauvegarde.", "Audio file missing from the backup."],
     ["API distante (facultatif)", "Remote API (optional)"], ["Utilisée si aucun modèle local n'est sélectionné.", "Used if no local model is selected."],
     ["URL de l'API", "API URL"], ["Clé d'API", "API key"], ["Réglages enregistrés", "Settings saved"],
     ["Langue de l'interface", "Interface language"], ["Automatique", "Automatic"],
@@ -173,7 +196,7 @@
     ["Moteurs et emplacements", "Engines and locations"], ["(installé avec le premier modèle)", "(installed with the first model)"],
     ["Aucune IA locale", "No local AI"], ["Utiliser l'API distante si elle est configurée, sinon un résumé simplifié", "Use the remote API if configured, otherwise a simplified summary"],
     ["Emplacement :", "Location:"], ["Installé :", "Installed:"], ["À installer :", "To install:"], ["Sera installé dans :", "Will be installed in:"], ["CPU :", "CPU:"], ["ROCm :", "ROCm:"], ["CUDA :", "CUDA:"],
-    ["Le modèle n'est chargé en mémoire (4 à 24 Go selon le modèle) que pendant la rédaction.", "The model is only loaded into memory (4 to 24 GB depending on the model) while writing."],
+    ["Le modèle n'est chargé en mémoire (3 à 24 Go selon le modèle) que pendant la rédaction.", "The model is only loaded into memory (3 to 24 GB depending on the model) while writing."],
     ["Processeur, compatible partout (beaucoup plus lent)", "Processor, works everywhere (much slower)"],
     ["Aucun moteur GPU installé.", "No GPU engine installed."],
     ["Moteurs et réglages avancés", "Engines and advanced settings"], ["Forcer Vulkan", "Force Vulkan"], ["Vulkan", "Vulkan"],
@@ -200,6 +223,15 @@
     ["Précis, ~3× plus lent que Small", "Accurate, ~3× slower than Small"], ["Large v3 Turbo (compressé Q5)", "Large v3 Turbo (compressed Q5)"], ["Large v3 Turbo (Q8)", "Large v3 Turbo (Q8)"], ["Large v3 Turbo (complet)", "Large v3 Turbo (full)"],
     ["Très précis, un peu moins que les versions Q8 et complète", "Very accurate, slightly below the Q8 and full versions"], ["Quasi identique à la version complète, recommandé pour le français", "Nearly identical to the full version, recommended for French"], ["Qualité maximale du Turbo, plus lourd", "Maximum Turbo quality, heavier"], ["Large v3 (compressé)", "Large v3 (compressed)"],
     ["Précision maximale, le plus lent", "Maximum accuracy, the slowest"],
+    ["Modèles recommandés", "Recommended models"], ["Tous les modèles, par famille", "All models, by family"], ["Choisir une famille…", "Choose a family…"], ["Modèle utilisé :", "Model in use:"],
+    ["Les modèles les mieux testés par Verbatim (temps mesurés dans le README). Tous les modèles du catalogue sont dans la liste déroulante plus bas.", "The models best tested by Verbatim (times measured in the README). All the models in the catalog are in the drop-down list below."],
+    ["Gemma 4 — E4B (léger)", "Gemma 4 — E4B (light)"], ["Google : ~6 Go de mémoire, rapide même sans carte graphique", "Google: ~6 GB of memory, fast even without a graphics card"],
+    ["Gemma 4 — 12B", "Gemma 4 — 12B"], ["Google : ~9 Go de mémoire, pour une carte de 10 à 12 Go", "Google: ~9 GB of memory, for a 10 to 12 GB card"],
+    ["Gemma 4 — 26B-A4B allégé (IQ3)", "Gemma 4 — 26B-A4B lightweight (IQ3)"],
+    ["Google, mélange d'experts (4 milliards de paramètres actifs) : ~13 Go de mémoire, pour une carte de 16 Go", "Google, mixture of experts (4 billion active parameters): ~13 GB of memory, for a 16 GB card"],
+    ["Ministral 3 — 3B (très léger)", "Ministral 3 — 3B (very light)"], ["Mistral AI : ~4 Go de mémoire, le plus petit du catalogue", "Mistral AI: ~4 GB of memory, the smallest in the catalog"],
+    ["Ministral 3 — 8B", "Ministral 3 — 8B"], ["Mistral AI : ~7 Go de mémoire, pour une carte de 8 Go", "Mistral AI: ~7 GB of memory, for an 8 GB card"],
+    ["Ministral 3 — 14B", "Ministral 3 — 14B"], ["Mistral AI : ~10 Go de mémoire, pour une carte de 12 Go", "Mistral AI: ~10 GB of memory, for a 12 GB card"],
     ["Qwen 3.5 — 4B (léger)", "Qwen 3.5 — 4B (light)"], ["Très économe : ~4 Go de RAM, rapide même sans carte graphique, compte-rendu correct", "Very frugal: ~4 GB of RAM, fast even without a graphics card, decent report"],
     ["Qwen 3.5 — 9B (équilibré, recommandé)", "Qwen 3.5 — 9B (balanced, recommended)"], ["Bon compromis qualité / mémoire : ~8 Go de RAM, repère bien décisions et actions", "Good quality / memory trade-off: ~8 GB of RAM, picks out decisions and actions well"],
     ["Qwen 3.8 — 27B allégé (IQ3)", "Qwen 3.8 — 27B lightened (IQ3)"], ["Qualité supérieure, ~14 Go de RAM ; lent sans carte graphique", "Higher quality, ~14 GB of RAM; slow without a graphics card"],
@@ -279,6 +311,15 @@
   add(/^(.*) · local$/, (m) => `${T(m[1])} · local`);
   add(/^(.+) · (\d+) %$/, (m) => `${T(m[1])} · ${m[2]}%`);
   add(/^Interrompu (\d+) %$/, (m) => `Interrupted ${m[1]}%`);
+  add(/^Sauvegarde créée : (\d+) réunion\(s\), (\d+(?: Ko| Mo| Go)?)\.$/, (m) => `Backup created: ${m[1]} meeting(s), ${m[2].replace(/ Ko$/, " KB").replace(/ Mo$/, " MB").replace(/ Go$/, " GB")}.`);
+  add(/^Restauration terminée : (\d+) réunion\(s\) ajoutée\(s\)\.$/, (m) => `Restore complete: ${m[1]} meeting(s) added.`);
+  add(/^Cette sauvegarde du (.+) contient (\d+) réunion\(s\) : (\d+) à ajouter, (\d+) déjà présente\(s\) et laissée\(s\) telle\(s\) quelle\(s\)\.( Elle ne contient pas les fichiers audio\.)?$/,
+    (m) => `This backup from ${m[1]} contains ${m[2]} meeting(s): ${m[3]} to add, ${m[4]} already present and left as they are.${m[5] ? " It does not contain the audio files." : ""}`);
+  add(/^(.+) \((\d+) modèles\)$/, (m) => `${m[1]} (${m[2]} models)`);
+  add(/^(\d+) passage\(s\) sélectionné\(s\)$/, (m) => `${m[1]} passage(s) selected`);
+  add(/^Intervenant de ces (\d+) passage\(s\)(?: \(déjà présents : (.*)\))?$/, (m) => `Speaker for these ${m[1]} passage(s)${m[2] ? " (already present: " + m[2] + ")" : ""}`);
+  add(/^Intervenant « (.*) »$/, (m) => `Speaker “${m[1]}”`);
+  add(/^Intervenant de ce passage(?: \(déjà présents : (.*)\))?$/, (m) => `Speaker for this passage${m[1] ? " (already present: " + m[1] + ")" : ""}`);
   add(/^Version (.+) disponible$/, (m) => `Version ${m[1]} available`);
   add(/^Version (.+) disponible\.$/, (m) => `Version ${m[1]} available.`);
   add(/^Vous avez la dernière version \(v(.+)\)\.$/, (m) => `You have the latest version (v${m[1]}).`);

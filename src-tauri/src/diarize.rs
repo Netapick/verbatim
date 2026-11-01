@@ -575,6 +575,29 @@ pub fn rename_speaker(st: State<AppState>, id: String, from: String, to: String)
     st.save(&s)
 }
 
+/// Attribue des passages (repérés par leur horodatage de début) à un intervenant, dans la transcription et dans
+/// toutes les traductions (mêmes horodatages). Sert à corriger les erreurs de la séparation des voix.
+#[tauri::command]
+pub fn set_segments_speaker(st: State<AppState>, id: String, starts: Vec<f64>, to: String) -> R<()> {
+    let to = to.trim().to_string();
+    if to.is_empty() {
+        return Err("Le nom ne peut pas être vide.".into());
+    }
+    let mut s = st.store.lock().unwrap();
+    let m = s.meetings.iter_mut().find(|m| m.id == id).ok_or("Réunion introuvable")?;
+    let mut found = false;
+    for g in m.transcript.iter_mut().chain(m.translations.values_mut().flatten()) {
+        if starts.iter().any(|s| (g.start - s).abs() < 1e-6) {
+            g.speaker = to.clone();
+            found = true;
+        }
+    }
+    if !found {
+        return Err("Passage introuvable.".into());
+    }
+    st.save(&s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

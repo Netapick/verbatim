@@ -113,6 +113,11 @@ input[type=radio],input[type=checkbox]{accent-color:var(--brand)}
 .seg .tm{color:var(--mute);font-variant-numeric:tabular-nums;width:48px;flex-shrink:0;font-family:var(--mono);font-size:12.5px;padding-top:1px}
 .seg:hover{background:var(--brand-soft)}
 .seg.now{background:var(--brand-soft);box-shadow:inset 3px 0 0 var(--brand)}
+.selmode .seg{user-select:none}
+.seg.sel{background:var(--brand-soft);box-shadow:inset 3px 0 0 var(--brand)}
+.selbar{position:sticky;top:0;z-index:2;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;margin:0 0 6px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-sm);box-shadow:var(--sh-1)}
+.selbar[hidden]{display:none}
+.selbar span{flex:1;font-weight:600}
 .player{position:sticky;top:-18px;z-index:3;display:flex;align-items:center;gap:10px;padding:10px 14px;backdrop-filter:blur(8px);box-shadow:var(--sh-2)}
 .player audio{flex:1;height:36px}
 .player select{width:auto}

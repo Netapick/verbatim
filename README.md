@@ -91,7 +91,7 @@ Au démarrage, Verbatim charge d'avance Whisper et la séparation des intervenan
 
 <img src="docs/screenshots/03-compte-rendu.png" alt="Un compte-rendu généré par Verbatim, avec la transcription minutée" width="720">
 
-- Résumé, points abordés, décisions, actions et prochaines étapes, générés par une IA locale : **Qwen 3.5** (4B ou 9B), **Qwen 3.8 27B**, ou vos propres modèles GGUF. Ollama et une API compatible OpenAI restent possibles en option.
+- Résumé, points abordés, décisions, actions et prochaines étapes, générés par une IA locale au choix : **Qwen** (3.5 en 4B ou 9B, 3.8 en 27B), **Gemma 4** (E4B, 12B, 26B-A4B), **Ministral 3** (3B, 8B, 14B), ou vos propres modèles GGUF. Ollama et une API compatible OpenAI restent possibles en option.
 - Les réunions longues sont découpées en parties, résumées, puis fusionnées. Le glossaire et la préparation liée sont fournis au modèle.
 - Le compte-rendu est volontairement **concis** : un résumé de 5 à 8 phrases, soit environ 120 à 250 mots que la réunion dure 15 min ou 1 h.
 - Sans modèle de rédaction, Verbatim produit un résumé simplifié à partir de phrases réelles de la transcription, sans rien inventer.
@@ -289,7 +289,7 @@ Seulement pour télécharger les moteurs et les modèles, et pour chercher les m
 Non. Verbatim fonctionne sur le processeur, mais une carte NVIDIA ou AMD accélère nettement la transcription et la rédaction (voir les [performances](#performances)).
 
 **Quelle place et quelle mémoire faut-il ?**
-Le pack de base pèse environ 61 Mo. Chaque modèle de transcription fait de 75 Mo à 1,1 Go, chaque modèle de rédaction de 2,7 à 16 Go environ, et chaque modèle de traduction (TranslateGemma) de 2,5 à 7,3 Go. Qwen 3.5 4B demande environ 4 Go de mémoire, le 9B environ 8 Go.
+Le pack de base pèse environ 61 Mo. Chaque modèle de transcription fait de 75 Mo à 1,1 Go, chaque modèle de rédaction de 2,1 à 19 Go environ, et chaque modèle de traduction (TranslateGemma) de 2,5 à 7,3 Go. Qwen 3.5 4B demande environ 4 Go de mémoire, le 9B environ 8 Go.
 
 **Dans quelle langue sont les comptes-rendus ?**
 Au choix : dans la langue de la réunion (par défaut) ou dans une autre, réglable par réunion. L'interface de Verbatim est disponible en français et en anglais, au choix à l'installation ou dans les Réglages.
@@ -320,9 +320,9 @@ Ce sont des pistes de travail, sans engagement de date ni d'ordre.
 - ✅ **Langue du compte-rendu** au choix, **traduction** de la transcription en 14 langues, **transcription en direct** avec traduction.
 - ✅ **Thèmes et palettes** (dont Kawaii et Gamer).
 - ✅ **Enregistrement en arrière-plan** : pastille flottante (pause, terminer) et icône dans la zone de notification.
+- ✅ **Sauvegarde et restauration** des réunions (un fichier .zip, avec ou sans l'audio), bouton pour vider la corbeille, **catalogue de modèles élargi** (Gemma 4, Ministral 3) et réattribution des passages à un autre intervenant (version 0.5.0).
 
 **Priorités**
-- **Sauvegarde et restauration** des réunions, et **catalogue de modèles élargi** (Llama, Mistral, Gemma).
 - **Compte-rendu plus détaillé** pour les longues réunions (résumé proportionnel à la durée).
 - **Plus de langues d'interface** (espagnol, allemand, italien).
 - **Signature de code** de l'installateur, pour supprimer les avertissements de Windows (la demande à SignPath a été refusée ; une autre solution est à choisir).

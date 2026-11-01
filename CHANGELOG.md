@@ -2,6 +2,48 @@
 
 Français · English below each version.
 
+## 0.5.0
+
+**Sauvegarde et restauration**
+- Réglages › Général › « Sauvegarde et restauration » : un seul fichier .zip contient vos réunions (transcriptions, comptes-rendus, traductions), vos préparations et votre glossaire, avec ou sans les fichiers audio. Les réglages et la clé d'API n'y sont pas.
+- La restauration ajoute ce qui manque, sans jamais modifier ni remplacer ce qui est déjà présent. Elle permet de retrouver ses réunions sur un autre ordinateur.
+
+**Compte-rendu des longues réunions**
+- La longueur du résumé suit maintenant la durée : 5 à 8 phrases jusqu'à 10 minutes, environ 15 à 18 pour une heure, jusqu'à 24 à 27 pour deux heures ou plus, en paragraphes pour les réunions de plus de 25 minutes. Le nombre de sujets listés augmente aussi. Les consignes ne demandent plus d'être « concis ».
+- Les réunions très longues (plus de 4 parties) sont fusionnées par étapes, pour que les notes tiennent dans la mémoire du modèle.
+
+**Intervenants**
+- Un clic sur le nom d'un intervenant propose maintenant « Renommer partout » ou « Ce passage seulement », pour corriger un passage attribué à la mauvaise personne sans renommer tous les autres.
+- Nouveau bouton « Réattribuer des passages » au-dessus de la transcription : on sélectionne plusieurs passages (clic, ou Maj+clic pour un intervalle) puis on les attribue d'un coup à un intervenant. Les traductions suivent.
+
+**Catalogue de modèles**
+- Six modèles de rédaction de plus, de 3 à 26 milliards de paramètres, pour des cartes de 4 à 16 Go : Ministral 3 (3B, 8B, 14B, Mistral AI) et Gemma 4 (E4B, 12B, 26B-A4B, Google), tous sous licence Apache 2.0. Dans Réglages › Compte-rendu, une carte « Modèles recommandés » (Qwen, les mieux testés) précède une liste déroulante des familles (Qwen, Gemma 4, Ministral 3) : le choix d'une famille affiche tous ses modèles.
+
+**Autres**
+- Corbeille : bouton « Vider la corbeille ».
+- Écran de démarrage : les deux étapes du chargement de Whisper portent maintenant des noms distincts (« Lecture du modèle Whisper… » puis « Démarrage de Whisper… »).
+
+### English
+
+**Backup and restore**
+- Settings › General › “Backup and restore”: a single .zip file holds your meetings (transcripts, reports, translations), preparations and glossary, with or without the audio files. Settings and the API key are not included.
+- Restoring adds what is missing and never modifies or replaces what is already there. It lets you bring your meetings to another computer.
+
+**Reports for long meetings**
+- The summary length now follows the duration: 5 to 8 sentences up to 10 minutes, about 15 to 18 for an hour, up to 24 to 27 for two hours or more, in paragraphs for meetings over 25 minutes. The number of listed topics grows too. The prompts no longer ask for “concise”.
+- Very long meetings (more than 4 parts) are merged in stages, so that the notes fit in the model's memory.
+
+**Speakers**
+- Clicking a speaker's name now offers “Rename everywhere” or “This passage only”, to fix a passage assigned to the wrong person without renaming all the others.
+- New “Reassign passages” button above the transcript: select several passages (click, or Shift+click for a range) and assign them to a speaker in one go. Translations follow.
+
+**Model catalog**
+- Six more writing models, from 3 to 26 billion parameters, for cards from 4 to 16 GB: Ministral 3 (3B, 8B, 14B, Mistral AI) and Gemma 4 (E4B, 12B, 26B-A4B, Google), all under the Apache 2.0 license. In Settings › Report, a “Recommended models” card (Qwen, the best tested) comes first, followed by a drop-down list of families (Qwen, Gemma 4, Ministral 3): choosing a family shows all its models.
+
+**Other**
+- Trash: “Empty the trash” button.
+- Startup screen: the two steps of loading Whisper now have distinct names (“Reading the Whisper model…” then “Starting Whisper…”).
+
 ## 0.4.1
 
 **Pastille d'enregistrement**

@@ -535,8 +535,9 @@ async function meeting(id) {
       <p class="meta">Avec l'IA locale, une longue réunion peut prendre plusieurs minutes. Vous pouvez quitter cette page : la génération continue.</p></div>` : ""}
     ${m.report_state === "error" ? `<div class="card"><b>Échec de la génération</b><p class="meta" style="margin-top:4px">${esc(m.report_error || "")}</p></div>` : ""}
     ${r ? (() => { const L = REP_LABELS[r.lang]; const h = (i, fr, st = "") => L ? `<h3 data-nt${st ? ` style="${st}"` : ""}>${L[i]}</h3>` : `<h3${st ? ` style="${st}"` : ""}>${fr}</h3>`;
-      return `<div class="card">${reportBadge(r)}${h(0, "Résumé", "margin-top:0")}<p>${esc(r.summary)}</p>${h(1, "Points abordés")}${lst(r.topics)}${h(2, "Décisions")}${lst(r.decisions)}${h(3, "Actions")}${lst(r.actions)}${h(4, "Prochaines étapes")}${lst(r.next_steps)}</div>`; })() : ""}
-    <div class="card"><div class="bar" style="margin:0 0 8px;align-items:center"><h3 style="margin:0;flex:1">Transcription</h3>
+      return `<div class="card">${reportBadge(r)}${h(0, "Résumé", "margin-top:0")}<p style="white-space:pre-line">${esc(r.summary)}</p>${h(1, "Points abordés")}${lst(r.topics)}${h(2, "Décisions")}${lst(r.decisions)}${h(3, "Actions")}${lst(r.actions)}${h(4, "Prochaines étapes")}${lst(r.next_steps)}</div>`; })() : ""}
+    <div class="card" id="trcard"><div class="bar" style="margin:0 0 8px;align-items:center"><h3 style="margin:0">Transcription</h3>
+      ${m.stage === "ready" && segsShown.length > 1 ? `<button class="btn sm" id="sel-mode" title="Sélectionner plusieurs passages pour les attribuer à un intervenant">Réattribuer des passages</button>` : ""}<span style="flex:1"></span>
       ${m.translate_state === "translating" ? "" : `<select id="tl-sel" style="width:auto" title="Traduire la transcription">${trOptions(m)}</select>`}
       ${shown ? `<button class="btn sm dng" id="tl-del" title="Supprimer cette traduction">Supprimer la traduction</button>` : ""}</div>
       ${m.translate_state === "translating" ? `<div class="tl-status"><span class="meta">Traduction en ${esc(trName(m.translate_lang))}…</span>
@@ -546,6 +547,7 @@ async function meeting(id) {
         <button class="btn sm dng" id="tl-stop">Arrêter</button></div>` : ""}
       ${shown && m.translation_models && m.translation_models[shown] ? `<p class="tl-status"><span class="pill" title="Modèle et matériel utilisés pour cette traduction">${esc(m.translation_models[shown])}</span></p>` : ""}
       ${m.translate_state === "error" ? `<p class="meta" style="color:var(--danger);margin-bottom:8px">${esc(m.translate_error || "La traduction a échoué.")}</p>` : ""}
+      <div class="selbar" id="selbar" hidden><span id="sel-n"></span><button class="btn sm pri" id="sel-go">Attribuer à…</button><button class="btn sm" id="sel-none">Tout désélectionner</button><button class="btn sm" id="sel-end">Terminer</button></div>
       ${segsShown.map((s) => `<div class="seg" data-t="${s.start}" data-e="${s.end}" title="Écouter à partir d'ici"><span class="tm">${fmtT(s.start)}</span><span class="sp" data-sp="${esc(s.speaker)}" ${spkColor(s.speaker)} title="Renommer cet intervenant">${esc(s.speaker)}</span><span>${esc(s.text)}</span></div>`).join("")}</div>`;
   main.innerHTML = `<div class="bar"><button class="btn sm" id="back">← Réunions</button></div>
     <h1>${esc(m.title)}</h1><p class="sub">${fmtDate(m.created_at)} · ${origin}</p>${player}${body}`;
@@ -599,10 +601,54 @@ async function meeting(id) {
   main.querySelectorAll(".seg .sp").forEach((el) => el.onclick = (e) => {
     e.stopPropagation();
     run(async () => {
-      const from = el.dataset.sp, to = await askText(`Nouveau nom pour « ${from} »`, from);
-      if (to && to !== from) { await invoke("rename_speaker", { id, from, to }); meeting(id); }
+      const from = el.dataset.sp;
+      const how = await infoModal(`Intervenant « ${from} »`,
+        ["Renommer cet intervenant partout dans la réunion, ou n'attribuer que ce passage à un autre intervenant (si la voix n'est pas la sienne) ?"],
+        [{ label: "Annuler", val: null }, { label: "Ce passage seulement", val: "one" }, { label: "Renommer partout", cls: "pri", val: "all" }]);
+      if (how === "all") {
+        const to = await askText(`Nouveau nom pour « ${from} »`, from);
+        if (to && to !== from) { await invoke("rename_speaker", { id, from, to }); meeting(id); }
+      } else if (how === "one") {
+        const others = [...new Set(m.transcript.map((s) => s.speaker))].filter((n) => n !== from);
+        const to = await askText(`Intervenant de ce passage${others.length ? ` (déjà présents : ${others.join(", ")})` : ""}`, "");
+        if (to && to !== from) { await invoke("set_segments_speaker", { id, starts: [Number(el.closest(".seg").dataset.t)], to }); meeting(id); }
+      }
     });
   });
+  // Sélection de plusieurs passages (clic = ajoute/retire, Maj+clic = tout l'intervalle) puis attribution à un intervenant
+  const selBtn = $("#sel-mode");
+  if (selBtn) {
+    const card = $("#trcard"), bar = $("#selbar"), rows = [...card.querySelectorAll(".seg")];
+    let on = false, last = -1;
+    const picked = () => rows.filter((r) => r.classList.contains("sel"));
+    const refresh = () => { const n = picked().length; $("#sel-n").textContent = `${n} passage(s) sélectionné(s)`; $("#sel-go").disabled = !n; $("#sel-none").disabled = !n; };
+    const setMode = (v) => {
+      on = v; card.classList.toggle("selmode", v); bar.hidden = !v; selBtn.hidden = v; last = -1;
+      if (!v) rows.forEach((r) => r.classList.remove("sel"));
+      refresh();
+    };
+    selBtn.onclick = () => setMode(true);
+    $("#sel-end").onclick = () => setMode(false);
+    $("#sel-none").onclick = () => { rows.forEach((r) => r.classList.remove("sel")); last = -1; refresh(); };
+    // en phase de capture : en mode sélection, le clic ne lance pas la lecture audio et ne renomme pas
+    card.addEventListener("click", (e) => {
+      if (!on) return;
+      const row = e.target.closest(".seg"); if (!row) return;
+      e.stopPropagation(); e.preventDefault();
+      const i = rows.indexOf(row);
+      if (e.shiftKey && last >= 0) { const [a, b] = [Math.min(last, i), Math.max(last, i)]; for (let k = a; k <= b; k++) rows[k].classList.add("sel"); }
+      else row.classList.toggle("sel");
+      last = i; refresh();
+    }, true);
+    $("#sel-go").onclick = () => run(async () => {
+      const sel = picked(); if (!sel.length) return;
+      const names = [...new Set(m.transcript.map((s) => s.speaker))];
+      const to = await askText(`Intervenant de ces ${sel.length} passage(s)${names.length ? ` (déjà présents : ${names.join(", ")})` : ""}`, "");
+      if (!to) return;
+      await invoke("set_segments_speaker", { id, starts: sel.map((r) => Number(r.dataset.t)), to });
+      toast("Passages réattribués"); meeting(id);
+    });
+  }
   const tsel = $("#tl-sel");
   if (tsel) tsel.onchange = () => run(async () => {
     const v = tsel.value;
@@ -803,11 +849,18 @@ async function trash() {
   const item = (kind, id, t) => `<div class="card row"><span class="t">${esc(t)}</span><span class="pill">${kind}</span>
     <button class="btn sm" data-a="restore" data-k="${kind}" data-id="${id}">Restaurer</button><button class="btn sm dng" data-a="purge" data-k="${kind}" data-id="${id}">Supprimer</button></div>`;
   main.innerHTML = `<h1>Corbeille</h1><p class="sub">Les éléments supprimés définitivement ne sont pas récupérables.</p>` +
+    (ms.length + bs.length ? `<div class="bar" style="margin:0 0 12px"><button class="btn dng" data-a="empty">Vider la corbeille</button></div>` : "") +
     (ms.length + bs.length ? ms.map((m) => item("Réunion", m.id, m.title)).join("") + bs.map((b) => item("Brief", b.id, b.subject)).join("") : `<div class="empty">La corbeille est vide.</div>`);
   main.onclick = (e) => {
     const b = e.target.closest("[data-a]");
     if (!b) return;
     run(async () => {
+      if (b.dataset.a === "empty") {
+        if (!(await ask("Supprimer définitivement tout le contenu de la corbeille ? Cette action est irréversible.", "Vider la corbeille"))) return;
+        for (const m of ms) await invoke("purge_meeting", { id: m.id });
+        for (const x of bs) await invoke("purge_brief", { id: x.id });
+        toast("Corbeille vidée"); trash(); return;
+      }
       const isM = b.dataset.k === "Réunion", id = b.dataset.id;
       if (b.dataset.a === "restore") await invoke(isM ? "update_meeting" : "update_brief", { id, trashed: false });
       else if (await ask("Supprimer définitivement ? Cette action est irréversible.")) await invoke(isM ? "purge_meeting" : "purge_brief", { id });
@@ -836,6 +889,11 @@ async function settings() {
         <p class="meta" style="margin-bottom:8px">Verbatim cherche au démarrage la dernière version publiée sur GitHub. Avec l'option cochée, elle est téléchargée en arrière-plan ; l'installation ne démarre que lorsque vous cliquez sur « Mettre à jour » (l'application redémarre alors), et jamais pendant un enregistrement, une transcription ou une rédaction.</p>
         <label class="chk"><input type="checkbox" id="au" ${s.auto_update !== false ? "checked" : ""}> Installer automatiquement les nouvelles versions</label>
         <div class="bar" style="margin:12px 0 0"><button class="btn" id="au-chk">Rechercher maintenant</button><span class="meta" id="au-msg"></span></div></div>
+      <div class="card"><h3>Sauvegarde et restauration</h3>
+        <p class="meta" style="margin-bottom:8px">Enregistre vos réunions (transcriptions, comptes-rendus, traductions), vos préparations et votre glossaire dans un seul fichier .zip, pour les mettre à l'abri ou les retrouver sur un autre ordinateur. Les réglages et la clé d'API n'en font pas partie.</p>
+        <label class="chk"><input type="checkbox" id="bk-audio" checked> Inclure les fichiers audio (sauvegarde plus volumineuse)</label>
+        <div class="bar" style="margin:12px 0 0"><button class="btn" id="bk-save">Créer une sauvegarde…</button><button class="btn" id="bk-load">Restaurer une sauvegarde…</button><span class="meta" id="bk-msg"></span></div>
+        <p class="meta" style="margin-top:8px">La restauration ajoute ce qui manque : les réunions déjà présentes ne sont jamais modifiées ni remplacées.</p></div>
     </section>
     <section class="pane" data-pane="tr" ${setTab === "tr" ? "" : "hidden"}>
       <div class="card avn"><h3>Antivirus : ajoutez une exclusion</h3>
@@ -861,6 +919,9 @@ async function settings() {
         <p class="meta" style="margin-bottom:8px">Le compte-rendu peut être rédigé dans une autre langue que celle de la réunion. Vous pouvez aussi la choisir réunion par réunion.</p>
         <select id="rl-def" style="max-width:260px">${repLangs(s.report_lang)}</select></div>
       <div class="card"><h3>Calcul de la rédaction</h3><div id="ldev"></div></div>
+      <div class="card"><h3>Modèles recommandés</h3>
+        <p class="meta" style="margin-bottom:10px">Les modèles les mieux testés par Verbatim (temps mesurés dans le README). Tous les modèles du catalogue sont dans la liste déroulante plus bas.</p>
+        <div id="llms-rec"></div></div>
       <div class="card"><h3>IA de rédaction</h3>
         <p class="meta" style="margin-bottom:10px">Un modèle installé sur cet ordinateur rédige le compte-rendu, sans rien envoyer en ligne. Sans modèle local ni API, seul un résumé simplifié est produit.</p>
         <div id="llms"></div></div>
@@ -901,7 +962,7 @@ async function settings() {
     document.querySelectorAll(".avn-path").forEach((e) => { e.textContent = r.path; });
     document.querySelectorAll(".avn-copy").forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(r.path); toast("Chemin copié"); } catch (x) { toast(r.path); } });
   });
-  let gpuVram = 0;
+  let gpuVram = 0, moreSel = ""; // moreSel : famille de modèles affichée sous la liste déroulante
   const noFit = (bytes) => gpuVram > 0 && curDev !== "cpu_only" && bytes + 1.5 * 1073741824 > gpuVram;
   const fitMsg = (bytes) => `<br><span class="meta" style="color:var(--danger)">Trop volumineux pour la mémoire vidéo de votre carte (${(gpuVram / 1073741824).toFixed(0)} Go) : environ ${((bytes + 1.5 * 1073741824) / 1073741824).toFixed(1)} Go nécessaires. Une partie du modèle tournera sur le processeur : rédaction très lente.</span>`;
   const saveAll = async () => invoke("set_settings", { settings: { llm_base_url: $("#u").value.trim(), llm_api_key: $("#k").value, llm_model: $("#m").value.trim(), whisper_model: curModel, whisper_lang: $("#wl").value, llm_local: curLlm, whisper_device: curWdev, llm_device: curDev, rocm_root: curRocm, auto_update: $("#au").checked, report_lang: $("#rl-def").value, translate_model: curTr, translate_device: curTdev } });
@@ -949,21 +1010,39 @@ async function settings() {
     const gd = $("#g-dl"); if (gd) gd.onclick = () => run(async () => { await invoke("engine_install_gpu"); renderModels(); watchDownload(); });
     const llm = st.llm;
     gpuVram = llm.vram || 0;
-    const lrows = [`<div class="card mrow ${curLlm === "" ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="" ${curLlm === "" ? "checked" : ""}>
-      <span><b>Aucune IA locale</b><br><span class="meta">Utiliser l'API distante si elle est configurée, sinon un résumé simplifié</span></span></label></div>`].concat(llm.models.filter((m) => !m.translator).map((m) => {
+    const famOf = (id) => /^qwen/.test(id) ? "Qwen · Alibaba" : /^gemma/.test(id) ? "Gemma 4 · Google" : /^ministral/.test(id) ? "Ministral 3 · Mistral AI" : "";
+    const rowOf = (m, grp = "lm") => {
       const busy = d.active && d.model === m.name;
       const pct = m.partial ? Math.round((m.partial / m.bytes) * 100) : 0;
       const state = m.installed ? `<span class="pill ok">Installé</span>` : busy ? `<span class="pill">Téléchargement…</span>` : m.partial ? `<span class="pill warn">Interrompu ${pct} %</span>` : "";
       const act = m.installed ? `<button class="btn sm dng" data-ldel="${m.name}">Supprimer</button>`
         : busy ? "" : `<button class="btn sm" data-lget="${m.name}">${m.partial ? "Reprendre" : "Télécharger"}</button>`;
-      return `<div class="card mrow ${curLlm === m.name ? "sel" : ""} ${noFit(m.bytes) ? "nofit" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="${m.name}" ${curLlm === m.name ? "checked" : ""} ${m.installed ? "" : "disabled"}>
+      return `<div class="card mrow ${curLlm === m.name ? "sel" : ""} ${noFit(m.bytes) ? "nofit" : ""}"><label class="chk" style="flex:1"><input type="radio" name="${grp}" value="${m.name}" ${curLlm === m.name ? "checked" : ""} ${m.installed ? "" : "disabled"}>
         <span><b>${esc(m.label)}</b> <span class="meta">· ${fmtSize(m.bytes)}</span><br><span class="meta">${esc(m.desc)}</span><br><span class="meta" style="word-break:break-all">${m.installed ? "Emplacement" : "Sera installé dans"} : <code>${esc(m.path)}</code></span>${noFit(m.bytes) ? fitMsg(m.bytes) : ""}
         ${busy ? `<div class="prog" style="width:100%;margin-top:6px"><b data-dlbar style="width:${dlPct(d)}%"></b></div><span class="meta" data-dlmsg>${esc(dlLabel(d))}</span>` : ""}</span></label>${state}${act}</div>`;
-    }));
-    $("#llms").innerHTML = lrows.join("") + `<p class="meta" style="margin-top:6px">Moteur d'IA locale (llama.cpp) : ${llm.binary ? "installé" : "non installé (téléchargé avec le premier modèle)"} · <code>${esc(llm.binary_path)}</code></p><p class="meta" style="margin-top:6px">Le modèle n'est chargé en mémoire (4 à 24 Go selon le modèle) que pendant la rédaction.</p>`;
-    $("#llms").querySelectorAll("[name=lm]").forEach((r) => r.onchange = () => run(async () => { curLlm = r.value; await saveAll(); renderModels(); if (typeof renderOllama === "function") renderOllama(); if (typeof renderGguf === "function") renderGguf(); }));
-    $("#llms").querySelectorAll("[data-lget]").forEach((b) => b.onclick = () => run(async () => { await invoke("llm_install", { model: b.dataset.lget }); renderModels(); watchDownload(); }));
-    $("#llms").querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => run(async () => { if (await ask("Supprimer ce modèle du disque ?")) { await invoke("llm_remove", { model: b.dataset.ldel }); curLlm = (await invoke("get_settings")).llm_local || ""; renderModels(); renderGguf(); } }));
+    };
+    const mods = llm.models.filter((m) => !m.translator);
+    // recommandés : ceux dont les temps sont mesurés (README) ; le 27B seulement avec 16 Go de mémoire vidéo
+    const recIds = ["qwen3.5-4b", "qwen3.5-9b"].concat(gpuVram >= 15 * 1073741824 ? ["qwen3.8-27b-q3"] : []);
+    const rec = recIds.map((i) => mods.find((m) => m.name === i)).filter(Boolean);
+    // liste déroulante des familles : le choix d'une famille affiche tous ses modèles (y compris les recommandés, dans un autre groupe de boutons radio)
+    const fams = [...new Set(mods.map((m) => famOf(m.name)))];
+    const inFam = (f) => mods.filter((m) => famOf(m.name) === f);
+    const cur = mods.find((m) => m.name === curLlm && !recIds.includes(m.name)); // utilisé mais non recommandé : mentionné, la liste reste masquée
+    if (!fams.includes(moreSel)) moreSel = "";
+    const moreSelect = `<select id="lm-more" style="max-width:100%"><option value="">Choisir une famille…</option>${fams.map((f) =>
+      `<option value="${esc(f)}" ${moreSel === f ? "selected" : ""}>${esc(f)} (${inFam(f).length} modèles)</option>`).join("")}</select>`;
+    $("#llms-rec").innerHTML = rec.map(rowOf).join("");
+    $("#llms").innerHTML = `<div class="card mrow ${curLlm === "" ? "sel" : ""}"><label class="chk" style="flex:1"><input type="radio" name="lm" value="" ${curLlm === "" ? "checked" : ""}>
+      <span><b>Aucune IA locale</b><br><span class="meta">Utiliser l'API distante si elle est configurée, sinon un résumé simplifié</span></span></label></div>
+      <label>Tous les modèles, par famille</label>${cur ? `<p class="meta" style="margin:2px 0 6px">Modèle utilisé : <b>${esc(cur.label)}</b></p>` : ""}${moreSelect}<div style="margin-top:10px">${moreSel ? inFam(moreSel).map((m) => rowOf(m, "lmf")).join("") : ""}</div>
+      <p class="meta" style="margin-top:6px">Moteur d'IA locale (llama.cpp) : ${llm.binary ? "installé" : "non installé (téléchargé avec le premier modèle)"} · <code>${esc(llm.binary_path)}</code></p><p class="meta" style="margin-top:6px">Le modèle n'est chargé en mémoire (3 à 24 Go selon le modèle) que pendant la rédaction.</p>`;
+    $("#lm-more").onchange = (e) => { moreSel = e.target.value; renderModels(); };
+    for (const root of [$("#llms-rec"), $("#llms")]) {
+      root.querySelectorAll("input[type=radio]").forEach((r) => r.onchange = () => run(async () => { curLlm = r.value; await saveAll(); renderModels(); if (typeof renderOllama === "function") renderOllama(); if (typeof renderGguf === "function") renderGguf(); }));
+      root.querySelectorAll("[data-lget]").forEach((b) => b.onclick = () => run(async () => { await invoke("llm_install", { model: b.dataset.lget }); renderModels(); watchDownload(); }));
+      root.querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => run(async () => { if (await ask("Supprimer ce modèle du disque ?")) { await invoke("llm_remove", { model: b.dataset.ldel }); curLlm = (await invoke("get_settings")).llm_local || ""; renderModels(); renderGguf(); } }));
+    }
     // modèles de traduction (TranslateGemma)
     const trRow = (m) => {
       const busy = d.active && d.model === m.name;
@@ -1119,6 +1198,36 @@ async function settings() {
       if (!u) { msg.textContent = "Vous avez la dernière version (v" + (await invoke("app_version")).version + ")."; return; }
       msg.textContent = "Version " + u.version + " disponible.";
     } catch (e) { msg.textContent = updErr(e); }
+  };
+  // Sauvegarde et restauration (la page peut être quittée pendant l'opération : on ne touche alors plus aux éléments)
+  const bkState = (busy, txt) => {
+    const set = (id, f) => { const e = $(id); if (e) f(e); };
+    set("#bk-save", (e) => { e.disabled = busy; }); set("#bk-load", (e) => { e.disabled = busy; });
+    set("#bk-msg", (e) => { e.textContent = txt || ""; });
+  };
+  const bkSize = (n) => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " Ko" : fmtSize(n);
+  $("#bk-save").onclick = async () => {
+    const dest = await dialog.save({ defaultPath: `Verbatim-sauvegarde-${new Date().toISOString().slice(0, 10)}.zip`, filters: [{ name: "Sauvegarde Verbatim", extensions: ["zip"] }] });
+    if (!dest) return;
+    bkState(true, "Sauvegarde en cours…");
+    try {
+      const r = await invoke("backup_export", { dest, withAudio: $("#bk-audio")?.checked ?? true });
+      bkState(false, `Sauvegarde créée : ${r.meetings} réunion(s), ${bkSize(r.bytes)}.`); toast("Sauvegarde créée");
+    } catch (e) { bkState(false, ""); toast(String(e)); }
+  };
+  $("#bk-load").onclick = async () => {
+    const f = await dialog.open({ filters: [{ name: "Sauvegarde Verbatim", extensions: ["zip"] }] });
+    if (!f) return;
+    bkState(true, "Lecture de la sauvegarde…");
+    try {
+      const i = await invoke("backup_inspect", { path: f });
+      if (!i.new_meetings && !i.new_briefs) { bkState(false, ""); toast("Rien à restaurer : tout ce que contient cette sauvegarde est déjà présent."); return; }
+      const ok = await ask(`Cette sauvegarde du ${fmtDate(i.created_at)} contient ${i.meetings} réunion(s) : ${i.new_meetings} à ajouter, ${i.meetings - i.new_meetings} déjà présente(s) et laissée(s) telle(s) quelle(s).${i.audio ? "" : " Elle ne contient pas les fichiers audio."}`, "Restaurer");
+      if (!ok) { bkState(false, ""); return; }
+      bkState(true, "Restauration en cours…");
+      const r = await invoke("backup_restore", { path: f });
+      bkState(false, `Restauration terminée : ${r.meetings} réunion(s) ajoutée(s).`); toast("Restauration terminée");
+    } catch (e) { bkState(false, ""); toast(String(e)); }
   };
   renderModels(); renderOllama(); renderGguf(); renderFound();
   $("#save").onclick = () => run(async () => { await saveAll(); toast("Réglages enregistrés"); });

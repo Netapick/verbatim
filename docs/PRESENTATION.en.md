@@ -80,7 +80,7 @@ Add your acronyms and business terms: they are passed to Whisper as initial voca
 
 ![Transcription settings](screenshots/en/07-reglages-transcription.png)
 
-**Report**: local **Qwen 3.5** AI (4B or 9B) and **Qwen 3.8 27B**, run by llama.cpp, with computation on CPU, Vulkan or ROCm. The model is only loaded into memory while writing. You can also reuse models that are already present (GGUF, Ollama): they are copied into Verbatim's folder, the originals are not modified.
+**Report**: a local AI of your choice (**Qwen**, **Gemma 4** or **Ministral 3**, from 3 to 27 billion parameters), run by llama.cpp, with computation on CPU, Vulkan or ROCm. The model is only loaded into memory while writing. You can also reuse models that are already present (GGUF, Ollama): they are copied into Verbatim's folder, the originals are not modified.
 
 ![Writing settings](screenshots/en/08-reglages-redaction.png)
 

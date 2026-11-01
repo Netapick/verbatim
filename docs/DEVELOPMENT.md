@@ -18,6 +18,7 @@ Verbatim est une application de bureau **Tauri 2 + Rust** (interface HTML/JS san
 | `src-tauri/src/translate.rs` | Traduction de la transcription par lots (TranslateGemma ou modèle du compte-rendu) |
 | `src-tauri/src/models.rs` | Détection et copie de modèles existants |
 | `src-tauri/src/update.rs` | Mise à jour automatique |
+| `src-tauri/src/backup.rs` | Sauvegarde et restauration des réunions (.zip) |
 | `src-tauri/installer/` | Hooks NSIS et scripts PowerShell de l'installateur |
 | `scripts/` | Construction des moteurs et des packs, logo |
 
@@ -28,6 +29,8 @@ Verbatim est une application de bureau **Tauri 2 + Rust** (interface HTML/JS san
 - **Direct** : `recorder::Sink` publie les échantillons dans un `TapBuf` par source ; `live.rs` les mixe, envoie toutes les ~0,6 s la fin de l'audio non validé à `whisper-server` (`/inference`), valide les phrases terminées 1,2 s avant la fin de l'audio (événement `live-segment`), laisse la dernière provisoire (`live-partial`) et traduit chaque phrase validée (`live-translation`). Serveur : ROCm (`engine-rocm/whisper-server.exe`) si carte Radeon + runtime, sinon CPU ; modèle ≤ small sur CPU. Le serveur est relancé s'il s'arrête (3 fois au plus, journal `verbatim-whisper-server.log`) ; la détection de parole du direct est faite en Rust (crate `earshot`, trames de 16 ms) et non par le VAD du serveur. Le rappel de capture cpal ne fait que copier les échantillons vers un thread de traitement (rééchantillonnage, disque, direct). À l'arrêt, `recorder::finish` coupe le direct puis la transcription normale du fichier est lancée.
 
 Les données sont dans un fichier `store.json` et les audios copiés, dans le dossier de données de l'application.
+
+**Sauvegarde** (`backup.rs`, Réglages › Général) : un `.zip` avec `manifest.json` (version, date), `data.json` (réunions, préparations, glossaire, types de réunion) et, au choix, `audio/`. Les réglages (clé d'API comprise) n'y sont pas. La restauration (`backup_inspect` puis `backup_restore`) est une fusion : une réunion, une préparation ou un type déjà présent (même identifiant) n'est jamais modifié ; l'audio est réécrit dans le dossier `audio/` de la machine, avec des noms filtrés. Les travaux en cours à la sauvegarde ne reprennent pas seuls (transcription interrompue : réunion en erreur à relancer).
 
 ## Enregistrement
 

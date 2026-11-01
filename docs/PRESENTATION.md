@@ -80,7 +80,7 @@ Ajoutez vos sigles et termes métier : ils sont transmis à Whisper comme vocabu
 
 ![Réglages de transcription](screenshots/07-reglages-transcription.png)
 
-**Compte-rendu** : IA locale **Qwen 3.5** (4B ou 9B) et **Qwen 3.8 27B**, exécutée par llama.cpp, avec calcul sur CPU, Vulkan ou ROCm. Le modèle n'est chargé en mémoire que pendant la rédaction. Vous pouvez aussi réutiliser des modèles déjà présents (GGUF, Ollama) : ils sont copiés dans le dossier de Verbatim, les originaux ne sont pas modifiés.
+**Compte-rendu** : IA locale au choix (**Qwen**, **Gemma 4** ou **Ministral 3**, de 3 à 27 milliards de paramètres), exécutée par llama.cpp, avec calcul sur CPU, Vulkan ou ROCm. Le modèle n'est chargé en mémoire que pendant la rédaction. Vous pouvez aussi réutiliser des modèles déjà présents (GGUF, Ollama) : ils sont copiés dans le dossier de Verbatim, les originaux ne sont pas modifiés.
 
 ![Réglages de rédaction](screenshots/08-reglages-redaction.png)
 
