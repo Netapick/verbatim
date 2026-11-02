@@ -395,6 +395,50 @@ struct Cached {
 }
 static CACHE: Mutex<Option<Cached>> = Mutex::new(None);
 
+// ─── Pause d'un compte-rendu ───────────────────────────────────────────────
+
+/// Erreur interne renvoyée quand la pause d'un compte-rendu est demandée (jamais affichée telle quelle).
+const PAUSED: &str = "Génération mise en pause.";
+/// Réunions dont la pause est demandée.
+static PAUSE_REQ: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// Serveur d'IA locale en cours d'un compte-rendu : (réunion, pid), pour l'arrêter aussitôt et libérer la mémoire vidéo.
+static ACTIVE_PID: Mutex<Vec<(String, u32)>> = Mutex::new(Vec::new());
+thread_local! {
+    /// Réunion dont le compte-rendu est rédigé par le thread courant (vide ailleurs : la pause ne s'applique pas).
+    static CUR_REPORT: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// La pause du compte-rendu en cours de ce thread a été demandée.
+fn paused() -> bool {
+    CUR_REPORT.with(|c| {
+        let id = c.borrow();
+        !id.is_empty() && lock(&PAUSE_REQ).iter().any(|x| *x == *id)
+    })
+}
+
+fn set_active(id: &str, pid: Option<u32>) {
+    let mut g = lock(&ACTIVE_PID);
+    g.retain(|(i, _)| i != id);
+    if let Some(p) = pid {
+        g.push((id.to_string(), p));
+    }
+}
+
+fn kill_pid(pid: u32) {
+    let mut c = Command::new("taskkill");
+    c.args(["/F", "/PID", &pid.to_string()]).stdout(Stdio::null()).stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let _ = c.status();
+}
+
 /// Arrête le serveur d'IA locale laissé en marche (avant de supprimer ou remplacer ses fichiers).
 pub fn release_server() {
     *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
@@ -429,7 +473,7 @@ fn read_model(model: &PathBuf, on_pct: &dyn Fn(u8)) {
     let (mut done, mut last) = (0u64, 255u8);
     on_pct(0);
     while let Ok(n) = f.read(&mut buf) {
-        if n == 0 {
+        if n == 0 || paused() {
             break;
         }
         done += n as u64;
@@ -451,6 +495,9 @@ fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings, on_pct: &dyn Fn(
     };
     let threads = (std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8) / 2).clamp(4, 8);
     read_model(model, on_pct);
+    if paused() {
+        return Err(PAUSED.into());
+    }
     let mut cmd = Command::new(bin);
     if !extra_path.is_empty() {
         // runtime ROCm : ses DLL (HIP, rocBLAS…) doivent être trouvables
@@ -475,6 +522,9 @@ fn start_server(dir: &PathBuf, model: &PathBuf, cfg: &Settings, on_pct: &dyn Fn(
     let mut srv = Server { child, port };
     let t0 = Instant::now();
     loop {
+        if paused() {
+            return Err(PAUSED.into()); // `srv` est abandonné : le serveur est arrêté
+        }
         if let Ok(Some(status)) = srv.child.try_wait() {
             return Err(format!("L'IA locale s'est arrêtée au démarrage ({status}). Mémoire insuffisante ?"));
         }
@@ -536,14 +586,17 @@ fn chat_json(be: &Backend, system: &str, user: &str, max_tokens: u32, on_frac: &
     if !be.key.is_empty() {
         req = req.set("Authorization", &format!("Bearer {}", be.key));
     }
-    let resp = req.send_json(body).map_err(|e| format!("Appel du modèle impossible : {e}"))?;
+    let resp = req.send_json(body).map_err(|e| if paused() { PAUSED.to_string() } else { format!("Appel du modèle impossible : {e}") })?;
     // la réponse JSON d'un compte-rendu fait en général ~60 % du maximum autorisé
     let expected = (max_tokens as f32 * 0.6).max(1.0);
     let mut txt = String::new();
     let mut chunks = 0u32;
     let mut finish = String::new();
     for line in std::io::BufRead::lines(std::io::BufReader::new(resp.into_reader())) {
-        let line = line.map_err(|e| e.to_string())?;
+        if paused() {
+            return Err(PAUSED.into());
+        }
+        let line = line.map_err(|e| if paused() { PAUSED.to_string() } else { e.to_string() })?;
         let Some(data) = line.strip_prefix("data:") else { continue };
         let data = data.trim();
         if data == "[DONE]" {
@@ -559,6 +612,9 @@ fn chat_json(be: &Backend, system: &str, user: &str, max_tokens: u32, on_frac: &
                 on_frac((chunks as f32 / expected).min(0.97));
             }
         }
+    }
+    if paused() {
+        return Err(PAUSED.into()); // flux coupé par l'arrêt du serveur : la réponse est incomplète
     }
     if txt.trim().is_empty() {
         return Err("Réponse vide du modèle.".into());
@@ -1250,6 +1306,29 @@ fn notes_block(notes: &[Value]) -> String {
         .join("\n")
 }
 
+/// Point de reprise : les notes des parties déjà analysées, conservées avec la réunion pour reprendre après une pause
+/// (même après la fermeture de l'application). Valable seulement pour la même langue et la même transcription découpée.
+fn save_ckpt(app: &AppHandle, id: &str, lang: &str, sig: usize, n: usize, notes: &[Value]) {
+    let st = app.state::<AppState>();
+    let mut s = st.store.lock().unwrap();
+    if let Some(m) = s.meetings.iter_mut().find(|m| m.id == id) {
+        m.report_ckpt = Some(json!({ "lang": lang, "sig": sig, "n": n, "notes": notes }));
+    }
+    let _ = st.save(&s);
+}
+
+fn load_ckpt(app: &AppHandle, id: &str, lang: &str, sig: usize, n: usize) -> Vec<Value> {
+    let st = app.state::<AppState>();
+    let s = st.store.lock().unwrap();
+    let Some(c) = s.meetings.iter().find(|m| m.id == id).and_then(|m| m.report_ckpt.as_ref()) else { return Vec::new() };
+    let notes = c["notes"].as_array().cloned().unwrap_or_default();
+    if c["lang"].as_str() == Some(lang) && c["sig"].as_u64() == Some(sig as u64) && c["n"].as_u64() == Some(n as u64) && notes.len() <= n {
+        notes
+    } else {
+        Vec::new()
+    }
+}
+
 /// Le chargement du modèle occupe 0-10 %, la rédaction 10-99 % répartis entre les étapes.
 /// `mins` : durée de la réunion, qui fixe la longueur visée du compte-rendu.
 fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &[String], lang: &str, mins: f32) -> R<Value> {
@@ -1266,13 +1345,25 @@ fn run_with_backend(app: &AppHandle, id: &str, be: &Backend, ctx: &str, lines: &
         let max = (hi * 45 + 1000).clamp(1400, 3500);
         return Ok(normalize(&chat_json(be, &system_full(lang, mins), &body, max, &|f| set_pct(app, id, at(0, f)))?));
     }
-    let mut notes = Vec::new();
-    for (i, p) in parts.iter().enumerate() {
+    // reprise après une pause : les parties déjà analysées ne sont pas refaites
+    let sig: usize = parts.iter().map(|p| p.len()).sum();
+    let mut notes = load_ckpt(app, id, lang, sig, n);
+    if !notes.is_empty() {
+        set_pct(app, id, at(notes.len(), 0.0));
+    }
+    for (i, p) in parts.iter().enumerate().skip(notes.len()) {
+        if paused() {
+            return Err(PAUSED.into());
+        }
         set_progress(app, id, &format!("Analyse de la partie {}/{}…", i + 1, n));
         let body = format!("{ctx}\nPartie {}/{} de la réunion. Transcription :\n{p}", i + 1, n);
         notes.push(normalize(&chat_json(be, &system_map(lang), &body, 1200, &|f| set_pct(app, id, at(i, f)))?));
+        save_ckpt(app, id, lang, sig, n, &notes);
     }
     while notes.len() > MAX_NOTES {
+        if paused() {
+            return Err(PAUSED.into());
+        }
         set_progress(app, id, "Fusion intermédiaire des parties…");
         let mut next = Vec::new();
         for g in notes.chunks(GROUP) {
@@ -1347,6 +1438,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
         });
         return match res {
             Ok(v) => Ok(stamp(v, be.mode, &be.label, &be.hw)),
+            Err(e) if e == PAUSED => Err(e),
             Err(e) => Ok(extractive(&title, &segs, &format!("Ollama a échoué ({e}). Résumé simplifié affiché."))),
         };
     }
@@ -1375,18 +1467,23 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
                     chunk_chars: 11_000,
                     timeout: 7200,
                 };
+                set_active(id, Some(srv.child.id()));
                 let r = run_with_backend(app, id, &be, &ctx, &lines, lang, mins);
+                set_active(id, None);
                 drop(srv);
                 r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
             })
         };
         let mut res = attempt(&cfg);
-        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" {
+        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" && !paused() {
             // le moteur GPU a été coupé : on retente une fois sur le processeur
             set_progress(app, id, "Moteur GPU interrompu : nouvel essai sur le processeur…");
             let mut cpu = cfg.clone();
             cpu.llm_device = "cpu_only".into();
             res = attempt(&cpu).map_err(|e2| format!("{} (essai sur le processeur : {e2})", res.as_ref().err().cloned().unwrap_or_default()));
+        }
+        if res.is_err() && paused() {
+            return Err(PAUSED.into());
         }
         return match res {
             Ok(v) => Ok(v),
@@ -1411,18 +1508,23 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
                     chunk_chars: 11_000,
                     timeout: 1800,
                 };
+                set_active(id, Some(srv.child.id()));
                 let r = run_with_backend(app, id, &be, &ctx, &lines, lang, mins);
+                set_active(id, None);
                 drop(srv);
                 r.map(|v| stamp(v, be.mode, &be.label, &be.hw))
             })
         };
         let mut res = attempt(&cfg);
-        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" {
+        if res.as_ref().err().map_or(false, |e| engine_crashed(e)) && cfg.llm_device != "cpu_only" && !paused() {
             // le moteur GPU a été coupé : on retente une fois sur le processeur
             set_progress(app, id, "Moteur GPU interrompu : nouvel essai sur le processeur…");
             let mut cpu = cfg.clone();
             cpu.llm_device = "cpu_only".into();
             res = attempt(&cpu).map_err(|e2| format!("{} (essai sur le processeur : {e2})", res.as_ref().err().cloned().unwrap_or_default()));
+        }
+        if res.is_err() && paused() {
+            return Err(PAUSED.into());
         }
         match res {
             Ok(v) => return Ok(v),
@@ -1446,6 +1548,7 @@ fn produce(app: &AppHandle, id: &str, lang: &str) -> R<Value> {
         };
         return match run_with_backend(app, id, &be, &ctx, &lines, lang, mins) {
             Ok(v) => Ok(stamp(v, be.mode, &be.label, &be.hw)),
+            Err(e) if e == PAUSED => Err(e),
             Err(e) => Ok(extractive(&title, &segs, &format!("L'API a échoué ({e}). Résumé simplifié affiché."))),
         };
     }
@@ -1468,35 +1571,62 @@ pub fn generate_report(app: AppHandle, st: State<AppState>, id: String, lang: Op
         if m.report_state == "generating" {
             return Err("Un compte-rendu est déjà en cours de génération.".into());
         }
+        if m.report_state == "paused" {
+            return Err("Un compte-rendu est en pause : reprenez-le ou abandonnez-le.".into());
+        }
         m.report_state = "generating".into();
         m.report_error = None;
         m.report_progress = "Démarrage…".into();
         m.report_pct = 0;
+        m.report_ckpt = None;
         st.save(&s)?;
     }
     let lang = {
         let s = st.store.lock().unwrap();
         lang.filter(|l| !l.is_empty()).unwrap_or_else(|| s.settings.report_lang.clone())
     };
+    spawn_report(app, id, lang);
+    Ok(())
+}
+
+/// Rédige le compte-rendu dans un thread. Si la pause est demandée en route, la réunion passe à « paused » (avec son point
+/// de reprise) ; sinon le compte-rendu, ou l'erreur, est enregistré.
+fn spawn_report(app: AppHandle, id: String, lang: String) {
     std::thread::spawn(move || {
+        CUR_REPORT.with(|c| *c.borrow_mut() = id.clone());
+        lock(&PAUSE_REQ).retain(|x| *x != id); // une demande restée d'un essai précédent
         // libère Whisper (mémoire vidéo comprise) pour laisser la place à l'IA du compte-rendu ; il se recharge à la prochaine
         // ouverture du panneau d'enregistrement. Pas pendant un enregistrement : le direct en a besoin.
         if app.state::<AppState>().rec.lock().unwrap().is_none() {
             crate::live::release();
         }
         let res = produce(&app, &id, &lang);
+        set_active(&id, None);
+        lock(&PAUSE_REQ).retain(|x| *x != id);
+        CUR_REPORT.with(|c| c.borrow_mut().clear());
         let st = app.state::<AppState>();
         let mut s = st.store.lock().unwrap();
         if let Some(m) = s.meetings.iter_mut().find(|m| m.id == id) {
-            m.report_progress.clear();
-            m.report_pct = 0;
             m.report_hw.clear();
             match res {
+                Err(e) if e == PAUSED => {
+                    m.report_state = "paused".into();
+                    if m.report_ckpt.is_none() {
+                        m.report_ckpt = Some(json!({ "lang": lang, "sig": 0, "n": 0, "notes": [] })); // retient la langue choisie
+                    }
+                    m.report_progress = "En pause : la mémoire vidéo est libérée".into();
+                }
                 Ok(v) => {
+                    m.report_progress.clear();
+                    m.report_pct = 0;
+                    m.report_ckpt = None;
                     m.report = Some(v);
                     m.report_state = String::new();
                 }
                 Err(e) => {
+                    m.report_progress.clear();
+                    m.report_pct = 0;
+                    m.report_ckpt = None;
                     m.report_state = "error".into();
                     m.report_error = Some(e);
                 }
@@ -1504,7 +1634,66 @@ pub fn generate_report(app: AppHandle, st: State<AppState>, id: String, lang: Op
         }
         let _ = st.save(&s);
     });
+}
+
+/// Met la rédaction en pause : le serveur d'IA est arrêté aussitôt (la mémoire vidéo est libérée). Les parties déjà analysées
+/// sont conservées, `resume_report` reprend à la suivante.
+#[tauri::command]
+pub fn pause_report(st: State<AppState>, id: String) -> R<()> {
+    {
+        let s = st.store.lock().unwrap();
+        let m = s.meetings.iter().find(|m| m.id == id).ok_or("Réunion introuvable")?;
+        if m.report_state != "generating" {
+            return Err("Aucun compte-rendu en cours de rédaction.".into());
+        }
+    }
+    {
+        let mut g = lock(&PAUSE_REQ);
+        if !g.contains(&id) {
+            g.push(id.clone());
+        }
+    }
+    let pid = lock(&ACTIVE_PID).iter().find(|(i, _)| *i == id).map(|(_, p)| *p);
+    if let Some(p) = pid {
+        kill_pid(p);
+    }
     Ok(())
+}
+
+/// Reprend un compte-rendu en pause : relance l'IA (le modèle, déjà lu récemment, se recharge vite) et continue après les
+/// parties déjà analysées.
+#[tauri::command]
+pub fn resume_report(app: AppHandle, st: State<AppState>, id: String) -> R<()> {
+    let lang = {
+        let mut s = st.store.lock().unwrap();
+        let default_lang = s.settings.report_lang.clone();
+        let m = s.meetings.iter_mut().find(|m| m.id == id).ok_or("Réunion introuvable")?;
+        if m.report_state != "paused" {
+            return Err("Ce compte-rendu n'est pas en pause.".into());
+        }
+        let lang = m.report_ckpt.as_ref().and_then(|c| c["lang"].as_str().map(String::from)).unwrap_or(default_lang);
+        m.report_state = "generating".into();
+        m.report_progress = "Reprise…".into();
+        st.save(&s)?;
+        lang
+    };
+    spawn_report(app, id, lang);
+    Ok(())
+}
+
+/// Abandonne un compte-rendu en pause (l'éventuel compte-rendu précédent est conservé).
+#[tauri::command]
+pub fn cancel_report(st: State<AppState>, id: String) -> R<()> {
+    let mut s = st.store.lock().unwrap();
+    let m = s.meetings.iter_mut().find(|m| m.id == id).ok_or("Réunion introuvable")?;
+    if m.report_state != "paused" {
+        return Err("Ce compte-rendu n'est pas en pause.".into());
+    }
+    m.report_state = String::new();
+    m.report_progress.clear();
+    m.report_pct = 0;
+    m.report_ckpt = None;
+    st.save(&s)
 }
 
 #[cfg(test)]

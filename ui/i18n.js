@@ -80,6 +80,11 @@
     ["Texte (.txt)", "Text (.txt)"], ["Sous-titres (.srt)", "Subtitles (.srt)"], ["Sous-titres (.vtt)", "Subtitles (.vtt)"], ["Données (.json)", "Data (.json)"],
     ["Compte-rendu", "Report"], ["Compte-rendu (.md)", "Report (.md)"], ["Enregistrement", "Recording"], ["Audio", "Audio"],
     ["Génération du compte-rendu…", "Generating the report…"],
+    ["Pause", "Pause"], ["Mise en pause…", "Pausing…"], ["Abandonner", "Discard"], ["Génération en pause", "Generation paused"], ["Reprise…", "Resuming…"],
+    ["En pause : la mémoire vidéo est libérée", "Paused: video memory is freed"],
+    ["Arrête l'IA et libère la mémoire vidéo ; vous reprendrez là où elle en était", "Stops the AI and frees video memory; you can resume where it left off"],
+    ["Les parties déjà analysées sont conservées, même si vous fermez l'application. Le GPU est libre pour autre chose (transcription, direct…).", "The parts already analyzed are kept, even if you close the application. The GPU is free for other tasks (transcription, live…)."],
+    ["Abandonner ce compte-rendu ? Les parties déjà analysées seront perdues.", "Discard this report? The parts already analyzed will be lost."],
     ["Avec l'IA locale, une longue réunion peut prendre plusieurs minutes. Vous pouvez quitter cette page : la génération continue.", "With the local AI, a long meeting can take several minutes. You can leave this page: generation continues."],
     ["Échec de la génération", "Generation failed"], ["Résumé", "Summary"], ["Points abordés", "Topics covered"], ["Décisions", "Decisions"],
     ["Actions", "Actions"], ["Prochaines étapes", "Next steps"], ["Écouter à partir d'ici", "Listen from here"], ["Intervenant", "Speaker"],
@@ -301,7 +306,8 @@
   const P = [];
   const add = (re, fn) => P.push([re, fn]);
   const T = (s) => translate(s);
-  add(/^(Moteur|Détection de parole|Modèle|Moteur IA|Modèle IA|Copie|Moteur GPU|Téléchargement) : (\d+ % \(.*\))$/, (m) => `${T(m[1])}: ${m[2]}`);
+  add(/^≈ (.+) restantes$/, (m) => `≈ ${m[1]} left`);
+  add(/^(Moteur|Détection de parole|Modèle|Moteur IA|Modèle IA|Copie|Moteur GPU|Téléchargement|Séparation des voix) : (\d+ % \(.*?\))(?: · ≈ (.+) restantes)?$/, (m) => `${T(m[1])}: ${m[2]}${m[3] ? ` · ≈ ${m[3]} left` : ""}`);
   add(/^Whisper s'exécute en local, l'audio ne quitte jamais cet ordinateur\. Modèle « (.*) » : (.+?)(?: — déjà (\d+) % téléchargés)?\. Téléchargé une seule fois, puis conservé\.$/,
     (m) => `Whisper runs locally; audio never leaves this computer. Model “${T(m[1])}”: ${m[2]}${m[3] ? ` — already ${m[3]}% downloaded` : ""}. Downloaded once, then kept.`);
   add(/^Par défaut — (.*)$/, (m) => `Default — ${m[1]}`);

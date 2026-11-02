@@ -75,7 +75,21 @@ const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Mat
 const { listen } = window.__TAURI__.event;
 const fmtSize = (n) => n >= 1073741824 ? (n / 1073741824).toFixed(2) + " Go" : (n / 1048576).toFixed(0) + " Mo";
 const dlPct = (d) => (d.total ? Math.min(100, Math.round((d.done / d.total) * 100)) : 0);
-const dlLabel = (d) => `${{ binary: "Moteur", vad: "Détection de parole", model: "Modèle", "llm-binary": "Moteur IA", "llm-model": "Modèle IA", copy: "Copie", "binary-gpu": "Moteur GPU", diarization: "Séparation des voix", }[d.phase] || "Téléchargement"} : ${dlPct(d)} % (${fmtSize(d.done)} / ${fmtSize(d.total)})`;
+// Temps restant estimé : extrapolé de la vitesse observée depuis que la tâche (clé) a commencé à avancer.
+// Renvoie "" tant que l'estimation n'est pas fiable (moins de 8 s ou moins de 1 % d'avancement).
+const ETA = {};
+const fmtRemain = (s) => { const m = Math.round(s / 60); return s < 60 ? `${Math.max(1, Math.round(s))} s` : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`; };
+function etaText(key, frac) {
+  const now = Date.now();
+  let e = ETA[key];
+  if (!e || frac < e.f || now - e.seen > 300000) e = ETA[key] = { t0: now, f0: frac, f: frac, seen: now };
+  e.seen = now; e.f = frac;
+  if (frac <= e.f0) { e.t0 = now; return ""; } // pas encore d'avancement (chargement du moteur, du modèle…)
+  const dt = (now - e.t0) / 1000, df = frac - e.f0;
+  if (dt < 8 || df < 0.01 || frac >= 1) return "";
+  return `≈ ${fmtRemain(dt * (1 - frac) / df)} restantes`;
+}
+const dlLabel = (d) => `${{ binary: "Moteur", vad: "Détection de parole", model: "Modèle", "llm-binary": "Moteur IA", "llm-model": "Modèle IA", copy: "Copie", "binary-gpu": "Moteur GPU", diarization: "Séparation des voix", }[d.phase] || "Téléchargement"} : ${dlPct(d)} % (${fmtSize(d.done)} / ${fmtSize(d.total)})${d.total ? (e => e ? " · " + e : "")(etaText("dl:" + d.phase, d.done / d.total)) : ""}`;
 
 // L'état du téléchargement vit côté Rust : il survit aux changements de page.
 // Cette fonction se (re)branche dessus à chaque affichage concerné.
@@ -424,7 +438,7 @@ async function meetings() {
     const ms = (await run(() => invoke("list_meetings", { trashed: false }))) || [];
     const html = ms.length ? ms.map((m) => `<div class="card row" data-id="${m.id}">
       <span class="t">${esc(m.title)}</span><span class="meta">${fmtDate(m.created_at)}</span>
-      ${m.stage === "ready" ? `<span class="pill ok">Prête</span>` : m.stage === "error" ? `<span class="pill err">Échec</span>` : m.stage === "needs_engine" ? `<span class="pill warn">Moteur requis</span>` : `<div class="prog"><b style="width:${m.progress}%"></b></div><span class="pill">${esc(m.stage_label)}${m.stage === "transcribing" || m.stage === "diarizing" ? " · " + m.progress + " %" : ""}</span>`}
+      ${m.stage === "ready" ? `<span class="pill ok">Prête</span>` : m.stage === "error" ? `<span class="pill err">Échec</span>` : m.stage === "needs_engine" ? `<span class="pill warn">Moteur requis</span>` : `<div class="prog"><b style="width:${m.progress}%"></b></div><span class="pill">${esc(m.stage_label)}${m.stage === "transcribing" || m.stage === "diarizing" ? " · " + m.progress + " %" : ""}</span>${m.stage === "transcribing" || m.stage === "diarizing" ? `<span class="meta eta">${etaText(m.stage + ":" + m.id, m.progress / 100)}</span>` : ""}`}
       <button class="btn sm ico ren" data-ren="${m.id}" title="Renommer" aria-label="Renommer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4zM13.5 6.5l4 4"/></svg></button>
     </div>`).join("") : `<div class="empty">Aucune réunion pour le moment.</div>`;
     const list = $("#list");
@@ -521,18 +535,23 @@ async function meeting(id) {
     : m.stage === "needs_engine"
     ? `<div id="eng2"></div>`
     : m.stage !== "ready"
-    ? `<div class="card"><div class="prog" style="width:100%"><b style="width:${m.progress}%"></b></div><p class="meta" style="margin-top:8px">${m.stage === "transcribing" || m.stage === "diarizing" ? `<span class="pill" id="tr-pct">${m.progress} %</span> ` : ""}${esc(m.stage_label)}…${m.transcribe_hw ? ` <span class="pill hw">${esc(m.transcribe_hw)}</span>` : ""}</p></div>`
+    ? `<div class="card"><div class="prog" style="width:100%"><b style="width:${m.progress}%"></b></div><p class="meta" style="margin-top:8px">${m.stage === "transcribing" || m.stage === "diarizing" ? `<span class="pill" id="tr-pct">${m.progress} %</span> <span id="tr-eta">${etaText(m.stage + ":" + id, m.progress / 100)}</span> ` : ""}${esc(m.stage_label)}…${m.transcribe_hw ? ` <span class="pill hw">${esc(m.transcribe_hw)}</span>` : ""}</p></div>`
     : `<div class="bar">
-      <button class="btn pri" id="gen" ${m.report_state === "generating" ? "disabled" : ""}>${r ? "Régénérer" : "Générer"} le compte-rendu</button>
+      <button class="btn pri" id="gen" ${m.report_state === "generating" || m.report_state === "paused" ? "disabled" : ""}>${r ? "Régénérer" : "Générer"} le compte-rendu</button>
       <select id="rl" style="width:auto" title="Langue de rédaction du compte-rendu">${repLangs(r && r.lang || cfg.report_lang)}</select>
       <button class="btn" id="ren">Renommer</button>
       ${m.has_audio ? `<button class="btn" id="dia" title="Repère qui parle et attribue chaque passage à un intervenant">Identifier les intervenants</button>` : ""}
       <select id="bf" style="width:auto"><option value="">Aucune préparation liée</option>${bs.map((b) => `<option value="${b.id}" ${m.brief_id === b.id ? "selected" : ""}>${esc(b.subject)}</option>`).join("")}</select>
       <select id="exp" style="width:auto"><option value="">Exporter…</option><optgroup label="${shown ? `Transcription (${trName(shown)})` : "Transcription"}"><option value="txt">Texte (.txt)</option><option value="srt">Sous-titres (.srt)</option><option value="vtt">Sous-titres (.vtt)</option><option value="json">Données (.json)</option></optgroup>${r ? `<optgroup label="Compte-rendu"><option value="report">Compte-rendu (.md)</option></optgroup>` : ""}${m.has_audio ? `<optgroup label="Enregistrement"><option value="audio">Audio</option></optgroup>` : ""}</select>
       <button class="btn dng" id="del">Corbeille</button></div>
-    ${m.report_state === "generating" ? `<div class="card"><b>Génération du compte-rendu…</b> <span class="pill" id="rep-pct">${m.report_pct || 0} %</span> <span class="meta" id="rep-prog">${esc(m.report_progress || "")}</span> <span class="pill hw" id="rep-hw" ${m.report_hw ? "" : "hidden"}>${esc(m.report_hw || "")}</span>
+    ${m.report_state === "generating" ? `<div class="card"><b>Génération du compte-rendu…</b> <span class="pill" id="rep-pct">${m.report_pct || 0} %</span> <span class="meta" id="rep-eta">${etaText("rep:" + id, (m.report_pct || 0) / 100)}</span> <span class="meta" id="rep-prog">${esc(m.report_progress || "")}</span> <span class="pill hw" id="rep-hw" ${m.report_hw ? "" : "hidden"}>${esc(m.report_hw || "")}</span>
+      <button class="btn sm" id="rep-pause" style="margin-left:10px" title="Arrête l'IA et libère la mémoire vidéo ; vous reprendrez là où elle en était">Pause</button>
       <div class="prog" style="width:100%;margin:8px 0"><b id="rep-bar" style="width:${m.report_pct || 0}%"></b></div>
       <p class="meta">Avec l'IA locale, une longue réunion peut prendre plusieurs minutes. Vous pouvez quitter cette page : la génération continue.</p></div>` : ""}
+    ${m.report_state === "paused" ? `<div class="card"><b>Génération en pause</b> <span class="pill">${m.report_pct || 0} %</span> <span class="meta">${esc(m.report_progress || "")}</span>
+      <div class="prog" style="width:100%;margin:8px 0"><b style="width:${m.report_pct || 0}%"></b></div>
+      <p class="meta" style="margin-bottom:8px">Les parties déjà analysées sont conservées, même si vous fermez l'application. Le GPU est libre pour autre chose (transcription, direct…).</p>
+      <button class="btn pri sm" id="rep-resume">Reprendre</button> <button class="btn sm dng" id="rep-cancel">Abandonner</button></div>` : ""}
     ${m.report_state === "error" ? `<div class="card"><b>Échec de la génération</b><p class="meta" style="margin-top:4px">${esc(m.report_error || "")}</p></div>` : ""}
     ${r ? (() => { const L = REP_LABELS[r.lang]; const h = (i, fr, st = "") => L ? `<h3 data-nt${st ? ` style="${st}"` : ""}>${L[i]}</h3>` : `<h3${st ? ` style="${st}"` : ""}>${fr}</h3>`;
       return `<div class="card">${reportBadge(r)}${h(0, "Résumé", "margin-top:0")}<p style="white-space:pre-line">${esc(r.summary)}</p>${h(1, "Points abordés")}${lst(r.topics)}${h(2, "Décisions")}${lst(r.decisions)}${h(3, "Actions")}${lst(r.actions)}${h(4, "Prochaines étapes")}${lst(r.next_steps)}</div>`; })() : ""}
@@ -544,6 +563,7 @@ async function meeting(id) {
         <span class="pill" id="tl-label" ${m.translate_label ? "" : "hidden"}>${esc(m.translate_label || "")}</span>
         <span class="pill hw" id="tl-hw" ${m.translate_hw ? "" : "hidden"}>${esc(m.translate_hw || "")}</span>
         <span class="pill" id="tl-pct">${m.translate_pct || 0} %</span>
+        <span class="meta" id="tl-eta">${etaText("tl:" + id, (m.translate_pct || 0) / 100)}</span>
         <button class="btn sm dng" id="tl-stop">Arrêter</button></div>` : ""}
       ${shown && m.translation_models && m.translation_models[shown] ? `<p class="tl-status"><span class="pill" title="Modèle et matériel utilisés pour cette traduction">${esc(m.translation_models[shown])}</span></p>` : ""}
       ${m.translate_state === "error" ? `<p class="meta" style="color:var(--danger);margin-bottom:8px">${esc(m.translate_error || "La traduction a échoué.")}</p>` : ""}
@@ -573,11 +593,17 @@ async function meeting(id) {
     setPoll(async () => { if (view !== "meeting") return; const x = await invoke("get_meeting", { id });
       if (x.stage !== m.stage) return meeting(id);
       const b = main.querySelector(".prog b"); if (b) b.style.width = x.progress + "%";
-      const tp = $("#tr-pct"); if (tp) tp.textContent = x.progress + " %"; }, 1500);
+      const tp = $("#tr-pct"); if (tp) tp.textContent = x.progress + " %";
+      const te = $("#tr-eta"); if (te) te.textContent = etaText(x.stage + ":" + id, x.progress / 100); }, 1500);
     return;
   }
   $("#gen").onclick = () => run(async () => { await invoke("generate_report", { id, lang: $("#rl").value }); meeting(id); });
   const toSet = $("#to-set"); if (toSet) toSet.onclick = (e) => { e.preventDefault(); go("settings"); };
+  const rResume = $("#rep-resume"), rCancel = $("#rep-cancel");
+  if (rResume) rResume.onclick = () => run(async () => { delete ETA["rep:" + id]; await invoke("resume_report", { id }); meeting(id); });
+  if (rCancel) rCancel.onclick = () => run(async () => { if (!(await ask("Abandonner ce compte-rendu ? Les parties déjà analysées seront perdues.", "Abandonner"))) return; await invoke("cancel_report", { id }); meeting(id); });
+  const rPause = $("#rep-pause");
+  if (rPause) rPause.onclick = () => run(async () => { rPause.disabled = true; rPause.textContent = "Mise en pause…"; await invoke("pause_report", { id }); });
   if (m.report_state === "generating") {
     setPoll(async () => {
       if (view !== "meeting") return;
@@ -587,6 +613,7 @@ async function meeting(id) {
       const hwe = $("#rep-hw"); if (hwe) { hwe.textContent = x.report_hw || ""; hwe.hidden = !x.report_hw; }
       const pc = x.report_pct || 0, pe = $("#rep-pct"), pb = $("#rep-bar");
       if (pe) pe.textContent = pc + " %"; if (pb) pb.style.width = pc + "%";
+      const ee = $("#rep-eta"); if (ee) ee.textContent = etaText("rep:" + id, pc / 100);
     }, 1200);
   }
   $("#ren").onclick = () => run(async () => {
@@ -667,6 +694,7 @@ async function meeting(id) {
       const x = await invoke("get_meeting", { id });
       if (x.translate_state !== "translating") return meeting(id);
       const pe = $("#tl-pct"); if (pe) pe.textContent = (x.translate_pct || 0) + " %";
+      const ee = $("#tl-eta"); if (ee) ee.textContent = etaText("tl:" + id, (x.translate_pct || 0) / 100);
       const le = $("#tl-label"); if (le) { le.textContent = x.translate_label || ""; le.hidden = !x.translate_label; }
       const he = $("#tl-hw"); if (he) { he.textContent = x.translate_hw || ""; he.hidden = !x.translate_hw; }
     }, 1500);
@@ -1340,7 +1368,7 @@ function updRender() {
   const busy = UPD.busy ? `<p class="meta upd-busy">${esc(UPD.busy)} Terminez-le avant de mettre à jour.</p>` : "";
   const size = UPD.total ? ` · ${updMb(UPD.done)} / ${updMb(UPD.total)}` : "";
   const body = {
-    progress: `<h3>Téléchargement de la version ${v}</h3><div class="prog wide"><b style="width:${pct}%"></b></div><p class="meta">${pct} %${size}</p><div class="acts"><button class="btn" data-u="close">Continuer en arrière-plan</button></div>`,
+    progress: `<h3>Téléchargement de la version ${v}</h3><div class="prog wide"><b style="width:${pct}%"></b></div><p class="meta">${pct} %${size} <span>${UPD.total ? etaText("upd", UPD.done / UPD.total) : ""}</span></p><div class="acts"><button class="btn" data-u="close">Continuer en arrière-plan</button></div>`,
     ready: `<h3>La version ${v} est prête</h3><p>Verbatim va se fermer puis redémarrer tout seul pour appliquer la mise à jour.</p>${busy}<div class="acts"><button class="btn" data-u="close">Plus tard</button><button class="btn pri" data-u="install" ${UPD.busy ? "disabled" : ""}>Mettre à jour</button></div>`,
     installing: `<div class="spin" aria-hidden="true"></div><h3>Installation de la version ${v}…</h3><p>Verbatim va se fermer puis redémarrer tout seul. Cela peut prendre plusieurs minutes : ne l'éteignez pas.</p>`,
     error: `<h3>Mise à jour impossible</h3><p>${esc(UPD.error)}</p><div class="acts"><button class="btn" data-u="close">Fermer</button><button class="btn pri" data-u="go">Réessayer</button></div>`,

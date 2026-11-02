@@ -197,6 +197,7 @@ pub fn backup_restore(st: State<AppState>, path: String) -> R<Value> {
         for state in [&mut m.report_state, &mut m.translate_state] { state.clear(); }
         m.report_progress.clear();
         m.report_pct = 0;
+        m.report_ckpt = None;
         m.translate_pct = 0;
         s.meetings.push(m);
         added += 1;

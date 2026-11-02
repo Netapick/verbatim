@@ -12,7 +12,7 @@ mod warm;
 mod engine;
 mod live;
 mod llm;
-use llm::{generate_report, llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
+use llm::{generate_report, pause_report, resume_report, cancel_report,llm_install_engine, llm_rocm_check, local_gguf_list, llm_remove_file, llm_install, llm_remove, ollama_start, ollama_status};
 mod models;
 mod overlay;
 mod procs;
@@ -87,6 +87,9 @@ pub struct Meeting {
     /// avancement de la rédaction du compte-rendu, 0 à 100
     #[serde(default)]
     pub report_pct: u8,
+    /// point de reprise d'un compte-rendu en pause (notes des parties déjà analysées)
+    #[serde(default)]
+    pub report_ckpt: Option<Value>,
     /// avancement de la transcription Whisper, 0 à 100 (non conservé)
     #[serde(default)]
     pub transcribe_pct: u8,
@@ -124,7 +127,7 @@ impl Meeting {
         Meeting {
             id, title, created_at, audio_path, brief_id: None, source: source.into(), status: status.into(),
             error: None, transcript, report: None, report_state: String::new(), report_error: None,
-            report_progress: String::new(), report_pct: 0, transcribe_pct: 0, transcribe_hw: String::new(),
+            report_progress: String::new(), report_pct: 0, report_ckpt: None, transcribe_pct: 0, transcribe_hw: String::new(),
             report_hw: String::new(), translations: Default::default(), translate_state: String::new(),
             translate_error: None, translate_lang: String::new(), translate_pct: 0, translate_hw: String::new(), translate_label: String::new(), translation_models: Default::default(), deleted: false,
         }
@@ -727,7 +730,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            list_meetings, import_audio, import_transcript, get_meeting, generate_report,
+            list_meetings, import_audio, import_transcript, get_meeting, generate_report, pause_report, resume_report, cancel_report,
             update_meeting, purge_meeting, export_meeting,
             list_briefs, list_kinds, set_kinds, create_brief, update_brief, purge_brief,
             get_glossary, set_glossary, get_settings, set_settings,
