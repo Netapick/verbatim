@@ -14,7 +14,7 @@ use std::{
     io::{BufWriter, Read, Write},
     path::{Path, PathBuf},
 };
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const FORMAT: u32 = 1;
@@ -42,18 +42,52 @@ fn opts(method: CompressionMethod, size: u64) -> SimpleFileOptions {
     SimpleFileOptions::default().compression_method(method).large_file(size >= 3_900_000_000)
 }
 
-fn add_file(z: &mut ZipWriter<BufWriter<fs::File>>, src: &Path, name: &str) -> R<()> {
+/// Avancement d'une copie volumineuse : événement `backup-progress` `{ pct }`, au plus un par pour cent.
+struct Prog<'a> {
+    app: &'a AppHandle,
+    total: u64,
+    done: u64,
+    last: u8,
+}
+impl<'a> Prog<'a> {
+    fn new(app: &'a AppHandle, total: u64) -> Self {
+        Prog { app, total, done: 0, last: 255 }
+    }
+    fn add(&mut self, n: u64) {
+        self.done += n;
+        let pct = if self.total == 0 { 100 } else { (self.done * 100 / self.total).min(100) as u8 };
+        if pct != self.last {
+            self.last = pct;
+            let _ = self.app.emit("backup-progress", json!({ "pct": pct }));
+        }
+    }
+}
+
+/// Copie par blocs de 1 Mo en rendant compte de l'avancement.
+fn copy_prog(src: &mut impl Read, dst: &mut impl Write, p: &mut Prog) -> std::io::Result<()> {
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = src.read(&mut buf)?;
+        if n == 0 {
+            return Ok(());
+        }
+        dst.write_all(&buf[..n])?;
+        p.add(n as u64);
+    }
+}
+
+fn add_file(z: &mut ZipWriter<BufWriter<fs::File>>, src: &Path, name: &str, p: &mut Prog) -> R<()> {
     let size = fs::metadata(src).map_err(|e| format!("{}: {e}", src.display()))?.len();
     // le WAV se compresse bien ; mp3, m4a, ogg… sont déjà compressés
     let wav = src.extension().and_then(|x| x.to_str()).is_some_and(|x| x.eq_ignore_ascii_case("wav"));
     let m = if wav { CompressionMethod::Deflated } else { CompressionMethod::Stored };
     z.start_file(name, opts(m, size)).map_err(|e| e.to_string())?;
     let mut f = fs::File::open(src).map_err(|e| format!("{}: {e}", src.display()))?;
-    std::io::copy(&mut f, z).map_err(|e| e.to_string())?;
+    copy_prog(&mut f, z, p).map_err(|e| e.to_string())?;
     Ok(())
 }
 
-fn write_backup(tmp: &Path, data: &Data, files: &[(PathBuf, String)], with_audio: bool) -> R<()> {
+fn write_backup(tmp: &Path, data: &Data, files: &[(PathBuf, String)], with_audio: bool, p: &mut Prog) -> R<()> {
     let f = fs::File::create(tmp).map_err(|e| e.to_string())?;
     let mut z = ZipWriter::new(BufWriter::new(f));
     let manifest = json!({
@@ -65,14 +99,14 @@ fn write_backup(tmp: &Path, data: &Data, files: &[(PathBuf, String)], with_audio
     z.start_file("data.json", opts(CompressionMethod::Deflated, 0)).map_err(|e| e.to_string())?;
     z.write_all(serde_json::to_string(data).map_err(|e| e.to_string())?.as_bytes()).map_err(|e| e.to_string())?;
     for (src, name) in files {
-        add_file(&mut z, src, name)?;
+        add_file(&mut z, src, name, p)?;
     }
     z.finish().map_err(|e| e.to_string())?.flush().map_err(|e| e.to_string())
 }
 
 /// Crée la sauvegarde `dest` ; `with_audio` ajoute les fichiers audio (volumineux). Renvoie `{ meetings, audio, bytes }`.
 #[tauri::command(async)]
-pub fn backup_export(st: State<AppState>, dest: String, with_audio: bool) -> R<Value> {
+pub fn backup_export(app: AppHandle, st: State<AppState>, dest: String, with_audio: bool) -> R<Value> {
     // copie des données sous verrou, puis écriture sans le garder (l'audio peut prendre du temps)
     let mut data = {
         let s = st.store.lock().unwrap();
@@ -99,7 +133,8 @@ pub fn backup_export(st: State<AppState>, dest: String, with_audio: bool) -> R<V
     }
     let dest = PathBuf::from(dest);
     let tmp = dest.with_extension("zip.tmp");
-    let res = write_backup(&tmp, &data, &files, with_audio);
+    let total: u64 = files.iter().map(|(f, _)| fs::metadata(f).map(|m| m.len()).unwrap_or(0)).sum();
+    let res = write_backup(&tmp, &data, &files, with_audio, &mut Prog::new(&app, total));
     if let Err(e) = res {
         let _ = fs::remove_file(&tmp);
         return Err(e);
@@ -152,7 +187,7 @@ pub fn backup_inspect(st: State<AppState>, path: String) -> R<Value> {
 
 /// Fusionne la sauvegarde dans les données actuelles. Renvoie `{ meetings, briefs, terms }` (éléments ajoutés).
 #[tauri::command(async)]
-pub fn backup_restore(st: State<AppState>, path: String) -> R<Value> {
+pub fn backup_restore(app: AppHandle, st: State<AppState>, path: String) -> R<Value> {
     let mut z = open(&path)?;
     check_format(&mut z)?;
     let data: Data = read_json(&mut z, "data.json")?;
@@ -170,13 +205,19 @@ pub fn backup_restore(st: State<AppState>, path: String) -> R<Value> {
             wanted.insert(format!("audio/{}", crate::engine::play_copy(&n).to_string_lossy()));
         }
     }
+    let mut total = 0u64;
+    for i in 0..z.len() {
+        let e = z.by_index(i).map_err(|e| e.to_string())?;
+        if !e.is_dir() && wanted.contains(e.name()) { total += e.size(); }
+    }
+    let mut prog = Prog::new(&app, total);
     for i in 0..z.len() {
         let mut e = z.by_index(i).map_err(|e| e.to_string())?;
         if e.is_dir() || !wanted.contains(e.name()) { continue; }
         let Some(name) = safe_name(e.name()) else { continue };
         let dst = audio_dir.join(name);
         let tmp = dst.with_extension("part");
-        let r = fs::File::create(&tmp).and_then(|mut f| std::io::copy(&mut e, &mut f).map(|_| ()));
+        let r = fs::File::create(&tmp).and_then(|mut f| copy_prog(&mut e, &mut f, &mut prog));
         match r {
             Ok(()) => fs::rename(&tmp, &dst).map_err(|e| e.to_string())?,
             Err(err) => { let _ = fs::remove_file(&tmp); return Err(format!("Écriture de l'audio impossible : {err}")); }

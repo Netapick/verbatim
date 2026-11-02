@@ -12,6 +12,16 @@ Français · English below each version.
 - La longueur du résumé suit maintenant la durée : 5 à 8 phrases jusqu'à 10 minutes, environ 15 à 18 pour une heure, jusqu'à 24 à 27 pour deux heures ou plus, en paragraphes pour les réunions de plus de 25 minutes. Le nombre de sujets listés augmente aussi. Les consignes ne demandent plus d'être « concis ».
 - Les réunions très longues (plus de 4 parties) sont fusionnées par étapes, pour que les notes tiennent dans la mémoire du modèle.
 
+**Langues de l'interface**
+- L'interface existe maintenant en français, anglais, **espagnol, allemand et italien** (Réglages › Général). Par défaut, la langue de l'installateur puis celle du système. L'installateur reste en français et en anglais.
+
+**Recherche**
+- Un champ « Rechercher dans la réunion… » au-dessus de la transcription cherche dans la transcription affichée et dans le compte-rendu, sans tenir compte des accents ni de la casse. Entrée et Maj+Entrée passent d'un résultat à l'autre ; Ctrl+F place le curseur dans le champ.
+- Un champ « Rechercher dans toutes les réunions… » en haut de la liste cherche dans les titres, les transcriptions et les comptes-rendus de toutes les réunions (hors corbeille), sans tenir compte des accents ni de la casse. Chaque résultat montre l'extrait trouvé (avec l'heure et l'intervenant) ; un clic ouvre la réunion au bon passage, mot surligné.
+
+**Pause du compte-rendu**
+- Le bouton « Pause » arrête l'IA et libère la mémoire vidéo. « Reprendre » continue après les parties déjà analysées, conservées même après la fermeture de l'application ; « Abandonner » annule. Un compte-rendu court repart de zéro ; avec Ollama ou une API distante, la pause ne prend effet qu'entre deux étapes.
+
 **Intervenants**
 - Un clic sur le nom d'un intervenant propose maintenant « Renommer partout » ou « Ce passage seulement », pour corriger un passage attribué à la mauvaise personne sans renommer tous les autres.
 - Nouveau bouton « Réattribuer des passages » au-dessus de la transcription : on sélectionne plusieurs passages (clic, ou Maj+clic pour un intervalle) puis on les attribue d'un coup à un intervenant. Les traductions suivent.
@@ -21,7 +31,13 @@ Français · English below each version.
 
 **Autres**
 - Corbeille : bouton « Vider la corbeille ».
+- Temps restant estimé (« ≈ 3 min restantes ») affiché à côté des pourcentages : transcription, séparation des intervenants, compte-rendu, traduction, téléchargements, sauvegarde et mise à jour.
+- Sauvegarde et restauration : barre de progression avec le temps restant, utile pour les gros fichiers audio.
 - Écran de démarrage : les deux étapes du chargement de Whisper portent maintenant des noms distincts (« Lecture du modèle Whisper… » puis « Démarrage de Whisper… »).
+- Téléchargements CUDA (NVIDIA) : somme de contrôle SHA-256 vérifiée pour les trois archives (moteur Whisper, moteur llama.cpp et bibliothèques CUDA), à l'installation comme depuis les Réglages ; un fichier corrompu est supprimé et signalé.
+- Pastille d'enregistrement : elle se masque quand la fenêtre principale est affichée (elle se redessinait de travers par-dessus) et réapparaît si on réduit la fenêtre pendant l'enregistrement, la fenêtre se masquant alors tout à fait (plus de bouton dans la barre des tâches).
+- Recherche dans la réunion : boutons « précédent / suivant » corrigés.
+- Pastille d'enregistrement : ancrée par défaut dans la barre des tâches, à gauche de la zone de notification (un petit bouton la détache pour la glisser librement, et la ré-ancre ; le choix est mémorisé) ; elle ne peut plus sortir du bureau ; fond opaque (plus translucide). Dans l'application, le point rouge de l'enregistrement pulse avec le même halo que la pastille.
 
 ### English
 
@@ -33,6 +49,16 @@ Français · English below each version.
 - The summary length now follows the duration: 5 to 8 sentences up to 10 minutes, about 15 to 18 for an hour, up to 24 to 27 for two hours or more, in paragraphs for meetings over 25 minutes. The number of listed topics grows too. The prompts no longer ask for “concise”.
 - Very long meetings (more than 4 parts) are merged in stages, so that the notes fit in the model's memory.
 
+**Interface languages**
+- The interface is now available in French, English, **Spanish, German and Italian** (Settings › General). By default, the installer's language, then the system's. The installer stays in French and English.
+
+**Search**
+- A “Search in the meeting…” field above the transcript searches the displayed transcript and the report, ignoring accents and case. Enter and Shift+Enter move between results; Ctrl+F puts the cursor in the field.
+- A “Search in all meetings…” field at the top of the list searches the titles, transcripts and reports of all meetings (trash excluded), ignoring accents and case. Each result shows the passage found (with time and speaker); a click opens the meeting at the right passage, with the word highlighted.
+
+**Report pause**
+- The “Pause” button stops the AI and frees video memory. “Resume” continues after the parts already analysed, kept even after the application is closed; “Cancel” aborts. A short report starts again from scratch; with Ollama or a remote API, the pause only takes effect between two steps.
+
 **Speakers**
 - Clicking a speaker's name now offers “Rename everywhere” or “This passage only”, to fix a passage assigned to the wrong person without renaming all the others.
 - New “Reassign passages” button above the transcript: select several passages (click, or Shift+click for a range) and assign them to a speaker in one go. Translations follow.
@@ -42,7 +68,13 @@ Français · English below each version.
 
 **Other**
 - Trash: “Empty the trash” button.
+- Estimated time remaining (“≈ 3 min left”) shown next to the percentages: transcription, speaker separation, report, translation, downloads, backup and update.
+- Backup and restore: progress bar with the time remaining, useful for large audio files.
 - Startup screen: the two steps of loading Whisper now have distinct names (“Reading the Whisper model…” then “Starting Whisper…”).
+- CUDA (NVIDIA) downloads: the SHA-256 checksum of the three archives (Whisper engine, llama.cpp engine and CUDA libraries) is now verified, at installation and from Settings; a corrupted file is deleted and reported.
+- Recording bar: it hides when the main window is shown (it was redrawn wrongly on top of it) and comes back if you minimize the window during a recording, the window then hiding completely (no taskbar button).
+- Search in the meeting: the “previous / next” buttons are fixed.
+- Recording bar: docked by default in the taskbar, left of the notification area (a small button detaches it to drag it freely, and docks it back; the choice is remembered); it can no longer leave the desktop; opaque background (no longer translucent). In the application, the recording's red dot pulses with the same halo as the bar.
 
 ## 0.4.1
 

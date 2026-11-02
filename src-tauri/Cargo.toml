@@ -25,7 +25,7 @@ regex = "1"             # détection des présentations (« bonjour, je suis X �
 sherpa-onnx = "2.0.0"   # séparation des intervenants (ONNX Runtime embarqué, sur CPU)
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Graphics_Gdi"] }   # découpe de la pastille d'enregistrement en pilule (flou)
+windows = { version = "0.62", features = ["Win32_Graphics_Gdi", "Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }   # découpe de la pastille d'enregistrement en pilule (flou)
 
 [profile.release]
 opt-level = 3        # décodage audio (symphonia) nettement plus rapide qu'en "s"

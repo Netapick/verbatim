@@ -16,6 +16,7 @@ const WHISPER_ZIP: &str =
 const WHISPER_GPU_ZIP: &str =
     "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip";
 const WHISPER_GPU_BYTES: u64 = 684_913_404;
+const WHISPER_GPU_SHA: &str = "afef0b881c500958921c3f5523b50e59ee2ec9b6f5cbd25b324c51ed308a957a";
 const VAD_URL: &str = "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin";
 const VAD_BYTES: u64 = 885_098;
 
@@ -224,6 +225,29 @@ pub fn download_to(url: &str, dst: &PathBuf, expected: u64, phase: &str, model: 
     fs::rename(&part, dst).map_err(|e| fs_err(&e, dst))
 }
 
+/// Vérifie l'empreinte SHA-256 d'un fichier téléchargé ; en cas d'écart, le fichier est supprimé.
+pub fn verify_sha256(path: &PathBuf, expected: &str) -> R<()> {
+    use sha2::{Digest, Sha256};
+    let mut f = fs::File::open(path).map_err(|e| fs_err(&e, path))?;
+    let mut h = Sha256::new();
+    let mut buf = vec![0u8; 1024 * 1024];
+    loop {
+        let n = f.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        h.update(&buf[..n]);
+    }
+    let got: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    if got.eq_ignore_ascii_case(expected) {
+        Ok(())
+    } else {
+        drop(f);
+        let _ = fs::remove_file(path);
+        Err("Somme de contrôle invalide : le fichier téléchargé est corrompu ou a été modifié. Il a été supprimé, réessayez.".into())
+    }
+}
+
 /// Archive du moteur : petite, taille inconnue à l'avance ; téléchargée en une fois.
 pub fn download_to_unsized(url: &str, dst: &PathBuf, phase: &str) -> R<()> {
     let resp = ureq::get(url).call().map_err(|e| format!("Téléchargement impossible : {e}"))?;
@@ -383,6 +407,7 @@ pub fn engine_install_gpu(app: AppHandle, st: State<AppState>) -> R<()> {
         }
         let zip_path = dir.join("engine-gpu.zip");
         download_to_unsized(WHISPER_GPU_ZIP, &zip_path, "binary-gpu")?;
+        verify_sha256(&zip_path, WHISPER_GPU_SHA)?;
         let files = extract_flat(&zip_path, &dir.join("engine-gpu"))?;
         let _ = fs::remove_file(&zip_path);
         verify_kept(&files)?;

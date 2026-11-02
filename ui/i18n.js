@@ -1,5 +1,7 @@
-// Traduction de l'interface : le texte de l'app est écrit en français ; en anglais, chaque texte affiché est
-// remplacé à la volée d'après ce dictionnaire (texte entier, ou motif pour les messages à valeurs variables).
+// Traduction de l'interface : le texte de l'app est écrit en français ; dans une autre langue, chaque texte affiché est
+// remplacé à la volée d'après un dictionnaire (texte entier, ou motif pour les messages à valeurs variables).
+// L'anglais est défini ci-dessous ; l'espagnol, l'allemand et l'italien sont des « packs » (i18n-es.js, i18n-de.js, i18n-it.js)
+// de même forme : { dict: [[français, traduction], …], patterns: (add, T) => { add(/motif/, (m) => "…"); … } }.
 (() => {
   const norm = (s) => s.replace(/\s+/g, " ").trim();
 
@@ -80,6 +82,15 @@
     ["Texte (.txt)", "Text (.txt)"], ["Sous-titres (.srt)", "Subtitles (.srt)"], ["Sous-titres (.vtt)", "Subtitles (.vtt)"], ["Données (.json)", "Data (.json)"],
     ["Compte-rendu", "Report"], ["Compte-rendu (.md)", "Report (.md)"], ["Enregistrement", "Recording"], ["Audio", "Audio"],
     ["Génération du compte-rendu…", "Generating the report…"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Rechercher dans toutes les réunions…", "Search in all meetings…"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Rechercher dans toutes les réunions", "Search in all meetings"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Titre", "Title"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Occurrences", "Matches"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Aucune réunion ne correspond.", "No meeting matches."],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Détacher de la barre des tâches", "Detach from the taskbar"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Ancrer dans la barre des tâches", "Dock in the taskbar"],
+    ["Rechercher dans la réunion…", "Search in the meeting…"], ["Rechercher dans la réunion", "Search in the meeting"], ["Aucun résultat", "No results"],
+    ["Résultat précédent (Maj+Entrée)", "Previous result (Shift+Enter)"], ["Résultat suivant (Entrée)", "Next result (Enter)"], ["Résultat précédent", "Previous result"], ["Résultat suivant", "Next result"],
     ["Pause", "Pause"], ["Mise en pause…", "Pausing…"], ["Abandonner", "Discard"], ["Génération en pause", "Generation paused"], ["Reprise…", "Resuming…"],
     ["En pause : la mémoire vidéo est libérée", "Paused: video memory is freed"],
     ["Arrête l'IA et libère la mémoire vidéo ; vous reprendrez là où elle en était", "Stops the AI and frees video memory; you can resume where it left off"],
@@ -306,6 +317,7 @@
   const P = [];
   const add = (re, fn) => P.push([re, fn]);
   const T = (s) => translate(s);
+  add(/^(Sauvegarde|Restauration) en cours… (\d+) %(?: · ≈ (.+) restantes)?$/, (m) => `${m[1] === "Sauvegarde" ? "Backing up…" : "Restoring…"} ${m[2]}%${m[3] ? ` · ≈ ${m[3]} left` : ""}`);
   add(/^≈ (.+) restantes$/, (m) => `≈ ${m[1]} left`);
   add(/^(Moteur|Détection de parole|Modèle|Moteur IA|Modèle IA|Copie|Moteur GPU|Téléchargement|Séparation des voix) : (\d+ % \(.*?\))(?: · ≈ (.+) restantes)?$/, (m) => `${T(m[1])}: ${m[2]}${m[3] ? ` · ≈ ${m[3]} left` : ""}`);
   add(/^Whisper s'exécute en local, l'audio ne quitte jamais cet ordinateur\. Modèle « (.*) » : (.+?)(?: — déjà (\d+) % téléchargés)?\. Téléchargé une seule fois, puis conservé\.$/,
@@ -396,10 +408,22 @@
   add(/^Whisper en direct : (.*)$/s, (m) => `Live Whisper: ${m[1]}`);
 
   // ── Langue ──
+  const LANGS = ["fr", "en", "es", "de", "it"];
+  const PACKS = (window.I18N_PACKS = window.I18N_PACKS || {});
+  const tables = { en: { dict: EN, P } };
+  // dictionnaire et motifs de la langue (les packs sont préparés à la première utilisation)
+  function table(l) {
+    if (tables[l]) return tables[l];
+    const pk = PACKS[l];
+    if (!pk) return (tables[l] = tables.en); // pack absent : anglais
+    const PP = [];
+    pk.patterns((re, fn) => PP.push([re, fn]), (x) => translate(x));
+    return (tables[l] = { dict: Object.fromEntries(pk.dict.map(([k, v]) => [norm(k), v])), P: PP });
+  }
   let pref = "auto", installLang = "";
   try { pref = localStorage.getItem("lang") || "auto"; } catch (_) {}
-  const sys = () => ((navigator.language || "fr").toLowerCase().startsWith("fr") ? "fr" : "en");
-  const resolve = () => (pref === "fr" || pref === "en" ? pref : installLang || sys());
+  const sys = () => { const c = (navigator.language || "fr").toLowerCase().slice(0, 2); return LANGS.includes(c) ? c : "en"; };
+  const resolve = () => (LANGS.includes(pref) ? pref : installLang || sys());
   let lang = resolve();
 
   const units = (s) => s.replace(/(\d)\s?Go\b/g, "$1 GB").replace(/(\d)\s?Mo\b/g, "$1 MB").replace(/\bGo de RAM\b/g, "GB of RAM");
@@ -408,14 +432,15 @@
     const m0 = src.match(/^(\s*)([\s\S]*?)(\s*)$/);
     const body = norm(m0[2]);
     if (!body || !/[A-Za-zÀ-ÿ]/.test(body)) return src;
-    let out = EN[body];
+    const { dict, P: pats } = table(lang);
+    let out = dict[body];
     if (out === undefined) {
-      for (const [re, fn] of P) { const m = body.match(re); if (m) { out = fn(m); break; } }
+      for (const [re, fn] of pats) { const m = body.match(re); if (m) { out = fn(m); break; } }
     }
-    if (out === undefined && body.endsWith("…") && EN[norm(body.slice(0, -1))] !== undefined) out = EN[norm(body.slice(0, -1))] + "…";
-    if (out === undefined && body.endsWith(".") && EN[norm(body.slice(0, -1))] !== undefined) out = EN[norm(body.slice(0, -1))] + ".";
+    if (out === undefined && body.endsWith("…") && dict[norm(body.slice(0, -1))] !== undefined) out = dict[norm(body.slice(0, -1))] + "…";
+    if (out === undefined && body.endsWith(".") && dict[norm(body.slice(0, -1))] !== undefined) out = dict[norm(body.slice(0, -1))] + ".";
     if (out === undefined && body.includes(" · ") || out === undefined && /(^· | ·$)/.test(body)) {
-      const parts = body.split(" · "), tr = parts.map((x) => { const y = norm(x.replace(/^· |·$/g, "")); const z = EN[y] ?? (P.map(([re, fn]) => { const m = y.match(re); return m ? fn(m) : undefined; }).find((v) => v !== undefined)); return z === undefined ? x : x.replace(y, z); });
+      const parts = body.split(" · "), tr = parts.map((x) => { const y = norm(x.replace(/^· |·$/g, "")); const z = dict[y] ?? (pats.map(([re, fn]) => { const m = y.match(re); return m ? fn(m) : undefined; }).find((v) => v !== undefined)); return z === undefined ? x : x.replace(y, z); });
       if (tr.some((x, i) => x !== parts[i])) out = tr.join(" · ");
     }
     if (out === undefined) {
@@ -479,7 +504,10 @@
     get lang() { return lang; },
     get pref() { return pref; },
     t: translate,
-    locale: () => (lang === "fr" ? "fr-FR" : (navigator.language || "").toLowerCase().startsWith("en") ? navigator.language : "en-US"),
+    locale: () => {
+      const nav = navigator.language || "";
+      return { fr: "fr-FR", es: "es-ES", de: "de-DE", it: "it-IT" }[lang] || (nav.toLowerCase().startsWith("en") ? nav : "en-US");
+    },
     set(v) {
       pref = v; try { localStorage.setItem("lang", v); } catch (_) {}
       lang = resolve(); document.documentElement.lang = lang;

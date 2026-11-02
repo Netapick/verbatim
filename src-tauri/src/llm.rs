@@ -31,6 +31,8 @@ const CUDA_ZIP: &str =
 const CUDA_RT_ZIP: &str =
     "https://github.com/ggml-org/llama.cpp/releases/download/b11700/cudart-llama-bin-win-cuda-12.4-x64.zip";
 const CUDA_BYTES: u64 = 266_814_439 + 391_443_627;
+const CUDA_SHA: &str = "119f65b8000dfb37ee7daa578ad68bd47f41fbf4e3984fd0e50576d17a7b4920";
+const CUDA_RT_SHA: &str = "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6";
 
 /// (id, libellé, description, taille exacte en octets, URL)
 pub const LLMS: [(&str, &str, &str, u64, &str); 12] = [
@@ -310,13 +312,16 @@ fn install_binary(dir: &PathBuf, dev: &str) -> R<()> {
     if !bin.exists() {
         let out = dir.join(dev_dir(dev));
         fs::create_dir_all(&out).map_err(|e| e.to_string())?;
-        let mut urls = vec![url];
+        let mut urls = vec![(url, if dev == "cuda" { Some(CUDA_SHA) } else { None })];
         if dev == "cuda" {
-            urls.push(CUDA_RT_ZIP);
+            urls.push((CUDA_RT_ZIP, Some(CUDA_RT_SHA)));
         }
-        for u in urls {
+        for (u, sha) in urls {
             let zip_path = dir.join("llm.zip");
             download_to_unsized(u, &zip_path, "llm-binary")?;
+            if let Some(s) = sha {
+                engine::verify_sha256(&zip_path, s)?;
+            }
             let files = engine::extract_flat(&zip_path, &out)?;
             let _ = fs::remove_file(&zip_path);
             engine::verify_kept(&files)?;

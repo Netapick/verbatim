@@ -18,6 +18,7 @@ mod overlay;
 mod procs;
 mod recorder;
 mod resample;
+mod search;
 mod translate;
 mod update;
 use recorder::{rec_devices, rec_pause, rec_set_gain, rec_start, rec_status};
@@ -654,6 +655,12 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         // fermeture pendant un travail en cours : on la retient et l'interface demande confirmation (`app_quit` quitte vraiment)
         .on_window_event(|window, event| {
+            // fenêtre principale réduite pendant un enregistrement : la pastille reprend la place
+            if let tauri::WindowEvent::Resized(_) = event {
+                if window.label() == "main" && window.is_minimized().unwrap_or(false) {
+                    overlay::main_minimized(window.app_handle());
+                }
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() != "main" { return; }
                 if let Some(st) = window.app_handle().try_state::<AppState>() {
@@ -736,9 +743,9 @@ fn main() {
             get_glossary, set_glossary, get_settings, set_settings,
             engine_status, engine_install, engine_install_gpu, download_cancel, engine_remove, llm_install, llm_remove, ollama_status, ollama_start, local_gguf_list, llm_install_engine, llm_rocm_check, llm_remove_file, models::models_scan, models::models_import, models::models_dir_info, models::install_lang, retry_transcription,
             rec_start, rec_status, rec_stop, rec_devices, rec_pause, rec_set_gain,
-            live::live_prepare, live::live_release, overlay::tray_labels, overlay::overlay_action, overlay::overlay_drag,
+            live::live_prepare, live::live_release, overlay::tray_labels, overlay::overlay_action, overlay::overlay_drag, overlay::overlay_dock,
             translate::translate_meeting, translate::translate_stop, translate::translation_remove,
-            backup::backup_export, backup::backup_inspect, backup::backup_restore,
+            search::search_meetings, backup::backup_export, backup::backup_inspect, backup::backup_restore,
             update::app_version, update::update_busy, update::update_prepare, update::app_quit, warm::warm_status,
             diarize::diarize_install, diarize::diarize_remove, diarize::diarize_meeting, diarize::rename_speaker, diarize::set_segments_speaker
         ])

@@ -18,7 +18,7 @@ Verbatim est une application de bureau Windows. Elle enregistre ou importe vos r
 
 | | |
 |---|---|
-| **100 % local** | Whisper (transcription) et Qwen via llama.cpp (rédaction) s'exécutent sur votre PC. Aucun compte, aucun abonnement, aucun envoi de données. |
+| **100 % local** | Whisper (transcription) et une IA locale via llama.cpp (rédaction : Qwen, Gemma 4 ou Ministral 3) s'exécutent sur votre PC. Aucun compte, aucun abonnement, aucun envoi de données. |
 | **Du son au compte-rendu** | Enregistrement ou import audio, transcription minutée, puis résumé, points abordés, décisions, actions et prochaines étapes. |
 | **Accéléré par votre carte graphique** | GPU AMD (ROCm, Vulkan) ou NVIDIA (CUDA, Vulkan), avec repli automatique sur le processeur. Whisper n'a pas de binaire officiel pour AMD sous Windows : Verbatim embarque un build ROCm compilé pour les Radeon RX 7000. |
 | **Pensé pour les réunions** | Préparations (ordre du jour, questions), glossaire de sigles métier, lecteur audio synchronisé avec la transcription. |
@@ -48,7 +48,8 @@ Chaque réunion regroupe un lecteur audio (de 0,75× à 2×), le compte-rendu et
 ![Compte-rendu d'une réunion](screenshots/03-compte-rendu.png)
 
 - **Résumé**, **points abordés**, **décisions**, **actions** et **prochaines étapes**, générés par l'IA locale.
-- Les longues réunions sont découpées en parties, résumées, puis fusionnées. Le glossaire et la préparation liée sont fournis au modèle.
+- Les longues réunions sont découpées en parties, résumées, puis fusionnées. Le glossaire et la préparation liée sont fournis au modèle. La longueur du compte-rendu suit la durée de la réunion.
+- **Pause** : le bouton Pause arrête l'IA et libère la mémoire vidéo. **Reprendre** continue après les parties déjà analysées, même après la fermeture de l'application ; **Abandonner** annule.
 - **Export** : texte, sous-titres (.srt, .vtt), données (.json), compte-rendu (.md) et audio d'origine.
 - Sans modèle de rédaction ni API, Verbatim produit un résumé simplifié à partir de phrases réelles de la transcription, sans rien inventer.
 
@@ -74,13 +75,25 @@ Ajoutez vos sigles et termes métier : ils sont transmis à Whisper comme vocabu
 
 ---
 
+## Intervenants
+
+Après la transcription, chaque passage est attribué à un intervenant, avec une couleur par personne. Cliquez sur un nom pour le renommer : « Renommer partout » change tous les passages, « Ce passage seulement » corrige un seul passage. Le bouton « Réattribuer des passages » permet de sélectionner plusieurs passages (clic, Maj+clic pour un intervalle) et de les attribuer d'un coup à un intervenant ; les traductions suivent.
+
+---
+
+## Sauvegarder et restaurer
+
+Réglages › Général contient la sauvegarde : un seul fichier .zip avec vos réunions, préparations et glossaire, avec ou sans l'audio. Les réglages et la clé d'API n'y sont pas. La restauration ajoute ce qui manque, sans modifier ce qui est déjà présent : c'est ainsi que vous retrouvez vos réunions sur un autre ordinateur.
+
+---
+
 ## Réglages : vos modèles, votre matériel
 
 **Transcription** : choix de la langue (français, anglais, espagnol, allemand, italien ou détection automatique) et du modèle Whisper, du plus léger (Tiny, 75 Mo) au plus précis (Large v3, avec des versions compressées). Mode « Automatique » : GPU quand il est disponible, repli sur le CPU en cas de problème.
 
 ![Réglages de transcription](screenshots/07-reglages-transcription.png)
 
-**Compte-rendu** : IA locale au choix (**Qwen**, **Gemma 4** ou **Ministral 3**, de 3 à 27 milliards de paramètres), exécutée par llama.cpp, avec calcul sur CPU, Vulkan ou ROCm. Le modèle n'est chargé en mémoire que pendant la rédaction. Vous pouvez aussi réutiliser des modèles déjà présents (GGUF, Ollama) : ils sont copiés dans le dossier de Verbatim, les originaux ne sont pas modifiés.
+**Compte-rendu** : IA locale au choix (**Qwen**, recommandé, **Gemma 4** ou **Ministral 3**, de 3 à 27 milliards de paramètres ; les autres familles sont dans une liste déroulante sous la carte « Modèles recommandés »), exécutée par llama.cpp, avec calcul sur CPU, Vulkan ou ROCm. Le modèle n'est chargé en mémoire que pendant la rédaction. Vous pouvez aussi réutiliser des modèles déjà présents (GGUF, Ollama) : ils sont copiés dans le dossier de Verbatim, les originaux ne sont pas modifiés.
 
 ![Réglages de rédaction](screenshots/08-reglages-redaction.png)
 
@@ -134,8 +147,8 @@ Inutile de lancer Verbatim en administrateur : cela ne change rien à l'analyse 
 ## En bref
 
 - Windows x64 · interface en français et en anglais (choix à l'installation, modifiable dans les Réglages)
-- Whisper (whisper.cpp) pour la transcription, Qwen (llama.cpp) pour la rédaction
-- Pas de diarisation pour l'instant : un seul « Intervenant »
+- Whisper (whisper.cpp) pour la transcription, Qwen, Gemma 4 ou Ministral 3 (llama.cpp) pour la rédaction
+- Séparation des intervenants : chaque passage a son intervenant, nommé quand la personne se présente
 - Composants tiers sous leurs licences respectives (whisper.cpp, llama.cpp, ROCm) : voir `THIRD-PARTY-LICENSES.md` dans la release
 
 Code source et documentation technique : [README](../README.md).

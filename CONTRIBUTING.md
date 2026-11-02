@@ -27,7 +27,7 @@ Ouvrez une issue avec le modèle « Proposer une idée ». Avant, regardez la [f
 2. Compilez et lancez l'application en suivant [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) (section « Construire »). Windows x64 uniquement pour l'instant.
 3. Gardez les changements ciblés : un sujet par *pull request*, dans le style du code voisin (interface en JavaScript sans framework, côté Rust dans `src-tauri/src/`).
 4. Testez ce que vous modifiez dans l'application réelle (`npx tauri dev`) et dites dans la *pull request* ce que vous avez essayé.
-5. Si vous touchez au texte affiché, mettez à jour la traduction anglaise (`ui/i18n.js`). Si vous touchez à la documentation, mettez à jour les deux langues (`*.md` et `*.en.md`).
+5. Si vous touchez au texte affiché, mettez à jour les traductions (`ui/i18n.js` pour l'anglais, `ui/i18n-es.js`, `ui/i18n-de.js` et `ui/i18n-it.js`). Si vous touchez à la documentation, mettez à jour les deux langues (`*.md` et `*.en.md`).
 
 Les messages de commit sont en français, courts, à l'indicatif ou au nom d'action : « Pastille d'enregistrement : déplacement sans barre de titre ».
 
@@ -62,7 +62,7 @@ Open an issue with the "Suggest an idea" template. First look at the [roadmap](R
 2. Build and run the application following [docs/DEVELOPMENT.en.md](docs/DEVELOPMENT.en.md) (section "Building"). Windows x64 only for now.
 3. Keep changes focused: one topic per pull request, in the style of the surrounding code (framework-free JavaScript interface, Rust side in `src-tauri/src/`).
 4. Test what you change in the real application (`npx tauri dev`) and say in the pull request what you tried.
-5. If you touch displayed text, update the English translation (`ui/i18n.js`). If you touch the documentation, update both languages (`*.md` and `*.en.md`).
+5. If you touch displayed text, update the translations (`ui/i18n.js` for English, `ui/i18n-es.js`, `ui/i18n-de.js` and `ui/i18n-it.js`). If you touch the documentation, update both languages (`*.md` and `*.en.md`).
 
 Commit messages are in French, short, as a noun phrase or in the indicative: "Pastille d'enregistrement : déplacement sans barre de titre".
 

@@ -8,7 +8,7 @@ Verbatim is a **Tauri 2 + Rust** desktop application (HTML/JS interface without 
 
 | Folder / file | Role |
 |---|---|
-| `ui/` | Interface: `app.js` (views), `i18n.js` (translation), `style.css`, `index.html` |
+| `ui/` | Interface: `app.js` (views), `i18n.js` and `i18n-es/de/it.js` (translation), `style.css`, `index.html` |
 | `src-tauri/src/main.rs` | Data (meetings, preparations, glossary, settings), Tauri commands |
 | `src-tauri/src/engine.rs` | Transcription: whisper.cpp, audio decoding (symphonia), resumable downloads, GPU detection |
 | `src-tauri/src/llm.rs` | Writing: llama.cpp (local server), Ollama, remote API, simplified summary |
@@ -16,6 +16,7 @@ Verbatim is a **Tauri 2 + Rust** desktop application (HTML/JS interface without 
 | `src-tauri/src/overlay.rs` | Background recording: notification-area icon (`tray-icon`), floating bar `overlay.html` (transparent window cut into a pill with `SetWindowRgn`; no blur: Windows' blur effects ignore the cut and leave a rectangle), main window hidden; moving goes through the `overlay_drag` command (Windows' native drag redraws the window's title bar while moving) and the window does not take focus; stopping goes through the `overlay-stop` event (the main window keeps the typed title) |
 | `src-tauri/src/live.rs` | Live transcription: persistent `whisper-server`, sliding window, `live-*` events |
 | `src-tauri/src/translate.rs` | Batched transcript translation (TranslateGemma or the report model) |
+| `src-tauri/src/diarize.rs` | Speaker separation (models, CPU computation, name from self-introduction), renaming (`rename_speaker`) and passage reassignment (`set_segments_speaker`) |
 | `src-tauri/src/models.rs` | Detection and copy of existing models |
 | `src-tauri/src/update.rs` | Automatic update |
 | `src-tauri/src/backup.rs` | Backup and restore of meetings (.zip) |
@@ -41,11 +42,13 @@ Microphone, PC sound (WASAPI loopback: video calls, videos) or both, mixed to 16
 - whisper.cpp v1.9.2 (official CPU binary); audio is decoded in Rust (symphonia: mp3, m4a/aac, ogg, flac, wav), converted to 16 kHz mono and transcribed offline. The glossary is passed to Whisper as the initial prompt. Speech detection (Silero VAD) limits hallucinations on silences. Greedy decoding (`-bs 1`, about 30% faster than `-bs 5`): the shorter segments are merged per sentence (6 s at most) and a sentence repeated more than twice in a row is cut back to two. Decoding and resampling run on two threads. Beyond one hour (GPU only), the WAV is split into 3 at silences (`split_points`) and transcribed by 3 parallel instances (about 43% faster on 1 h), timestamps shifted when stitching; whisper-cli's `-ot`/`-d` do not suit the VAD (they count time after silence removal). Measured separately: running the report in parallel (`llama-server -np 3`) only gains 21% for 15.6 GB of VRAM out of 16, so it stays sequential.
 - Models: tiny, base, small, medium-q5_0, large-v3-turbo-q5_0, large-v3-turbo-q8_0, large-v3-turbo, large-v3-q5_0, downloaded from Hugging Face (`ggerganov/whisper.cpp`).
 - Resumable downloads: `.part` file kept, HTTP Range resume, progress kept across page changes; a stop button (`download_cancel`).
-- Computation: "Automatic" mode (GPU when available, fallback to the CPU) or "CPU only". NVIDIA: official whisper.cpp CUDA build (b5454, ≈ 685 MB, `ia/engine-gpu`). AMD: whisper.cpp has no official binary, so `scripts/build-whisper-rocm.ps1` builds it for HIP/ROCm on RDNA3 (≈ 180 MB, `redist/engine-rocm`).
+- Computation: "Automatic" mode (GPU when available, fallback to the CPU) or "CPU only". NVIDIA: official whisper.cpp CUDA build (b5454, ≈ 685 MB, `ia/engine-gpu`, SHA-256 verified). AMD: whisper.cpp has no official binary, so `scripts/build-whisper-rocm.ps1` builds it for HIP/ROCm on RDNA3 (≈ 180 MB, `redist/engine-rocm`).
 
 ## Report writing
 
-Order of priority: local AI (llama.cpp + Qwen, loaded only while writing), then Ollama (started on demand), then an OpenAI-compatible API, then a simplified summary computed from the transcript (real sentences, no invented text). Long meetings are split into parts, summarized, then merged. The glossary and the linked preparation are provided to the model.
+Order of priority: local AI (llama.cpp + Qwen, Gemma 4 or Ministral 3; loaded only while writing), then Ollama (started on demand), then an OpenAI-compatible API, then a simplified summary computed from the transcript (real sentences, no invented text). Long meetings are split into parts, summarized, then merged (in stages beyond 4 parts, so the notes fit in the model's context). The summary's length follows the meeting's duration. The glossary and the linked preparation are provided to the model.
+
+**Pause** (`llm.rs`, section "Pause d'un compte-rendu"): `pause_report` records the meeting in `PAUSE_REQ` and stops the AI server at once (video memory freed); calls in progress return the internal `PAUSED` error, and the parts already analysed are kept in the meeting (resume point). `resume_report` continues after the last analysed part, `cancel_report` aborts. A short report starts again from scratch; with Ollama or a remote API, the pause is only checked between two steps.
 
 ### Writing computation engines
 
@@ -105,7 +108,7 @@ The third-party engines are unsigned and may be deleted by an antivirus. After e
 
 ## Interface translation
 
-The interface texts are written in French in the code. `ui/i18n.js` holds a French → English dictionary and patterns for messages with variable values, applied at display time (text nodes and attributes). To translate a new text, add its pair to `EN` (key = exact French text) or a pattern to `P`. The language choice is in Settings › General; by default, the installer's language (`lang.txt`), then the system's.
+The interface texts are written in French in the code. `ui/i18n.js` holds a French → English dictionary and patterns for messages with variable values, applied at display time (text nodes and attributes). To translate a new text, add its pair to `EN` (key = exact French text) or a pattern to `P`, **then the same pair in the packs `ui/i18n-es.js`, `i18n-de.js` and `i18n-it.js`** (same shape: `dict` = `[French, translation]` pairs, `patterns` = the same expressions as English, in the same order). A text missing from a pack stays in French. The language choice is in Settings › General; by default, the installer's language (`lang.txt`), then the system's.
 
 ## Building
 

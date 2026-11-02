@@ -35,11 +35,29 @@ $("#b-stop").onclick = async () => {
   setTimeout(() => { busy = false; $("#b-stop").disabled = false; }, 8000); // la pastille se ferme d'elle-même si l'arrêt aboutit
 };
 $("#b-show").onclick = () => invoke("overlay_action", { action: "show" }).catch(() => {});
+// Ancrée dans la barre des tâches par défaut ; le petit bouton la détache (elle devient glissable) ou la ré-ancre.
+// Le choix est mémorisé d'un enregistrement à l'autre.
+const ICON_UNDOCK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V5M6.5 10.5 12 5l5.5 5.5M5 20h14"/></svg>`;
+const ICON_DOCK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v12M6.5 11.5 12 17l5.5-5.5M5 20h14"/></svg>`;
+let docked = true;
+function showDock() {
+  $("#bar").classList.toggle("docked", docked);
+  const b = $("#b-dock"), tip = docked ? "Détacher de la barre des tâches" : "Ancrer dans la barre des tâches";
+  b.innerHTML = docked ? ICON_UNDOCK : ICON_DOCK;
+  b.title = tip; b.setAttribute("aria-label", tip);
+}
+async function setDocked(d) {
+  docked = d; showDock();
+  try { localStorage.setItem("ov.detached", d ? "0" : "1"); } catch (_) {}
+  try { await invoke("overlay_dock", { docked: d }); } catch (_) {}
+}
+$("#b-dock").onclick = () => setDocked(!docked);
+try { if (localStorage.getItem("ov.detached") === "1") setDocked(false); else showDock(); } catch (_) { showDock(); }
 // Glissement : géré côté Rust (`overlay_drag`) à partir des coordonnées d'écran du pointeur.
 const bar = $("#bar");
 let dragging = false;
 bar.addEventListener("pointerdown", (e) => {
-  if (e.button !== 0 || e.target.closest("button")) return;
+  if (e.button !== 0 || e.target.closest("button") || docked) return;
   dragging = true; bar.setPointerCapture(e.pointerId);
   invoke("overlay_drag", { phase: "start", x: e.screenX, y: e.screenY }).catch(() => {});
 });

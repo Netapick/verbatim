@@ -106,6 +106,20 @@ input[type=radio],input[type=checkbox]{accent-color:var(--brand)}
 /* ── Transcription ── */
 .seg{display:flex;gap:12px;padding:8px 8px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:8px;transition:background .12s}
 .seg:last-child{border-bottom:0}
+.findbar{display:flex;gap:8px;align-items:center;margin:0 0 12px}
+.findbar input{flex:1;max-width:360px}
+.findbar .btn.ico{padding:5px 8px;color:var(--ink)}
+.findbar .btn.ico:hover{color:var(--brand);border-color:var(--brand)}
+.findbar .btn.ico svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.hitcard{cursor:pointer;padding-bottom:8px}
+.hitcard:hover{border-color:var(--line-2);box-shadow:var(--sh-2)}
+.hit-h{display:flex;align-items:center;gap:14px;margin-bottom:4px}
+.hit-h .t{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hit{display:flex;gap:12px;padding:5px 8px;border-radius:8px;border-top:1px solid var(--line)}
+.hit:hover{background:var(--brand-soft)}
+.hit .meta{width:190px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+mark{background:#ffc83d66;color:inherit;border-radius:3px;padding:0 1px}
+mark.cur{background:#ffb300;color:#14181f}
 .seg .sp{width:130px;flex-shrink:0;font-weight:600;color:var(--brand)}
 .seg .sp:hover{text-decoration:underline}
 #dropzone{position:fixed;inset:12px;z-index:60;display:grid;place-items:center;border:3px dashed var(--brand);border-radius:var(--r);background:var(--brand-soft);color:var(--brand);font-size:18px;font-weight:600;pointer-events:none;backdrop-filter:blur(2px)}
@@ -124,7 +138,7 @@ input[type=radio],input[type=checkbox]{accent-color:var(--brand)}
 
 /* ── Enregistrement ── */
 .recing{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:var(--danger);box-shadow:0 0 0 3px #c93a451a}
-.recing .dot{width:11px;height:11px;border-radius:50%;background:var(--danger);animation:pulse 1.2s infinite}
+.recing .dot{width:11px;height:11px;border-radius:50%;background:var(--danger);animation:ovpulse 1.4s ease-out infinite}
 .recing .clock{font-variant-numeric:tabular-nums;font-size:20px;font-weight:700;font-family:var(--mono)}
 .row .ren{margin-left:6px;padding:5px 7px;opacity:.5;transition:opacity .15s}
 .row:hover .ren,.row .ren:focus-visible{opacity:1}
@@ -134,11 +148,8 @@ input[type=radio],input[type=checkbox]{accent-color:var(--brand)}
 .recing.paused .dot{animation:none;background:var(--mute)}
 .meter{display:inline-block;width:72px;height:6px;border-radius:9px;background:var(--line);overflow:hidden}
 .meter b{display:block;height:100%;background:var(--ok);transition:width .2s}
-@keyframes pulse{50%{opacity:.25}}
-/* direct : le point pulse avec un halo */
-.recing.live .dot{animation:livepulse 1.1s ease-out infinite}
-@keyframes livepulse{0%{box-shadow:0 0 0 0 #c93a4599;transform:scale(1)}60%{box-shadow:0 0 0 9px #c93a4500;transform:scale(1.25)}100%{box-shadow:0 0 0 0 #c93a4500;transform:scale(1)}}
-.recing.live.paused .dot{animation:none}
+/* point rouge : même halo resserré que la pastille d'enregistrement (overlay.html) */
+@keyframes ovpulse{0%{box-shadow:0 0 0 0 #ef6b7599;transform:scale(1)}70%{box-shadow:0 0 0 5px #ef6b7500;transform:scale(1.1)}100%{box-shadow:0 0 0 0 #ef6b7500;transform:scale(1)}}
 .live{margin-top:10px}
 .live-lines{max-height:220px;overflow-y:auto;margin-top:8px;font-size:14px}
 .live-lines .ll{display:flex;gap:10px;padding:3px 0}

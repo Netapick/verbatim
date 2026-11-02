@@ -8,7 +8,7 @@ Verbatim est une application de bureau **Tauri 2 + Rust** (interface HTML/JS san
 
 | Dossier / fichier | Rôle |
 |---|---|
-| `ui/` | Interface : `app.js` (vues), `i18n.js` (traduction), `style.css`, `index.html` |
+| `ui/` | Interface : `app.js` (vues), `i18n.js` et `i18n-es/de/it.js` (traduction), `style.css`, `index.html` |
 | `src-tauri/src/main.rs` | Données (réunions, préparations, glossaire, réglages), commandes Tauri |
 | `src-tauri/src/engine.rs` | Transcription : whisper.cpp, décodage audio (symphonia), téléchargements reprenables, détection GPU |
 | `src-tauri/src/llm.rs` | Rédaction : llama.cpp (serveur local), Ollama, API distante, résumé simplifié |
@@ -16,6 +16,7 @@ Verbatim est une application de bureau **Tauri 2 + Rust** (interface HTML/JS san
 | `src-tauri/src/overlay.rs` | Enregistrement en arrière-plan : icône de la zone de notification (`tray-icon`), pastille flottante `overlay.html` (fenêtre transparente découpée en pilule avec `SetWindowRgn` ; pas de flou : ceux de Windows ignorent la découpe et laissent un rectangle), fenêtre principale masquée ; le déplacement passe par la commande `overlay_drag` (le glissement natif de Windows redessine la barre de titre de la fenêtre pendant le déplacement) et la fenêtre ne prend pas le focus ; l'arrêt passe par l'événement `overlay-stop` (la fenêtre principale garde le titre saisi) |
 | `src-tauri/src/live.rs` | Transcription en direct : `whisper-server` persistant, fenêtre glissante, événements `live-*` |
 | `src-tauri/src/translate.rs` | Traduction de la transcription par lots (TranslateGemma ou modèle du compte-rendu) |
+| `src-tauri/src/diarize.rs` | Séparation des intervenants (modèles, calcul CPU, nom par présentation), renommage (`rename_speaker`) et réattribution de passages (`set_segments_speaker`) |
 | `src-tauri/src/models.rs` | Détection et copie de modèles existants |
 | `src-tauri/src/update.rs` | Mise à jour automatique |
 | `src-tauri/src/backup.rs` | Sauvegarde et restauration des réunions (.zip) |
@@ -41,11 +42,13 @@ Micro, son du PC (boucle WASAPI : visio, vidéo) ou les deux, mixés en mono 16 
 - whisper.cpp v1.9.2 (binaire officiel CPU) ; l'audio est décodé en Rust (symphonia : mp3, m4a/aac, ogg, flac, wav), converti en 16 kHz mono et transcrit hors ligne. Le glossaire est transmis à Whisper comme prompt initial. La détection de parole (VAD Silero) limite les hallucinations sur les silences. Décodage glouton (`-bs 1`, ≈ 30 % plus rapide que `-bs 5`) : les segments, plus courts, sont recollés par phrase (6 s au plus) et une phrase répétée plus de deux fois de suite est réduite à deux. Le décodage et le rééchantillonnage tournent sur deux threads. Au-delà d'une heure (GPU seulement), le WAV est coupé en 3 aux silences (`split_points`) et transcrit par 3 instances en parallèle (≈ 43 % plus rapide sur 1 h), horodatages décalés au recollage ; `-ot`/`-d` de whisper-cli ne conviennent pas avec le VAD (ils comptent le temps après suppression des silences). Mesuré à part : le compte-rendu en parallèle (`llama-server -np 3`) ne gagne que 21 % pour 15,6 Go de VRAM sur 16, il reste séquentiel.
 - Modèles : tiny, base, small, medium-q5_0, large-v3-turbo-q5_0, large-v3-turbo-q8_0, large-v3-turbo, large-v3-q5_0, téléchargés depuis Hugging Face (`ggerganov/whisper.cpp`).
 - Téléchargements reprenables : fichier `.part` conservé, reprise HTTP Range, progression conservée entre les pages ; bouton d'arrêt (`download_cancel`).
-- Calcul : mode « Automatique » (GPU si disponible, repli sur le CPU) ou « CPU uniquement ». NVIDIA : build CUDA officiel de whisper.cpp (b5454, ≈ 685 Mo, `ia/engine-gpu`). AMD : whisper.cpp n'a pas de binaire officiel, donc `scripts/build-whisper-rocm.ps1` le compile en HIP/ROCm pour RDNA3 (≈ 180 Mo, `redist/engine-rocm`).
+- Calcul : mode « Automatique » (GPU si disponible, repli sur le CPU) ou « CPU uniquement ». NVIDIA : build CUDA officiel de whisper.cpp (b5454, ≈ 685 Mo, `ia/engine-gpu`, SHA-256 vérifié). AMD : whisper.cpp n'a pas de binaire officiel, donc `scripts/build-whisper-rocm.ps1` le compile en HIP/ROCm pour RDNA3 (≈ 180 Mo, `redist/engine-rocm`).
 
 ## Rédaction du compte-rendu
 
-Ordre de priorité : IA locale (llama.cpp + Qwen, chargée uniquement pendant la rédaction), puis Ollama (démarré à la demande), puis API compatible OpenAI, puis résumé simplifié calculé sur la transcription (phrases réelles, aucun texte inventé). Les longues réunions sont découpées en parties, résumées, puis fusionnées. Le glossaire et la préparation liée sont fournis au modèle.
+Ordre de priorité : IA locale (llama.cpp + Qwen, Gemma 4 ou Ministral 3 ; chargée uniquement pendant la rédaction), puis Ollama (démarré à la demande), puis API compatible OpenAI, puis résumé simplifié calculé sur la transcription (phrases réelles, aucun texte inventé). Les longues réunions sont découpées en parties, résumées, puis fusionnées (par étapes au-delà de 4 parties, pour tenir dans le contexte du modèle). La longueur du résumé suit la durée de la réunion. Le glossaire et la préparation liée sont fournis au modèle.
+
+**Pause** (`llm.rs`, section « Pause d'un compte-rendu ») : `pause_report` enregistre la réunion dans `PAUSE_REQ` et arrête le serveur d'IA aussitôt (mémoire vidéo libérée) ; les appels en cours renvoient l'erreur interne `PAUSED`, et les parties déjà analysées sont conservées dans la réunion (point de reprise). `resume_report` repart après la dernière partie analysée, `cancel_report` abandonne. Un compte-rendu court repart de zéro ; avec Ollama ou une API distante, la pause n'est vérifiée qu'entre deux étapes.
 
 ### Moteurs de calcul de la rédaction
 
@@ -105,7 +108,7 @@ Les moteurs tiers ne sont pas signés et peuvent être supprimés par un antivir
 
 ## Traduction de l'interface
 
-Les textes de l'interface sont écrits en français dans le code. `ui/i18n.js` contient un dictionnaire français → anglais et des motifs pour les messages à valeurs variables, appliqués à l'affichage (nœuds texte et attributs). Pour traduire un nouveau texte, ajoutez sa paire dans `EN` (clé = texte français exact) ou un motif dans `P`. Le choix de langue est dans Réglages › Général ; à défaut, la langue de l'installateur (`lang.txt`), puis celle du système.
+Les textes de l'interface sont écrits en français dans le code. `ui/i18n.js` contient un dictionnaire français → anglais et des motifs pour les messages à valeurs variables, appliqués à l'affichage (nœuds texte et attributs). Pour traduire un nouveau texte, ajoutez sa paire dans `EN` (clé = texte français exact) ou un motif dans `P`, **puis la même paire dans les packs `ui/i18n-es.js`, `i18n-de.js` et `i18n-it.js`** (même forme : `dict` = paires `[français, traduction]`, `patterns` = mêmes expressions que l'anglais, dans le même ordre). Un texte absent d'un pack reste en français. Le choix de langue est dans Réglages › Général ; à défaut, la langue de l'installateur (`lang.txt`), puis celle du système.
 
 ## Construire
 

@@ -71,6 +71,58 @@ function askText(msg, value = "") {
   });
 }
 const fmtDate = (d) => new Date(d).toLocaleString(I18N.locale(), { dateStyle: "medium", timeStyle: "short" });
+// Recherche dans la réunion ouverte (transcription affichée et compte-rendu) : sans tenir compte des accents ni de la casse.
+const findBar = `<div class="findbar"><input type="search" id="fq" placeholder="Rechercher dans la réunion…" aria-label="Rechercher dans la réunion"><span class="meta" id="fcount"></span>
+  <button class="btn sm ico" id="fprev" title="Résultat précédent (Maj+Entrée)" aria-label="Résultat précédent"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+  <button class="btn sm ico" id="fnext" title="Résultat suivant (Entrée)" aria-label="Résultat suivant"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>`;
+const foldText = (t) => t.replace(/[\s\S]/g, (c) => c.normalize("NFD")[0]).toLowerCase();
+function bindFind(init) {
+  const fq = $("#fq"); if (!fq) return;
+  const targets = [...main.querySelectorAll("#trcard .seg > span:last-child, #repcard p, #repcard li")];
+  targets.forEach((el) => { el.dataset.raw = el.textContent; });
+  let hits = [], cur = -1, timer = null;
+  const show = (i) => {
+    hits.forEach((h) => h.classList.remove("cur")); cur = i;
+    if (hits[i]) { hits[i].classList.add("cur"); hits[i].scrollIntoView({ block: "center", behavior: "smooth" }); }
+    $("#fcount").textContent = hits.length ? `${i + 1} / ${hits.length}` : (fq.value.trim() ? "Aucun résultat" : "");
+  };
+  const search = () => {
+    const q = foldText(fq.value.trim());
+    targets.forEach((el) => {
+      const raw = el.dataset.raw, f = q ? foldText(raw) : "";
+      if (!q || !f.includes(q)) { if (el.firstElementChild) el.textContent = raw; return; }
+      let out = "", pos = 0, i;
+      while ((i = f.indexOf(q, pos)) >= 0) { out += esc(raw.slice(pos, i)) + "<mark>" + esc(raw.slice(i, i + q.length)) + "</mark>"; pos = i + q.length; }
+      el.innerHTML = out + esc(raw.slice(pos));
+    });
+    hits = [...main.querySelectorAll("mark")];
+    show(hits.length ? 0 : -1);
+  };
+  const step = (d) => { if (hits.length) show((cur + d + hits.length) % hits.length); };
+  fq.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { timer = null; search(); }, 150); };
+  fq.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); if (timer) { clearTimeout(timer); timer = null; search(); } else step(e.shiftKey ? -1 : 1); }
+    else if (e.key === "Escape") { fq.value = ""; search(); }
+  };
+  $("#fprev").onclick = () => step(-1);
+  $("#fnext").onclick = () => step(1);
+  if (init && init.q) { // arrivée depuis la recherche dans toutes les réunions : surligne et se place sur le bon passage
+    fq.value = init.q; search();
+    if (init.t != null) {
+      const i = hits.findIndex((h) => { const sg = h.closest(".seg"); return sg && Math.abs(parseFloat(sg.dataset.t) - init.t) < 0.01; });
+      if (i >= 0) show(i);
+    }
+  }
+}
+// Recherche demandée depuis la liste des réunions, appliquée à l'ouverture de la réunion choisie
+let pendingFind = null;
+// Fenêtre réaffichée après avoir été masquée (enregistrement en arrière-plan) : WebView2 peut avoir figé les animations CSS,
+// notamment le pouls du point rouge ; on les relance.
+const restartAnims = () => document.querySelectorAll(".recing .dot").forEach((d) => { d.style.animation = "none"; void d.offsetWidth; d.style.animation = ""; });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) restartAnims(); });
+window.addEventListener("focus", restartAnims);
+// Ctrl+F : place le curseur dans la recherche de la réunion ouverte
+document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { const q = $("#fq") || $("#gq"); if (q) { e.preventDefault(); q.focus(); q.select(); } } });
 const fmtT = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const { listen } = window.__TAURI__.event;
 const fmtSize = (n) => n >= 1073741824 ? (n / 1073741824).toFixed(2) + " Go" : (n / 1048576).toFixed(0) + " Mo";
@@ -123,6 +175,15 @@ function watchDownload() {
   }, 700);
 }
 listen("engine-done", () => { if (engineHook) engineHook(); });
+// Avancement d'une sauvegarde ou d'une restauration (le texte « Sauvegarde en cours… » reçoit le pourcentage et le temps restant)
+const BK = { label: "" };
+listen("backup-progress", (e) => {
+  const pct = e.payload.pct, m = $("#bk-msg"), b = $("#bk-bar");
+  if (!BK.label) return;
+  if (b) b.style.width = pct + "%";
+  const eta = etaText("bk", pct / 100);
+  if (m) m.textContent = `${BK.label} ${pct} %${eta ? " · " + eta : ""}`;
+});
 listen("diarize-done", (e) => { if (!e.payload.ok) toast("Séparation des intervenants impossible : " + e.payload.error); });
 
 // Glisser-déposer : des fichiers déposés sur la fenêtre (quelle que soit la page) sont importés.
@@ -416,7 +477,9 @@ async function recRefresh() {
 async function meetings() {
   main.innerHTML = `<h1>Réunions</h1><p class="sub">Importez un enregistrement ou une transcription existante.</p>
     <div class="bar"><button class="btn rec" id="rec">● Enregistrer</button><button class="btn pri" id="ia">+ Importer un audio</button><button class="btn" id="it">Importer une transcription</button></div>
-    <div id="recbox"></div><div id="livebox"></div><div id="eng"></div><div id="list"></div>`;
+    <div id="recbox"></div><div id="livebox"></div><div id="eng"></div>
+    <div class="findbar"><input type="search" id="gq" placeholder="Rechercher dans toutes les réunions…" aria-label="Rechercher dans toutes les réunions"></div>
+    <div id="list"></div>`;
   $("#rec").onclick = () => recPanel();
   recRefresh();
   const cfg0 = await invoke("get_settings");
@@ -436,6 +499,7 @@ async function meetings() {
   });
   async function draw() {
     const ms = (await run(() => invoke("list_meetings", { trashed: false }))) || [];
+    if (gSearching()) return;
     const html = ms.length ? ms.map((m) => `<div class="card row" data-id="${m.id}">
       <span class="t">${esc(m.title)}</span><span class="meta">${fmtDate(m.created_at)}</span>
       ${m.stage === "ready" ? `<span class="pill ok">Prête</span>` : m.stage === "error" ? `<span class="pill err">Échec</span>` : m.stage === "needs_engine" ? `<span class="pill warn">Moteur requis</span>` : `<div class="prog"><b style="width:${m.progress}%"></b></div><span class="pill">${esc(m.stage_label)}${m.stage === "transcribing" || m.stage === "diarizing" ? " · " + m.progress + " %" : ""}</span>${m.stage === "transcribing" || m.stage === "diarizing" ? `<span class="meta eta">${etaText(m.stage + ":" + m.id, m.progress / 100)}</span>` : ""}`}
@@ -446,7 +510,28 @@ async function meetings() {
     // plus rien en cours : inutile de continuer à interroger
     if (ms.length && ms.every((m) => m.stage === "ready" || m.stage === "error" || m.stage === "needs_engine")) clearInterval(poll);
   }
+  const gSearching = () => ($("#gq")?.value.trim().length || 0) >= 2;
+  let gTimer = null, gSeq = 0;
+  const gSearch = async () => {
+    const q = $("#gq").value.trim(), seq = ++gSeq, list = $("#list");
+    if (q.length < 2) { delete list.dataset.h; return draw(); }
+    const res = (await run(() => invoke("search_meetings", { query: q }))) || [];
+    if (seq !== gSeq || !$("#list")) return;
+    const kinds = { title: "Titre", report: "Compte-rendu", transcript: "Transcription" };
+    list.dataset.h = "";
+    list.innerHTML = res.length ? res.map((m) => `<div class="card hitcard" data-id="${m.id}"><div class="hit-h"><span class="t">${esc(m.title)}</span><span class="meta">${fmtDate(m.created_at)}</span><span class="pill" title="Occurrences">${m.total}</span></div>
+      ${m.hits.map((h) => `<div class="hit" data-id="${m.id}" ${h.t != null ? `data-t="${h.t}"` : ""}><span class="meta">${kinds[h.kind]}${h.t != null ? ` · ${fmtT(h.t)}` : ""}${h.who ? ` · ${esc(h.who)}` : ""}</span><span>${esc(h.before)}<mark>${esc(h.match)}</mark>${esc(h.after)}</span></div>`).join("")}</div>`).join("")
+      : `<div class="empty">Aucune réunion ne correspond.</div>`;
+  };
+  $("#gq").oninput = () => { clearTimeout(gTimer); gTimer = setTimeout(gSearch, 200); };
+  $("#gq").onkeydown = (e) => { if (e.key === "Escape") { e.target.value = ""; gSearch(); } };
   $("#list").onclick = (e) => {
+    const h = e.target.closest(".hitcard");
+    if (h) { // résultat de la recherche : ouvre la réunion à l'endroit trouvé
+      const x = e.target.closest(".hit");
+      pendingFind = { q: $("#gq").value.trim(), t: x && x.dataset.t != null ? parseFloat(x.dataset.t) : null };
+      return go("meeting", h.dataset.id);
+    }
     const r = e.target.closest("[data-ren]");
     if (r) { // renommer sans ouvrir la réunion
       e.stopPropagation();
@@ -495,6 +580,7 @@ const reportBadge = (r) => {
 };
 
 async function meeting(id) {
+  const pf = pendingFind; pendingFind = null;
   clearInterval(poll);
   const seq = ++renderSeq;
   const m = await run(() => invoke("get_meeting", { id }));
@@ -554,7 +640,7 @@ async function meeting(id) {
       <button class="btn pri sm" id="rep-resume">Reprendre</button> <button class="btn sm dng" id="rep-cancel">Abandonner</button></div>` : ""}
     ${m.report_state === "error" ? `<div class="card"><b>Échec de la génération</b><p class="meta" style="margin-top:4px">${esc(m.report_error || "")}</p></div>` : ""}
     ${r ? (() => { const L = REP_LABELS[r.lang]; const h = (i, fr, st = "") => L ? `<h3 data-nt${st ? ` style="${st}"` : ""}>${L[i]}</h3>` : `<h3${st ? ` style="${st}"` : ""}>${fr}</h3>`;
-      return `<div class="card">${reportBadge(r)}${h(0, "Résumé", "margin-top:0")}<p style="white-space:pre-line">${esc(r.summary)}</p>${h(1, "Points abordés")}${lst(r.topics)}${h(2, "Décisions")}${lst(r.decisions)}${h(3, "Actions")}${lst(r.actions)}${h(4, "Prochaines étapes")}${lst(r.next_steps)}</div>`; })() : ""}
+      return `<div class="card" id="repcard">${reportBadge(r)}${h(0, "Résumé", "margin-top:0")}<p style="white-space:pre-line">${esc(r.summary)}</p>${h(1, "Points abordés")}${lst(r.topics)}${h(2, "Décisions")}${lst(r.decisions)}${h(3, "Actions")}${lst(r.actions)}${h(4, "Prochaines étapes")}${lst(r.next_steps)}</div>`; })() : ""}
     <div class="card" id="trcard"><div class="bar" style="margin:0 0 8px;align-items:center"><h3 style="margin:0">Transcription</h3>
       ${m.stage === "ready" && segsShown.length > 1 ? `<button class="btn sm" id="sel-mode" title="Sélectionner plusieurs passages pour les attribuer à un intervenant">Réattribuer des passages</button>` : ""}<span style="flex:1"></span>
       ${m.translate_state === "translating" ? "" : `<select id="tl-sel" style="width:auto" title="Traduire la transcription">${trOptions(m)}</select>`}
@@ -570,7 +656,7 @@ async function meeting(id) {
       <div class="selbar" id="selbar" hidden><span id="sel-n"></span><button class="btn sm pri" id="sel-go">Attribuer à…</button><button class="btn sm" id="sel-none">Tout désélectionner</button><button class="btn sm" id="sel-end">Terminer</button></div>
       ${segsShown.map((s) => `<div class="seg" data-t="${s.start}" data-e="${s.end}" title="Écouter à partir d'ici"><span class="tm">${fmtT(s.start)}</span><span class="sp" data-sp="${esc(s.speaker)}" ${spkColor(s.speaker)} title="Renommer cet intervenant">${esc(s.speaker)}</span><span>${esc(s.text)}</span></div>`).join("")}</div>`;
   main.innerHTML = `<div class="bar"><button class="btn sm" id="back">← Réunions</button></div>
-    <h1>${esc(m.title)}</h1><p class="sub">${fmtDate(m.created_at)} · ${origin}</p>${player}${body}`;
+    <h1>${esc(m.title)}</h1><p class="sub">${fmtDate(m.created_at)} · ${origin}</p>${player}${m.stage === "ready" && m.transcript.length ? findBar : ""}${body}`;
   $("#back").onclick = () => go("meetings");
   bindPlayer();
   if (keep) {
@@ -598,6 +684,7 @@ async function meeting(id) {
     return;
   }
   $("#gen").onclick = () => run(async () => { await invoke("generate_report", { id, lang: $("#rl").value }); meeting(id); });
+  bindFind(pf);
   const toSet = $("#to-set"); if (toSet) toSet.onclick = (e) => { e.preventDefault(); go("settings"); };
   const rResume = $("#rep-resume"), rCancel = $("#rep-cancel");
   if (rResume) rResume.onclick = () => run(async () => { delete ETA["rep:" + id]; await invoke("resume_report", { id }); meeting(id); });
@@ -907,7 +994,7 @@ async function settings() {
     <div class="tabs" id="tabs" role="tablist">${[["gen", "Général"], ["tr", "Transcription"], ["ia", "Compte-rendu"], ["tl", "Traduction"], ["mod", "Modèles"], ["net", "Connexions"]].map(([k, v]) => `<button role="tab" data-tab="${k}" class="${setTab === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <section class="pane" data-pane="gen" ${setTab === "gen" ? "" : "hidden"}>
       <div class="card"><h3>Langue de l'interface</h3>
-        <select id="ui-lang" style="max-width:260px"><option value="auto" ${I18N.pref === "auto" ? "selected" : ""}>Automatique</option><option value="fr" data-nt ${I18N.pref === "fr" ? "selected" : ""}>Français</option><option value="en" data-nt ${I18N.pref === "en" ? "selected" : ""}>English</option></select></div>
+        <select id="ui-lang" style="max-width:260px"><option value="auto" ${I18N.pref === "auto" ? "selected" : ""}>Automatique</option><option value="fr" data-nt ${I18N.pref === "fr" ? "selected" : ""}>Français</option><option value="en" data-nt ${I18N.pref === "en" ? "selected" : ""}>English</option><option value="es" data-nt ${I18N.pref === "es" ? "selected" : ""}>Español</option><option value="de" data-nt ${I18N.pref === "de" ? "selected" : ""}>Deutsch</option><option value="it" data-nt ${I18N.pref === "it" ? "selected" : ""}>Italiano</option></select></div>
       <div class="card"><h3>Apparence</h3>
         <label style="margin-top:0">Thème</label>
         <select id="th-mode" style="max-width:260px"><option value="light">Clair</option><option value="">Automatique (système)</option><option value="dark">Sombre</option></select>
@@ -921,6 +1008,7 @@ async function settings() {
         <p class="meta" style="margin-bottom:8px">Enregistre vos réunions (transcriptions, comptes-rendus, traductions), vos préparations et votre glossaire dans un seul fichier .zip, pour les mettre à l'abri ou les retrouver sur un autre ordinateur. Les réglages et la clé d'API n'en font pas partie.</p>
         <label class="chk"><input type="checkbox" id="bk-audio" checked> Inclure les fichiers audio (sauvegarde plus volumineuse)</label>
         <div class="bar" style="margin:12px 0 0"><button class="btn" id="bk-save">Créer une sauvegarde…</button><button class="btn" id="bk-load">Restaurer une sauvegarde…</button><span class="meta" id="bk-msg"></span></div>
+        <div class="prog" id="bk-prog" style="width:100%;margin:8px 0 0" hidden><b id="bk-bar" style="width:0%"></b></div>
         <p class="meta" style="margin-top:8px">La restauration ajoute ce qui manque : les réunions déjà présentes ne sont jamais modifiées ni remplacées.</p></div>
     </section>
     <section class="pane" data-pane="tr" ${setTab === "tr" ? "" : "hidden"}>
@@ -1232,6 +1320,8 @@ async function settings() {
     const set = (id, f) => { const e = $(id); if (e) f(e); };
     set("#bk-save", (e) => { e.disabled = busy; }); set("#bk-load", (e) => { e.disabled = busy; });
     set("#bk-msg", (e) => { e.textContent = txt || ""; });
+    set("#bk-prog", (e) => { e.hidden = !busy; }); set("#bk-bar", (e) => { e.style.width = "0%"; });
+    BK.label = busy && /^(Sauvegarde|Restauration) en cours…$/.test(txt || "") ? txt : ""; delete ETA.bk;
   };
   const bkSize = (n) => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " Ko" : fmtSize(n);
   $("#bk-save").onclick = async () => {

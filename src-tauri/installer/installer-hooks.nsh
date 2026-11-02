@@ -46,19 +46,22 @@
 
 ; Moteur Whisper CUDA officiel (NVIDIA), extrait à plat dans ia\engine-gpu : même source que le bouton des Réglages.
 !define CUDA_URL "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-win-cuda-12.4.0-x64.zip"
-!define CUDA_MB "685"
+!define CUDA_SHA "afef0b881c500958921c3f5523b50e59ee2ec9b6f5cbd25b324c51ed308a957a"
+!define CUDA_MB "653"
 ; Moteur llama.cpp CUDA (rédaction) + DLL runtime : deux archives extraites dans ia\llm-cuda.
 !define LLM_CUDA_URL "https://github.com/ggml-org/llama.cpp/releases/download/b11700/llama-b11700-bin-win-cuda-12.4-x64.zip"
+!define LLM_CUDA_SHA "119f65b8000dfb37ee7daa578ad68bd47f41fbf4e3984fd0e50576d17a7b4920"
 !define LLM_CUDA_MB "254"
 !define LLM_CUDART_URL "https://github.com/ggml-org/llama.cpp/releases/download/b11700/cudart-llama-bin-win-cuda-12.4-x64.zip"
+!define LLM_CUDART_SHA "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"
 !define LLM_CUDART_MB "373"
 
-!macro VB_FETCH_URL LABEL_FR LABEL_EN URL MB DEST
+!macro VB_FETCH_URL LABEL_FR LABEL_EN URL SHA MB DEST
   !insertmacro VB_SAY "${LABEL_FR} (environ ${MB} Mo)…" "${LABEL_EN} (about ${MB} MB)…"
   !insertmacro VB_LOG "[hook] ${LABEL_FR}"
   InitPluginsDir
   File "/oname=$PLUGINSDIR\dl-pack.ps1" "${VB_DIR}\dl-pack.ps1"
-  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\dl-pack.ps1" -Url "${URL}" -Dest "${DEST}" -SizeMb ${MB} -Log "$INSTDIR\redist-install.log" -Flat -Lang $R7'
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\dl-pack.ps1" -Url "${URL}" -Sha "${SHA}" -Dest "${DEST}" -SizeMb ${MB} -Log "$INSTDIR\redist-install.log" -Flat -Lang $R7'
   Pop $0
   !insertmacro VB_LOG "[hook] code retour : $0"
   ${If} $0 != "0"
@@ -127,14 +130,14 @@
   ${If} $1 != 0
   ${AndIfNot} ${FileExists} "$INSTDIR\ia\engine-gpu\whisper-cli.exe"
     CreateDirectory "$INSTDIR\ia\engine-gpu"
-    !insertmacro VB_FETCH_URL "Accélération NVIDIA (CUDA)" "NVIDIA acceleration (CUDA)" "${CUDA_URL}" "${CUDA_MB}" "$INSTDIR\ia\engine-gpu"
+    !insertmacro VB_FETCH_URL "Accélération NVIDIA (CUDA)" "NVIDIA acceleration (CUDA)" "${CUDA_URL}" "${CUDA_SHA}" "${CUDA_MB}" "$INSTDIR\ia\engine-gpu"
   ${EndIf}
   IntOp $1 $2 & 1
   ${If} $1 != 0
   ${AndIfNot} ${FileExists} "$INSTDIR\ia\llm-cuda\llama-server.exe"
     CreateDirectory "$INSTDIR\ia\llm-cuda"
-    !insertmacro VB_FETCH_URL "Rédaction NVIDIA (CUDA)" "NVIDIA report writing (CUDA)" "${LLM_CUDA_URL}" "${LLM_CUDA_MB}" "$INSTDIR\ia\llm-cuda"
-    !insertmacro VB_FETCH_URL "Bibliothèques CUDA" "CUDA libraries" "${LLM_CUDART_URL}" "${LLM_CUDART_MB}" "$INSTDIR\ia\llm-cuda"
+    !insertmacro VB_FETCH_URL "Rédaction NVIDIA (CUDA)" "NVIDIA report writing (CUDA)" "${LLM_CUDA_URL}" "${LLM_CUDA_SHA}" "${LLM_CUDA_MB}" "$INSTDIR\ia\llm-cuda"
+    !insertmacro VB_FETCH_URL "Bibliothèques CUDA" "CUDA libraries" "${LLM_CUDART_URL}" "${LLM_CUDART_SHA}" "${LLM_CUDART_MB}" "$INSTDIR\ia\llm-cuda"
   ${EndIf}
 !macroend
 
