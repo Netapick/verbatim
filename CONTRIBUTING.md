@@ -15,7 +15,7 @@ Ouvrez une [issue](https://github.com/Netapick/verbatim/issues/new/choose) avec 
 
 **Retirez de ces fichiers tout ce qui est privé** (noms, contenu de réunion) avant de les publier. Ne joignez jamais d'enregistrement réel.
 
-Pour une **faille de sécurité**, suivez plutôt [SECURITY.md](SECURITY.md).
+Pour une **faille de sécurité**, suivez plutôt [SECURITY.md](SECURITY.md). Les échanges suivent le [code de conduite](CODE_OF_CONDUCT.md).
 
 ## Proposer une idée
 
@@ -50,7 +50,7 @@ Open an [issue](https://github.com/Netapick/verbatim/issues/new/choose) with the
 
 **Remove anything private from these files** (names, meeting content) before posting them. Never attach a real recording.
 
-For a **security vulnerability**, follow [SECURITY.md](SECURITY.md#security-policy) instead.
+For a **security vulnerability**, follow [SECURITY.md](SECURITY.md#security-policy) instead. Exchanges follow the [code of conduct](CODE_OF_CONDUCT.md#code-of-conduct).
 
 ### Suggesting an idea
 

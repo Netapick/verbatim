@@ -20,3 +20,5 @@ Uninstalling the application removes its program files; the `ia` folder (models)
 
 ## Contact
 For any question, open an [issue](https://github.com/Netapick/verbatim/issues) on the repository.
+
+---

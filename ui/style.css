@@ -106,8 +106,11 @@ input[type=radio],input[type=checkbox]{accent-color:var(--brand)}
 /* ── Transcription ── */
 .seg{display:flex;gap:12px;padding:8px 8px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:8px;transition:background .12s}
 .seg:last-child{border-bottom:0}
-.findbar{display:flex;gap:8px;align-items:center;margin:0 0 12px}
-.findbar input{flex:1;max-width:360px}
+.findbar{display:flex;gap:6px;align-items:center;margin:0 0 12px auto;width:max-content;max-width:100%;padding:6px 8px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-sm);box-shadow:var(--sh-2);
+  position:sticky;top:calc(var(--plh,0px) - 12px);z-index:4} /* flotte en haut à droite et suit le défilement, comme dans VS Code ; --plh = hauteur du lecteur audio collé au-dessus */
+.findbar input{width:260px;min-width:0}
+.findbar #gq{width:min(400px,60vw)}
+.findbar .meta{min-width:64px;text-align:right;white-space:nowrap}
 .findbar .btn.ico{padding:5px 8px;color:var(--ink)}
 .findbar .btn.ico:hover{color:var(--brand);border-color:var(--brand)}
 .findbar .btn.ico svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}

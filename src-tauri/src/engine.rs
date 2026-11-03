@@ -998,3 +998,21 @@ mod tests {
         assert!((40_000..41_000).contains(&cuts[0]), "coupe à {} ms", cuts[0]);
     }
 }
+
+#[cfg(test)]
+mod sha_tests {
+    use super::verify_sha256;
+
+    #[test]
+    fn verify_sha256_accepte_le_bon_fichier_et_supprime_le_mauvais() {
+        let p = std::env::temp_dir().join("verbatim-sha-test.bin");
+        std::fs::write(&p, b"abc").unwrap();
+        // SHA-256 de « abc »
+        let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert!(verify_sha256(&p, abc).is_ok());
+        assert!(verify_sha256(&p, &abc.to_uppercase()).is_ok());
+        assert!(p.exists());
+        assert!(verify_sha256(&p, &"0".repeat(64)).is_err());
+        assert!(!p.exists(), "un fichier corrompu doit être supprimé");
+    }
+}

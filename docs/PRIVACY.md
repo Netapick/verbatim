@@ -22,6 +22,3 @@ Désinstaller l'application supprime ses fichiers de programme ; le dossier `ia`
 Pour toute question : ouvrez une [issue](https://github.com/Netapick/verbatim/issues) sur le dépôt.
 
 ---
-
-## English summary
-Verbatim records, transcribes and summarizes meetings entirely on your computer. It collects no personal data and includes no telemetry. Its only network activity is: downloading engines and models from GitHub and Hugging Face when you ask for it, checking GitHub for updates at startup (can be turned off in Settings › General), and — only if you configure one yourself — sending transcripts to a remote API of your choice for report writing.

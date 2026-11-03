@@ -36,7 +36,7 @@ Français · English below each version.
 - Écran de démarrage : les deux étapes du chargement de Whisper portent maintenant des noms distincts (« Lecture du modèle Whisper… » puis « Démarrage de Whisper… »).
 - Téléchargements CUDA (NVIDIA) : somme de contrôle SHA-256 vérifiée pour les trois archives (moteur Whisper, moteur llama.cpp et bibliothèques CUDA), à l'installation comme depuis les Réglages ; un fichier corrompu est supprimé et signalé.
 - Pastille d'enregistrement : elle se masque quand la fenêtre principale est affichée (elle se redessinait de travers par-dessus) et réapparaît si on réduit la fenêtre pendant l'enregistrement, la fenêtre se masquant alors tout à fait (plus de bouton dans la barre des tâches).
-- Recherche dans la réunion : boutons « précédent / suivant » corrigés.
+- Recherche dans la réunion et dans toutes les réunions : la barre (champ et boutons « précédent / suivant ») flotte en haut à droite et suit le défilement, comme dans VS Code ; boutons corrigés.
 - Pastille d'enregistrement : ancrée par défaut dans la barre des tâches, à gauche de la zone de notification (un petit bouton la détache pour la glisser librement, et la ré-ancre ; le choix est mémorisé) ; elle ne peut plus sortir du bureau ; fond opaque (plus translucide). Dans l'application, le point rouge de l'enregistrement pulse avec le même halo que la pastille.
 
 ### English
@@ -73,7 +73,7 @@ Français · English below each version.
 - Startup screen: the two steps of loading Whisper now have distinct names (“Reading the Whisper model…” then “Starting Whisper…”).
 - CUDA (NVIDIA) downloads: the SHA-256 checksum of the three archives (Whisper engine, llama.cpp engine and CUDA libraries) is now verified, at installation and from Settings; a corrupted file is deleted and reported.
 - Recording bar: it hides when the main window is shown (it was redrawn wrongly on top of it) and comes back if you minimize the window during a recording, the window then hiding completely (no taskbar button).
-- Search in the meeting: the “previous / next” buttons are fixed.
+- Search in the meeting and across all meetings: the bar (field and “previous / next” buttons) floats at the top right and follows scrolling, as in VS Code; buttons fixed.
 - Recording bar: docked by default in the taskbar, left of the notification area (a small button detaches it to drag it freely, and docks it back; the choice is remembered); it can no longer leave the desktop; opaque background (no longer translucent). In the application, the recording's red dot pulses with the same halo as the bar.
 
 ## 0.4.1

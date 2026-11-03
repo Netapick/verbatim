@@ -480,6 +480,7 @@ async function meetings() {
     <div id="recbox"></div><div id="livebox"></div><div id="eng"></div>
     <div class="findbar"><input type="search" id="gq" placeholder="Rechercher dans toutes les réunions…" aria-label="Rechercher dans toutes les réunions"></div>
     <div id="list"></div>`;
+  main.style.setProperty("--plh", "0px");
   $("#rec").onclick = () => recPanel();
   recRefresh();
   const cfg0 = await invoke("get_settings");
@@ -684,6 +685,7 @@ async function meeting(id) {
     return;
   }
   $("#gen").onclick = () => run(async () => { await invoke("generate_report", { id, lang: $("#rl").value }); meeting(id); });
+  main.style.setProperty("--plh", ($(".player")?.offsetHeight || 0) + "px"); // la barre de recherche se colle sous le lecteur audio
   bindFind(pf);
   const toSet = $("#to-set"); if (toSet) toSet.onclick = (e) => { e.preventDefault(); go("settings"); };
   const rResume = $("#rep-resume"), rCancel = $("#rep-cancel");
